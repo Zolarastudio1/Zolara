@@ -8,6 +8,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Scissors } from "lucide-react";
+import { z } from "zod";
+
+const loginSchema = z.object({
+  email: z.string().email("Invalid email address").max(255, "Email too long"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+const signupSchema = z.object({
+  fullName: z.string().trim().min(1, "Name is required").max(100, "Name too long"),
+  email: z.string().email("Invalid email address").max(255, "Email too long"),
+  password: z.string().min(6, "Password must be at least 6 characters").max(72, "Password too long"),
+});
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -23,9 +35,14 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const validated = loginSchema.parse({
         email: loginEmail,
         password: loginPassword,
+      });
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: validated.email,
+        password: validated.password,
       });
 
       if (error) throw error;
@@ -35,7 +52,11 @@ const Auth = () => {
         navigate("/dashboard");
       }
     } catch (error: any) {
-      toast.error(error.message || "Login failed");
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error(error.message || "Login failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -46,12 +67,18 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const validated = signupSchema.parse({
+        fullName: signupFullName,
         email: signupEmail,
         password: signupPassword,
+      });
+
+      const { data, error } = await supabase.auth.signUp({
+        email: validated.email,
+        password: validated.password,
         options: {
           data: {
-            full_name: signupFullName,
+            full_name: validated.fullName,
           },
           emailRedirectTo: `${window.location.origin}/dashboard`,
         },
@@ -64,7 +91,11 @@ const Auth = () => {
         navigate("/dashboard");
       }
     } catch (error: any) {
-      toast.error(error.message || "Signup failed");
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error(error.message || "Signup failed");
+      }
     } finally {
       setLoading(false);
     }

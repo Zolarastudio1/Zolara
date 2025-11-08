@@ -8,6 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { z } from "zod";
+
+const staffSchema = z.object({
+  full_name: z.string().trim().min(1, "Name is required").max(100, "Name too long"),
+  phone: z.string().regex(/^\+?[0-9]{10,15}$/, "Invalid phone number format"),
+  email: z.string().email("Invalid email address").max(255, "Email too long").optional().or(z.literal("")),
+  specialization: z.string().max(100, "Specialization too long").optional(),
+});
 
 const Staff = () => {
   const [staff, setStaff] = useState<any[]>([]);
@@ -45,7 +53,16 @@ const Staff = () => {
     e.preventDefault();
     
     try {
-      const { error } = await supabase.from("staff").insert([formData]);
+      const validated = staffSchema.parse(formData);
+      
+      const insertData = {
+        full_name: validated.full_name,
+        phone: validated.phone,
+        ...(validated.email && { email: validated.email }),
+        ...(validated.specialization && { specialization: validated.specialization }),
+      };
+      
+      const { error } = await supabase.from("staff").insert([insertData]);
       
       if (error) throw error;
       
@@ -54,7 +71,11 @@ const Staff = () => {
       setFormData({ full_name: "", phone: "", email: "", specialization: "" });
       fetchStaff();
     } catch (error: any) {
-      toast.error(error.message || "Failed to add staff");
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error(error.message || "Failed to add staff");
+      }
     }
   };
 

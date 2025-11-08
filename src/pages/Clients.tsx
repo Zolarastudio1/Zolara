@@ -8,6 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { z } from "zod";
+
+const clientSchema = z.object({
+  full_name: z.string().trim().min(1, "Name is required").max(100, "Name too long"),
+  phone: z.string().regex(/^\+?[0-9]{10,15}$/, "Invalid phone number format"),
+  email: z.string().email("Invalid email address").max(255, "Email too long").optional().or(z.literal("")),
+  address: z.string().max(500, "Address too long").optional(),
+  notes: z.string().max(1000, "Notes too long").optional(),
+});
 
 const Clients = () => {
   const [clients, setClients] = useState<any[]>([]);
@@ -46,7 +55,17 @@ const Clients = () => {
     e.preventDefault();
     
     try {
-      const { error } = await supabase.from("clients").insert([formData]);
+      const validated = clientSchema.parse(formData);
+      
+      const insertData = {
+        full_name: validated.full_name,
+        phone: validated.phone,
+        ...(validated.email && { email: validated.email }),
+        ...(validated.address && { address: validated.address }),
+        ...(validated.notes && { notes: validated.notes }),
+      };
+      
+      const { error } = await supabase.from("clients").insert([insertData]);
       
       if (error) throw error;
       
@@ -55,7 +74,11 @@ const Clients = () => {
       setFormData({ full_name: "", phone: "", email: "", address: "", notes: "" });
       fetchClients();
     } catch (error: any) {
-      toast.error(error.message || "Failed to add client");
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error(error.message || "Failed to add client");
+      }
     }
   };
 

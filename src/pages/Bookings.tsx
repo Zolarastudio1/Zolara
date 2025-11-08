@@ -10,6 +10,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { z } from "zod";
+
+const bookingSchema = z.object({
+  client_id: z.string().uuid("Invalid client selection"),
+  service_id: z.string().uuid("Invalid service selection"),
+  staff_id: z.string().uuid("Invalid staff selection").optional().or(z.literal("")),
+  appointment_date: z.string().min(1, "Date is required"),
+  appointment_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid time format"),
+  status: z.enum(["scheduled", "confirmed", "completed", "cancelled", "no_show"]).optional(),
+  notes: z.string().max(1000, "Notes too long").optional(),
+});
 
 const Bookings = () => {
   const [bookings, setBookings] = useState<any[]>([]);
@@ -65,7 +76,19 @@ const Bookings = () => {
     e.preventDefault();
     
     try {
-      const { error } = await supabase.from("bookings").insert([formData]);
+      const validated = bookingSchema.parse(formData);
+      
+      const insertData = {
+        client_id: validated.client_id,
+        service_id: validated.service_id,
+        ...(validated.staff_id && { staff_id: validated.staff_id }),
+        appointment_date: validated.appointment_date,
+        appointment_time: validated.appointment_time,
+        status: validated.status || "scheduled",
+        ...(validated.notes && { notes: validated.notes }),
+      };
+      
+      const { error } = await supabase.from("bookings").insert([insertData]);
       
       if (error) throw error;
       
@@ -82,7 +105,11 @@ const Bookings = () => {
       });
       fetchData();
     } catch (error: any) {
-      toast.error(error.message || "Failed to create booking");
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error(error.message || "Failed to create booking");
+      }
     }
   };
 

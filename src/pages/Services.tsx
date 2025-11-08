@@ -9,6 +9,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { z } from "zod";
+
+const serviceSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(100, "Name too long"),
+  category: z.string().trim().min(1, "Category is required").max(50, "Category too long"),
+  price: z.number().positive("Price must be positive").max(1000000, "Price too high"),
+  duration_minutes: z.number().int().positive("Duration must be positive").max(1440, "Duration cannot exceed 24 hours"),
+  description: z.string().max(500, "Description too long").optional().or(z.literal("")),
+});
 
 const Services = () => {
   const [services, setServices] = useState<any[]>([]);
@@ -48,11 +57,23 @@ const Services = () => {
     e.preventDefault();
     
     try {
-      const { error } = await supabase.from("services").insert([{
-        ...formData,
+      const validated = serviceSchema.parse({
+        name: formData.name,
+        category: formData.category,
         price: parseFloat(formData.price),
-        duration_minutes: parseInt(formData.duration_minutes)
-      }]);
+        duration_minutes: parseInt(formData.duration_minutes),
+        description: formData.description,
+      });
+      
+      const insertData = {
+        name: validated.name,
+        category: validated.category,
+        price: validated.price,
+        duration_minutes: validated.duration_minutes,
+        ...(validated.description && { description: validated.description }),
+      };
+      
+      const { error } = await supabase.from("services").insert([insertData]);
       
       if (error) throw error;
       
@@ -61,7 +82,11 @@ const Services = () => {
       setFormData({ name: "", category: "", price: "", duration_minutes: "", description: "" });
       fetchServices();
     } catch (error: any) {
-      toast.error(error.message || "Failed to add service");
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error(error.message || "Failed to add service");
+      }
     }
   };
 

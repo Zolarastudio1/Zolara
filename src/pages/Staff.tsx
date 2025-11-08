@@ -115,7 +115,7 @@ const Staff = () => {
                 <Label>Phone *</Label>
                 <Input 
                   type="tel" 
-                  placeholder="+234..." 
+                  placeholder="+233..." 
                   value={formData.phone} 
                   onChange={(e) => setFormData({...formData, phone: e.target.value})} 
                   required 

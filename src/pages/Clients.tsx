@@ -3,7 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Mail, Phone } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,15 +17,26 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 const clientSchema = z.object({
-  full_name: z.string().trim().min(1, "Name is required").max(100, "Name too long"),
+  full_name: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .max(100, "Name too long"),
   phone: z.string().regex(/^\+?[0-9]{10,15}$/, "Invalid phone number format"),
-  email: z.string().email("Invalid email address").max(255, "Email too long").optional().or(z.literal("")),
+  email: z
+    .string()
+    .email("Invalid email address")
+    .max(255, "Email too long")
+    .optional()
+    .or(z.literal("")),
   address: z.string().max(500, "Address too long").optional(),
   notes: z.string().max(1000, "Notes too long").optional(),
 });
 
 const Clients = () => {
   const [clients, setClients] = useState<any[]>([]);
+  const [editingClientId, setEditingClientId] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -27,7 +44,7 @@ const Clients = () => {
     phone: "",
     email: "",
     address: "",
-    notes: ""
+    notes: "",
   });
 
   useEffect(() => {
@@ -53,37 +70,67 @@ const Clients = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
+      // Validate form data
       const validated = clientSchema.parse(formData);
-      
-      const insertData = {
+
+      const clientData = {
         full_name: validated.full_name,
         phone: validated.phone,
         ...(validated.email && { email: validated.email }),
         ...(validated.address && { address: validated.address }),
         ...(validated.notes && { notes: validated.notes }),
       };
-      
-      const { error } = await supabase.from("clients").insert([insertData]);
-      
-      if (error) throw error;
-      
-      toast.success("Client added successfully");
+
+      if (editingClientId) {
+        // Update existing client
+        const { error } = await supabase
+          .from("clients")
+          .update(clientData)
+          .eq("id", editingClientId);
+
+        if (error) throw error;
+      } else {
+        // Insert new client
+        const { error } = await supabase.from("clients").insert([clientData]);
+        if (error) throw error;
+      }
+
+      toast.success(
+        editingClientId
+          ? "Client updated successfully"
+          : "Client added successfully"
+      );
+
+      // Reset form and dialog
       setDialogOpen(false);
-      setFormData({ full_name: "", phone: "", email: "", address: "", notes: "" });
+      setEditingClientId(null);
+      setFormData({
+        full_name: "",
+        phone: "",
+        email: "",
+        address: "",
+        notes: "",
+      });
+
+      // Refresh client list
       fetchClients();
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
       } else {
-        toast.error(error.message || "Failed to add client");
+        toast.error(error.message || "Failed to save client");
       }
     }
   };
 
   if (loading) {
-    return <div className="flex justify-center p-8"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>;
+    return (
+      <div className="flex justify-center p-8">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
   }
 
   return (
@@ -97,59 +144,73 @@ const Clients = () => {
           <DialogTrigger asChild>
             <Button>
               <Plus className="w-4 h-4 mr-2" />
-              Add Client
+              {!editingClientId ? "Add Client" : "Update Client"}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Add New Client</DialogTitle>
+              <DialogTitle>
+                {!editingClientId ? "Add New Client" : "Update Client Details"}
+              </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label>Full Name *</Label>
-                <Input 
-                  placeholder="John Doe" 
-                  value={formData.full_name} 
-                  onChange={(e) => setFormData({...formData, full_name: e.target.value})} 
-                  required 
+                <Input
+                  placeholder="John Doe"
+                  value={formData.full_name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, full_name: e.target.value })
+                  }
+                  required
                 />
               </div>
               <div className="space-y-2">
                 <Label>Phone *</Label>
-                <Input 
-                  type="tel" 
-                  placeholder="+234..." 
-                  value={formData.phone} 
-                  onChange={(e) => setFormData({...formData, phone: e.target.value})} 
-                  required 
+                <Input
+                  type="tel"
+                  placeholder="+233..."
+                  value={formData.phone}
+                  onChange={(e) =>
+                    setFormData({ ...formData, phone: e.target.value })
+                  }
+                  required
                 />
               </div>
               <div className="space-y-2">
                 <Label>Email</Label>
-                <Input 
-                  type="email" 
-                  placeholder="client@example.com" 
-                  value={formData.email} 
-                  onChange={(e) => setFormData({...formData, email: e.target.value})} 
+                <Input
+                  type="email"
+                  placeholder="client@example.com"
+                  value={formData.email}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
                 />
               </div>
               <div className="space-y-2">
                 <Label>Address</Label>
-                <Input 
-                  placeholder="Client address" 
-                  value={formData.address} 
-                  onChange={(e) => setFormData({...formData, address: e.target.value})} 
+                <Input
+                  placeholder="Client address"
+                  value={formData.address}
+                  onChange={(e) =>
+                    setFormData({ ...formData, address: e.target.value })
+                  }
                 />
               </div>
               <div className="space-y-2">
                 <Label>Notes</Label>
-                <Textarea 
-                  placeholder="Additional notes about client" 
-                  value={formData.notes} 
-                  onChange={(e) => setFormData({...formData, notes: e.target.value})} 
+                <Textarea
+                  placeholder="Additional notes about client"
+                  value={formData.notes}
+                  onChange={(e) =>
+                    setFormData({ ...formData, notes: e.target.value })
+                  }
                 />
               </div>
-              <Button type="submit" className="w-full">Add Client</Button>
+              <Button type="submit" className="w-full">
+              {!editingClientId ? "Add Client" : "Update Client"}
+              </Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -158,8 +219,25 @@ const Clients = () => {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {clients.map((client) => (
           <Card key={client.id} className="hover:shadow-md transition-shadow">
-            <CardHeader>
+            <CardHeader className="flex justify-between items-start">
               <CardTitle className="text-lg">{client.full_name}</CardTitle>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setFormData({
+                    full_name: client.full_name,
+                    phone: client.phone,
+                    email: client.email || "",
+                    address: client.address || "",
+                    notes: client.notes || "",
+                  });
+                  setDialogOpen(true);
+                  setEditingClientId(client.id); // Track which client is being edited
+                }}
+              >
+                Edit
+              </Button>
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -173,7 +251,9 @@ const Clients = () => {
                 </div>
               )}
               {client.notes && (
-                <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{client.notes}</p>
+                <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                  {client.notes}
+                </p>
               )}
             </CardContent>
           </Card>
@@ -181,7 +261,9 @@ const Clients = () => {
         {clients.length === 0 && (
           <Card className="col-span-full">
             <CardContent className="text-center py-12">
-              <p className="text-muted-foreground">No clients yet. Add your first client!</p>
+              <p className="text-muted-foreground">
+                No clients yet. Add your first client!
+              </p>
             </CardContent>
           </Card>
         )}

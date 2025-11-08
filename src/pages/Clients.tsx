@@ -221,10 +221,10 @@ const Clients = () => {
             key={client.id}
             className="relative overflow-hidden border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 bg-gradient-to-b from-white/80 to-white/60 dark:from-gray-800/80 dark:to-gray-900/60 backdrop-blur-md"
           >
-            <CardHeader className="flex justify-between items-center">
+            <CardHeader className="flex flex-row justify-between items-center">
               <div className="flex items-center gap-4">
                 {/* Avatar with initials */}
-                <div className="w-12 h-12 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-lg shadow-md">
+                <div className="w-12 h-12 rounded-full bg-green-500 text-white flex items-center justify-center font-bold text-lg shadow-md">
                   {client.full_name
                     .split(" ")
                     .map((n: string) => n[0])
@@ -238,7 +238,7 @@ const Clients = () => {
               <Button
                 size="sm"
                 variant="outline"
-                className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-indigo-900 hover:text-indigo-600 dark:hover:text-indigo-400"
+                className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-green-50 dark:hover:bg-green-900 hover:text-green-600 dark:hover:text-green-400"
                 onClick={() => {
                   setFormData({
                     full_name: client.full_name,
@@ -257,13 +257,13 @@ const Clients = () => {
 
             <CardContent className="space-y-3 mt-2">
               <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                <Phone className="w-4 h-4 text-indigo-500" />
+                <Phone className="w-4 h-4 text-green-500" />
                 <span>{client.phone}</span>
               </div>
 
               {client.email && (
                 <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                  <Mail className="w-4 h-4 text-indigo-500" />
+                  <Mail className="w-4 h-4 text-green-500" />
                   <span>{client.email}</span>
                 </div>
               )}
@@ -283,7 +283,7 @@ const Clients = () => {
 
             {/* Optional: role badge */}
             {client.role && (
-              <span className="absolute top-2 right-2 px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded-full">
+              <span className="absolute top-2 right-2 px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full">
                 {client.role}
               </span>
             )}
@@ -296,7 +296,7 @@ const Clients = () => {
               <p className="text-gray-500 dark:text-gray-400 text-lg">
                 No clients yet. Add your first client!
               </p>
-              <Plus className="mx-auto mt-4 w-8 h-8 text-indigo-500 animate-bounce" />
+              <Plus className="mx-auto mt-4 w-8 h-8 text-green-500 animate-bounce" />
             </CardContent>
           </Card>
         )}

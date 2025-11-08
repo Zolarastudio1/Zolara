@@ -3,16 +3,17 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Auth from "./pages/Auth";
+import Auth from "./pages/Admin/Auth";
 import DashboardLayout from "./components/layout/DashboardLayout";
-import Dashboard from "./pages/Dashboard";
-import Bookings from "./pages/Bookings";
-import Clients from "./pages/Clients";
-import Staff from "./pages/Staff";
-import Services from "./pages/Services";
-import Sales from "./pages/Sales";
-import Reports from "./pages/Reports";
-import NotFound from "./pages/NotFound";
+import Dashboard from "./pages/Admin/Dashboard";
+import Bookings from "./pages/Admin/Bookings";
+import Clients from "./pages/Admin/Clients";
+import Staff from "./pages/Admin/Staff";
+import Services from "./pages/Admin/Services";
+import Sales from "./pages/Admin/Sales";
+import Reports from "./pages/Admin/Reports";
+import NotFound from "./pages/Admin/NotFound";
+import ClientDashboard from "./pages/Client/ClientDashboard";
 
 const queryClient = new QueryClient();
 
@@ -26,13 +27,14 @@ const App = () => (
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/auth" element={<Auth />} />
           <Route element={<DashboardLayout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/bookings" element={<Bookings />} />
-            <Route path="/clients" element={<Clients />} />
-            <Route path="/staff" element={<Staff />} />
-            <Route path="/services" element={<Services />} />
-            <Route path="/sales" element={<Sales />} />
-            <Route path="/reports" element={<Reports />} />
+            <Route path="/dashboard" element={<ClientDashboard />} />
+            <Route path="admin/dashboard" element={<Dashboard />} />
+            <Route path="admin/bookings" element={<Bookings />} />
+            <Route path="admin/clients" element={<Clients />} />
+            <Route path="admin/staff" element={<Staff />} />
+            <Route path="admin/services" element={<Services />} />
+            <Route path="admin/sales" element={<Sales />} />
+            <Route path="admin/reports" element={<Reports />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

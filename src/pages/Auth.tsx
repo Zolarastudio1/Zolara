@@ -4,32 +4,54 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Scissors } from "lucide-react";
 import { z } from "zod";
+import RoleSelect from "@/components/ui/role-select";
 
+// Validation schemas
 const loginSchema = z.object({
   email: z.string().email("Invalid email address").max(255, "Email too long"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
 const signupSchema = z.object({
-  fullName: z.string().trim().min(1, "Name is required").max(100, "Name too long"),
+  fullName: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .max(100, "Name too long"),
   email: z.string().email("Invalid email address").max(255, "Email too long"),
-  password: z.string().min(6, "Password must be at least 6 characters").max(72, "Password too long"),
+  password: z
+    .string()
+    .min(6, "Password must be at least 6 characters")
+    .max(72, "Password too long"),
+  role: z.enum(["client", "staff", "receptionist", "owner"]).optional(),
 });
 
 const Auth = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+
+  const [signupFullName, setSignupFullName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
-  const [signupFullName, setSignupFullName] = useState("");
+  const [signupRole, setSignupRole] = useState<
+    "client" | "staff" | "receptionist" | "owner"
+  >("client");
 
+  /** Handle Login */
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -46,22 +68,28 @@ const Auth = () => {
       });
 
       if (error) throw error;
+      if (!data.user) throw new Error("User not found");
 
-      if (data.user) {
-        toast.success("Login successful!");
-        navigate("/dashboard");
-      }
+      // Extract role from user_metadata
+      const role = (data.user.user_metadata?.role as string) || "client";
+
+      // Save minimal user data in localStorage
+      const userData = { id: data.user.id, email: data.user.email, role };
+      localStorage.setItem("user", JSON.stringify(userData));
+
+      toast.success("Login successful!");
+
+      // Redirect based on role
+      redirectToDashboard(role);
     } catch (error: any) {
-      if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
-      } else {
-        toast.error(error.message || "Login failed");
-      }
+      if (error instanceof z.ZodError) toast.error(error.errors[0].message);
+      else toast.error(error.message || "Login failed");
     } finally {
       setLoading(false);
     }
   };
 
+  /** Handle Signup */
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -71,6 +99,7 @@ const Auth = () => {
         fullName: signupFullName,
         email: signupEmail,
         password: signupPassword,
+        role: signupRole,
       });
 
       const { data, error } = await supabase.auth.signUp({
@@ -79,25 +108,47 @@ const Auth = () => {
         options: {
           data: {
             full_name: validated.fullName,
+            role: validated.role || "client", // default role
           },
           emailRedirectTo: `${window.location.origin}/dashboard`,
         },
       });
 
       if (error) throw error;
+      if (!data.user) throw new Error("Signup failed");
 
-      if (data.user) {
-        toast.success("Account created successfully!");
-        navigate("/dashboard");
-      }
+      // Save minimal user data in localStorage
+      const userData = {
+        id: data.user.id,
+        email: data.user.email,
+        role: validated.role || "client",
+      };
+      localStorage.setItem("user", JSON.stringify(userData));
+
+      toast.success("Account created successfully!");
+      redirectToDashboard(userData.role);
     } catch (error: any) {
-      if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
-      } else {
-        toast.error(error.message || "Signup failed");
-      }
+      if (error instanceof z.ZodError) toast.error(error.errors[0].message);
+      else toast.error(error.message || "Signup failed");
     } finally {
       setLoading(false);
+    }
+  };
+
+  /** Redirect user based on role */
+  const redirectToDashboard = (role: string) => {
+    switch (role) {
+      case "owner":
+        navigate("/admin/dashboard");
+        break;
+      case "receptionist":
+        navigate("/staff/dashboard");
+        break;
+      case "staff":
+        navigate("/staff/dashboard");
+        break;
+      default:
+        navigate("/dashboard");
     }
   };
 
@@ -109,7 +160,9 @@ const Auth = () => {
             <Scissors className="w-6 h-6 text-primary-foreground" />
           </div>
           <CardTitle className="text-2xl font-bold">Salon Management</CardTitle>
-          <CardDescription>Manage your salon operations efficiently</CardDescription>
+          <CardDescription>
+            Manage your salon operations efficiently
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login" className="w-full">
@@ -117,7 +170,8 @@ const Auth = () => {
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
             </TabsList>
-            
+
+            {/* Login Form */}
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
@@ -143,11 +197,12 @@ const Auth = () => {
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Loading..." : "Login"}
+                  {loading ? "Logging in..." : "Login"}
                 </Button>
               </form>
             </TabsContent>
 
+            {/* Signup Form */}
             <TabsContent value="signup">
               <form onSubmit={handleSignup} className="space-y-4">
                 <div className="space-y-2">
@@ -182,6 +237,14 @@ const Auth = () => {
                     onChange={(e) => setSignupPassword(e.target.value)}
                     required
                     minLength={6}
+                  />
+                </div>
+                {/* Optional: Role Selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="signup-role">Role</Label>
+                  <RoleSelect
+                    value={signupRole}
+                    onChange={(val) => setSignupRole(val as any)}
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>

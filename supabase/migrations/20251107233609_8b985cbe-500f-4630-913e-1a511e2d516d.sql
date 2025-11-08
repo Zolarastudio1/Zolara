@@ -92,6 +92,20 @@ CREATE TABLE public.payments (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Create table for client booking requests
+CREATE TABLE public.booking_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID REFERENCES public.clients(id) ON DELETE CASCADE NOT NULL,
+  service_id UUID REFERENCES public.services(id) ON DELETE CASCADE NOT NULL,
+  preferred_date DATE,
+  preferred_time TIME,
+  notes TEXT,
+  status TEXT DEFAULT 'pending',     -- pending | approved | declined | converted
+  admin_notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Enable RLS on all tables
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
@@ -140,6 +154,11 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_new_user();
 
+  -- Keep updated_at fresh
+CREATE TRIGGER update_booking_requests_updated_at
+BEFORE UPDATE ON public.booking_requests
+FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
 -- Create update trigger function
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER
@@ -183,6 +202,26 @@ CREATE POLICY "Owners and receptionists can manage clients" ON public.clients
     public.has_role(auth.uid(), 'owner') OR 
     public.has_role(auth.uid(), 'receptionist')
   );
+
+-- Allow clients to create/view their own requests
+CREATE POLICY "Clients can create booking requests"
+ON public.booking_requests
+FOR INSERT TO authenticated
+WITH CHECK (true);
+
+CREATE POLICY "Clients can view their own requests"
+ON public.booking_requests
+FOR SELECT TO authenticated
+USING (auth.uid() = client_id);
+
+-- Allow owners/receptionists to view/manage all
+CREATE POLICY "Admins can manage booking requests"
+ON public.booking_requests
+FOR ALL TO authenticated
+USING (
+  public.has_role(auth.uid(), 'owner') OR
+  public.has_role(auth.uid(), 'receptionist')
+);
 
 -- RLS Policies for staff
 CREATE POLICY "Authenticated users can view staff" ON public.staff

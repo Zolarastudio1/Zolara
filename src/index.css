@@ -1,12 +1,12 @@
-@tailwind base;
+/* @tailwind base;
 @tailwind components;
-@tailwind utilities;
+@tailwind utilities; */
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */
 
-@layer base {
+/* @layer base {
   :root {
     --background: 0 0% 100%;
     --foreground: 220 13% 13%;
@@ -87,19 +87,128 @@ All colors MUST be HSL.
     --input: 220 13% 18%;
     --ring: 160 84% 39%;
 
-    --sidebar-background: 220 13% 13%;
+    --sidebar-background: 0 0% 0%;
     --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 160 84% 39%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 220 13% 18%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 220 13% 18%;
+    --sidebar-border: 34 92% 96%;
     --sidebar-ring: 160 84% 50%;
 
     --chart-1: 160 84% 39%;
     --chart-2: 24 95% 65%;
     --chart-3: 38 92% 50%;
     --chart-4: 199 89% 48%;
+    --chart-5: 280 80% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+} */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ---- CORE COLORS ---- */
+    --background: 34 92% 96%; /* milk color (#FEF4EB) */
+    --foreground: 0 0% 0%; /* black text */
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+
+    /* ---- BRAND COLORS ---- */
+    --primary: 46 85% 55%; /* gold */
+    --primary-foreground: 0 0% 100%; /* white text on gold */
+
+    --secondary: 34 92% 96%; /* milk tone for secondary bg */
+    --secondary-foreground: 0 0% 0%;
+
+    --accent: 46 85% 55%; /* gold for highlights */
+    --accent-foreground: 0 0% 100%;
+
+    /* ---- STATUS COLORS ---- */
+    --success: 160 84% 39%;
+    --warning: 38 92% 50%;
+    --info: 199 89% 48%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* ---- BORDER & INPUTS ---- */
+    --border: 34 30% 85%;
+    --input: 34 30% 85%;
+    --ring: 46 85% 55%;
+
+    /* ---- SIDEBAR ---- */
+    --sidebar-background: 0 0% 0%; /* black */
+    --sidebar-foreground: 0 0% 100%; /* white text */
+    --sidebar-primary: 46 85% 55%; /* gold */
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 46 85% 45%; /* darker gold hover */
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 46 85% 30%;
+    --sidebar-ring: 46 85% 55%;
+
+    /* ---- CHART COLORS ---- */
+    --chart-1: 46 85% 55%;
+    --chart-2: 34 92% 96%;
+    --chart-3: 0 0% 0%;
+    --chart-4: 38 92% 50%;
+    --chart-5: 280 80% 60%;
+
+    --radius: 0.75rem;
+  }
+
+  /* ---- DARK MODE ---- */
+  .dark {
+    --background: 0 0% 0%; /* black background */
+    --foreground: 34 92% 96%; /* milk text */
+
+    --card: 0 0% 10%;
+    --card-foreground: 34 92% 96%;
+
+    --popover: 0 0% 10%;
+    --popover-foreground: 34 92% 96%;
+
+    --primary: 46 85% 55%; /* gold */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 34 92% 96%;
+    --secondary-foreground: 0 0% 0%;
+
+    --accent: 46 85% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --border: 46 85% 25%;
+    --input: 46 85% 25%;
+    --ring: 46 85% 55%;
+
+    --sidebar-background: 0 0% 0%; /* black */
+    --sidebar-foreground: 34 92% 96%; /* milk/white text */
+    --sidebar-primary: 46 85% 55%; /* gold */
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 46 85% 45%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 46 85% 25%;
+    --sidebar-ring: 46 85% 55%;
+
+    --chart-1: 46 85% 55%;
+    --chart-2: 34 92% 96%;
+    --chart-3: 0 0% 100%;
+    --chart-4: 38 92% 50%;
     --chart-5: 280 80% 60%;
   }
 }

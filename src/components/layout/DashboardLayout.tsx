@@ -84,7 +84,7 @@ const DashboardLayout = () => {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed top-0 left-0 h-full w-64 bg-sidebar text-sidebar-foreground z-50 transition-transform duration-300 lg:translate-x-0",
+          "fixed top-0 left-0 h-full w-64 bg-black text-sidebar-foreground z-50 transition-transform duration-300 lg:translate-x-0",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >

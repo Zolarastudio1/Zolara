@@ -3,17 +3,17 @@ import { Outlet, useNavigate, Link, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { User } from "@supabase/supabase-js";
-import { 
-  LayoutDashboard, 
-  Calendar, 
-  Users, 
-  UserCog, 
-  Scissors, 
-  CreditCard, 
+import {
+  LayoutDashboard,
+  Calendar,
+  Users,
+  UserCog,
+  Scissors,
+  CreditCard,
   FileText,
   LogOut,
   Menu,
-  X
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +33,9 @@ const DashboardLayout = () => {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
       if (!session?.user && event !== "INITIAL_SESSION") {
         navigate("/auth");
@@ -73,30 +75,39 @@ const DashboardLayout = () => {
     <div className="min-h-screen bg-background">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <aside className={cn(
-        "fixed top-0 left-0 h-full w-64 bg-sidebar text-sidebar-foreground z-50 transition-transform duration-300 lg:translate-x-0",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
+      <aside
+        className={cn(
+          "fixed top-0 left-0 h-full w-64 bg-sidebar text-sidebar-foreground z-50 transition-transform duration-300 lg:translate-x-0",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
         <div className="flex flex-col h-full">
           <div className="p-6 flex items-center justify-between border-b border-sidebar-border">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-sidebar-primary rounded-full flex items-center justify-center">
-                <Scissors className="w-5 h-5 text-sidebar-primary-foreground" />
+              <div className="w-10 h-10 bg-sidebar-primary rounded-full flex items-center justify-center overflow-hidden">
+                <img
+                  src="/assets/zolara-logo.jpg"
+                  alt="Zolara Logo"
+                  className="w-full h-full object-cover"
+                />
               </div>
+
               <div>
-                <h1 className="font-bold text-lg">Salon</h1>
-                <p className="text-xs text-sidebar-foreground/70">Management</p>
+                <h1 className="font-bold text-lg">Zolara</h1>
+                <p className="text-xs text-sidebar-foreground/70">
+                  Beauty Studio
+                </p>
               </div>
             </div>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="icon"
               className="lg:hidden text-sidebar-foreground"
               onClick={() => setSidebarOpen(false)}
@@ -116,8 +127,8 @@ const DashboardLayout = () => {
                   onClick={() => setSidebarOpen(false)}
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
-                    isActive 
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+                    isActive
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
                       : "hover:bg-sidebar-accent/50 text-sidebar-foreground"
                   )}
                 >
@@ -141,8 +152,8 @@ const DashboardLayout = () => {
                 </p>
               </div>
             </div>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent"
               onClick={handleLogout}
             >
@@ -157,8 +168,8 @@ const DashboardLayout = () => {
       <div className="lg:ml-64">
         {/* Mobile Header */}
         <header className="lg:hidden sticky top-0 z-30 bg-card border-b border-border p-4 flex items-center gap-4">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="icon"
             onClick={() => setSidebarOpen(true)}
           >

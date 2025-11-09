@@ -3,82 +3,80 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Loader2, Calendar, Clock } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import {
+  Loader2,
+  Calendar,
+  Clock,
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
+  History,
+} from "lucide-react";
 
 const ClientDashboard = () => {
   const [bookings, setBookings] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [rescheduleDialog, setRescheduleDialog] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState<any>(null);
-  const [newDate, setNewDate] = useState("");
-  const [newTime, setNewTime] = useState("");
-  const navigate = useNavigate();
+  const [stats, setStats] = useState({
+    total: 0,
+    completed: 0,
+    cancelled: 0,
+    upcoming: 0,
+    totalSpent: 0,
+  });
 
   useEffect(() => {
-    fetchBookings();
+    fetchDashboardData();
   }, []);
 
-  const fetchBookings = async () => {
+  const fetchDashboardData = async () => {
     setLoading(true);
-    const {
-      data,
-      error,
-    } = await supabase
-      .from("bookings")
-      .select("*, staff(full_name), services(name)")
-      .eq("client_id", (await supabase.auth.getUser()).data.user?.id)
-      .order("appointment_date", { ascending: true });
+    const user = (await supabase.auth.getUser()).data.user;
+    if (!user) return;
 
-    if (error) {
-      toast.error(error.message);
-    } else {
-      setBookings(data || []);
+    // Fetch bookings
+    const { data: bookingsData, error: bookingsError } = await supabase
+      .from("bookings")
+      .select("*, staff(full_name), services(name, price)")
+      .eq("client_id", user.id)
+      .order("appointment_date", { ascending: false });
+
+    if (bookingsError) {
+      toast.error(bookingsError.message);
+      return;
     }
+
+    // Fetch payments
+    const { data: paymentsData, error: paymentsError } = await supabase
+      .from("payments")
+      .select("*, bookings(appointment_date, services(name))")
+      .order("payment_date", { ascending: false });
+
+    if (paymentsError) {
+      toast.error(paymentsError.message);
+    }
+
+    setBookings(bookingsData || []);
+    setPayments(paymentsData || []);
+
+    // Compute stats
+    const total = bookingsData?.length || 0;
+    const completed = bookingsData?.filter(
+      (b) => b.status === "completed"
+    ).length;
+    const cancelled = bookingsData?.filter(
+      (b) => b.status === "cancelled"
+    ).length;
+    const upcoming = bookingsData?.filter(
+      (b) => b.status === "scheduled" || b.status === "confirmed"
+    ).length;
+    const totalSpent =
+      paymentsData?.reduce((acc, p) => acc + Number(p.amount || 0), 0) || 0;
+
+    setStats({ total, completed, cancelled, upcoming, totalSpent });
     setLoading(false);
-  };
-
-  const handleCancel = async (id: string) => {
-    const confirm = window.confirm("Are you sure you want to cancel this booking?");
-    if (!confirm) return;
-
-    const { error } = await supabase
-      .from("bookings")
-      .update({ status: "cancelled" })
-      .eq("id", id);
-
-    if (error) toast.error("Failed to cancel booking");
-    else {
-      toast.success("Booking cancelled successfully");
-      fetchBookings();
-    }
-  };
-
-  const handleReschedule = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!selectedBooking) return;
-
-    const { error } = await supabase
-      .from("bookings")
-      .update({
-        appointment_date: newDate,
-        appointment_time: newTime,
-        status: "scheduled",
-      })
-      .eq("id", selectedBooking.id);
-
-    if (error) toast.error("Failed to reschedule");
-    else {
-      toast.success("Booking rescheduled successfully");
-      setRescheduleDialog(false);
-      fetchBookings();
-    }
   };
 
   const getStatusColor = (status: string) => {
@@ -93,112 +91,147 @@ const ClientDashboard = () => {
   };
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">My Bookings</h1>
-          <p className="text-muted-foreground">
-            View, manage, or reschedule your appointments
-          </p>
-        </div>
-        <Button onClick={() => navigate("/services")}>Book New Service</Button>
+    <div className="space-y-8 p-6">
+      {/* HEADER */}
+      <div>
+        <h1 className="text-3xl font-bold">Dashboard Overview</h1>
+        <p className="text-muted-foreground">
+          Track your activity, spending, and appointment history
+        </p>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center items-center p-8">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
-        </div>
-      ) : bookings.length === 0 ? (
-        <Card className="p-8 text-center text-muted-foreground">
-          No bookings yet. Book your first appointment!
+      {/* STATS GRID */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="flex items-center justify-between p-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Total Bookings</p>
+              <p className="text-2xl font-bold">{stats.total}</p>
+            </div>
+            <TrendingUp className="text-primary w-6 h-6" />
+          </CardContent>
         </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {bookings.map((booking) => (
-            <Card key={booking.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader className="flex justify-between items-start">
+
+        <Card>
+          <CardContent className="flex items-center justify-between p-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Upcoming</p>
+              <p className="text-2xl font-bold">{stats.upcoming}</p>
+            </div>
+            <Calendar className="text-blue-600 w-6 h-6" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="flex items-center justify-between p-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Completed</p>
+              <p className="text-2xl font-bold">{stats.completed}</p>
+            </div>
+            <TrendingUp className="text-green-600 w-6 h-6" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="flex items-center justify-between p-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Cancelled</p>
+              <p className="text-2xl font-bold">{stats.cancelled}</p>
+            </div>
+            <TrendingDown className="text-red-600 w-6 h-6" />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* TOTAL EXPENSES */}
+      <Card className="bg-primary/5 border border-primary/20">
+        <CardHeader>
+          <CardTitle className="flex justify-between items-center">
+            <span>Total Expenses</span>
+            <DollarSign className="w-6 h-6 text-primary" />
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-3xl font-bold text-primary">
+            GH₵{stats.totalSpent.toLocaleString()}
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* RECENT BOOKINGS */}
+      <div>
+        <h2 className="text-xl font-semibold mb-3">Recent Bookings</h2>
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin" />
+          </div>
+        ) : bookings.length === 0 ? (
+          <Card className="p-6 text-center text-muted-foreground">
+            No bookings yet.
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {bookings.slice(0, 6).map((booking) => (
+              <Card key={booking.id} className="hover:shadow-md">
+                <CardHeader className="flex justify-between items-start">
+                  <div>
+                    <CardTitle>{booking.services?.name}</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {booking.staff?.full_name || "Unassigned"}
+                    </p>
+                  </div>
+                  <Badge className={getStatusColor(booking.status)}>
+                    {booking.status}
+                  </Badge>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Calendar className="w-4 h-4" />
+                    {format(new Date(booking.appointment_date), "PPP")}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="w-4 h-4" />
+                    {booking.appointment_time}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* PAYMENT LOGS */}
+      <div>
+        <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
+          <History className="w-5 h-5" /> Payment Logs
+        </h2>
+        {payments.length === 0 ? (
+          <Card className="p-6 text-center text-muted-foreground">
+            No payments recorded yet.
+          </Card>
+        ) : (
+          <div className="space-y-2">
+            {payments.slice(0, 5).map((p) => (
+              <Card
+                key={p.id}
+                className="flex items-center justify-between p-4"
+              >
                 <div>
-                  <CardTitle>{booking.services?.name}</CardTitle>
+                  <p className="font-medium">
+                    {p.bookings?.services?.name || "Service Payment"}
+                  </p>
                   <p className="text-sm text-muted-foreground">
-                    {booking.staff?.full_name || "Unassigned"}
+                    {format(new Date(p.payment_date), "PPP")}
                   </p>
                 </div>
-                <Badge className={getStatusColor(booking.status)}>
-                  {booking.status}
+                <Badge className="bg-green-100 text-green-800">
+                  GH₵{Number(p.amount).toLocaleString()}
                 </Badge>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="w-4 h-4" />
-                  {format(new Date(booking.appointment_date), "PPP")}
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Clock className="w-4 h-4" />
-                  {booking.appointment_time}
-                </div>
-
-                <div className="flex gap-2 mt-4">
-                  {booking.status === "scheduled" && (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedBooking(booking);
-                          setRescheduleDialog(true);
-                        }}
-                      >
-                        Reschedule
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleCancel(booking.id)}
-                      >
-                        Cancel
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* Reschedule Dialog */}
-      <Dialog open={rescheduleDialog} onOpenChange={setRescheduleDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Reschedule Booking</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleReschedule} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>New Date</Label>
-                <Input
-                  type="date"
-                  value={newDate}
-                  onChange={(e) => setNewDate(e.target.value)}
-                  required
-                />
-              </div>
-              <div>
-                <Label>New Time</Label>
-                <Input
-                  type="time"
-                  value={newTime}
-                  onChange={(e) => setNewTime(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-            <Button type="submit" className="w-full">
-              Confirm Reschedule
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

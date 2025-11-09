@@ -34,7 +34,11 @@ import {
 const bookingSchema = z.object({
   client_id: z.string().uuid("Invalid client selection"),
   service_id: z.string().uuid("Invalid service selection"),
-  staff_id: z.string().uuid("Invalid staff selection").optional().or(z.literal("")),
+  staff_id: z
+    .string()
+    .uuid("Invalid staff selection")
+    .optional()
+    .or(z.literal("")),
   appointment_date: z.string().min(1, "Date is required"),
   appointment_time: z
     .string()
@@ -49,6 +53,7 @@ const bookingSchema = z.object({
 
 const Bookings = () => {
   const [bookings, setBookings] = useState<any[]>([]);
+  const [requests, setRequests] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
@@ -73,23 +78,29 @@ const Bookings = () => {
 
   const fetchData = async () => {
     try {
-      const [bookingsRes, clientsRes, staffRes, servicesRes] = await Promise.all([
-        supabase
-          .from("bookings")
-          .select("*, clients(*), staff(*), services(*)")
-          .order("appointment_date", { ascending: false }),
-        supabase.from("clients").select("*").order("full_name"),
-        supabase.from("staff").select("*").order("full_name"),
-        supabase.from("services").select("*").order("name"),
-      ]);
+      const [bookingsRes, requestsRes, clientsRes, staffRes, servicesRes] =
+        await Promise.all([
+          supabase
+            .from("bookings")
+            .select("*, clients(*), staff(*), services(*)")
+            .order("appointment_date", { ascending: false }),
+          supabase
+            .from("booking_requests") 
+            .select("*, clients(*), services(*)")
+            .order("created_at", { ascending: false }),
+          supabase.from("clients").select("*").order("full_name"),
+          supabase.from("staff").select("*").order("full_name"),
+          supabase.from("services").select("*").order("name"),
+        ]);
 
       if (bookingsRes.data) setBookings(bookingsRes.data);
+      if (requestsRes.data) setRequests(requestsRes.data);
       if (clientsRes.data) setClients(clientsRes.data);
       if (staffRes.data) setStaff(staffRes.data);
       if (servicesRes.data) setServices(servicesRes.data);
     } catch (error) {
       console.error("Error fetching data:", error);
-      toast.error("Failed to load bookings");
+      toast.error("Failed to load data");
     } finally {
       setLoading(false);
     }
@@ -163,6 +174,36 @@ const Bookings = () => {
     }
   };
 
+    // Handle admin approval or decline of requests
+  const handleRequestStatus = async (id: string, status: "approved" | "declined") => {
+    try {
+      const { error } = await supabase.from("booking_requests").update({ request_status }).eq("id", id);
+      if (error) throw error;
+
+      toast.success(`Request ${status}`);
+      fetchData();
+
+      if (status === "approved") {
+        const request = requests.find((r) => r.id === id);
+        if (request) {
+          await supabase.from("bookings").insert([
+            {
+              client_id: request.client_id,
+              service_id: request.service_id,
+              staff_id: null,
+              appointment_date: request.preferred_date,
+              appointment_time: request.preferred_time,
+              status: "scheduled",
+              notes: request.notes,
+            },
+          ]);
+        }
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update request");
+    }
+  };
+
   const getStatusColor = (status: string) => {
     const colors: any = {
       scheduled: "bg-blue-100 text-blue-800",
@@ -187,7 +228,9 @@ const Bookings = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Bookings</h1>
-          <p className="text-muted-foreground">Manage and track all appointments</p>
+          <p className="text-muted-foreground">
+            Manage and track all appointments
+          </p>
         </div>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -360,6 +403,44 @@ const Bookings = () => {
             </form>
           </DialogContent>
         </Dialog>
+      </div>
+
+      {/* Booking Requests Section */}
+      <div>
+        <h1 className="text-3xl font-bold">Booking Requests</h1>
+        <div className="grid gap-4">
+          {requests.map((r) => (
+            <Card key={r.id} className="hover:shadow-md transition-shadow">
+              <CardHeader className="flex justify-between items-start">
+                <div>
+                  <CardTitle>{r.services?.name}</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Requested by: {r.profiles?.full_name || "Unknown"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {format(new Date(r.preferred_date), "MMM dd, yyyy")} at{" "}
+                    {r.preferred_time}
+                  </p>
+                </div>
+                <Badge className={getStatusColor(r.status)}>{r.status}</Badge>
+              </CardHeader>
+              {r.status === "pending" && (
+                <CardContent className="flex gap-2">
+                  <Button onClick={() => handleRequestStatus(r.id, "approved")}>
+                    Approve
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleRequestStatus(r.id, "declined")}
+                  >
+                    Decline
+                  </Button>
+                </CardContent>
+              )}
+            </Card>
+          ))}
+          {requests.length === 0 && <p>No booking requests at the moment.</p>}
+        </div>
       </div>
 
       {/* Bookings List */}

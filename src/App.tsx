@@ -16,6 +16,7 @@ import NotFound from "./pages/Admin/NotFound";
 import ClientDashboard from "./pages/Client/ClientDashboard";
 import { useEffect, useState } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import ClientBookings from "./pages/Client/ClientBookings";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ const App = () => {
                 element={<ProtectedRoute user={user} />}
               />
               <Route path="/dashboard" element={<ClientDashboard />} />
+              <Route path="/bookings" element={<ClientBookings/>} />
               <Route path="admin/dashboard" element={<Dashboard />} />
               <Route path="admin/bookings" element={<Bookings />} />
               <Route path="admin/clients" element={<Clients />} />

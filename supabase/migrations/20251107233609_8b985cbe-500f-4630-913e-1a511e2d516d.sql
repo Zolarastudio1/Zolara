@@ -1,16 +1,18 @@
--- Create enum for user roles
+-- ======================================
+-- 1️⃣ ENUMS
+-- ======================================
+
 CREATE TYPE public.app_role AS ENUM ('owner', 'receptionist', 'staff');
-
--- Create enum for appointment status
 CREATE TYPE public.appointment_status AS ENUM ('scheduled', 'confirmed', 'completed', 'cancelled', 'no_show');
-
--- Create enum for payment method
 CREATE TYPE public.payment_method AS ENUM ('cash', 'momo', 'card', 'bank_transfer');
-
--- Create enum for payment status
 CREATE TYPE public.payment_status AS ENUM ('pending', 'completed', 'refunded');
+CREATE TYPE public.request_status AS ENUM ('pending', 'approved', 'declined', 'converted');
 
--- Create profiles table
+-- ======================================
+-- 2️⃣ USERS & ROLES
+-- ======================================
+
+-- Profiles
 CREATE TABLE public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name TEXT NOT NULL,
@@ -20,7 +22,7 @@ CREATE TABLE public.profiles (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Create user_roles table
+-- User roles
 CREATE TABLE public.user_roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
@@ -29,7 +31,10 @@ CREATE TABLE public.user_roles (
   UNIQUE(user_id, role)
 );
 
--- Create clients table
+-- ======================================
+-- 3️⃣ CLIENTS & STAFF
+-- ======================================
+
 CREATE TABLE public.clients (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   full_name TEXT NOT NULL,
@@ -41,7 +46,6 @@ CREATE TABLE public.clients (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Create staff table
 CREATE TABLE public.staff (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   full_name TEXT NOT NULL,
@@ -53,7 +57,10 @@ CREATE TABLE public.staff (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Create services table
+-- ======================================
+-- 4️⃣ SERVICES
+-- ======================================
+
 CREATE TABLE public.services (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
@@ -66,7 +73,10 @@ CREATE TABLE public.services (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Create bookings table
+-- ======================================
+-- 5️⃣ BOOKINGS
+-- ======================================
+
 CREATE TABLE public.bookings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   client_id UUID REFERENCES public.clients(id) ON DELETE CASCADE NOT NULL,
@@ -80,7 +90,10 @@ CREATE TABLE public.bookings (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Create payments table
+-- ======================================
+-- 6️⃣ PAYMENTS
+-- ======================================
+
 CREATE TABLE public.payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   booking_id UUID REFERENCES public.bookings(id) ON DELETE CASCADE NOT NULL,
@@ -92,7 +105,10 @@ CREATE TABLE public.payments (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Create table for client booking requests
+-- ======================================
+-- 7️⃣ BOOKING REQUESTS
+-- ======================================
+
 CREATE TABLE public.booking_requests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   client_id UUID REFERENCES public.clients(id) ON DELETE CASCADE NOT NULL,
@@ -100,28 +116,49 @@ CREATE TABLE public.booking_requests (
   preferred_date DATE,
   preferred_time TIME,
   notes TEXT,
-  status TEXT DEFAULT 'pending',     -- pending | approved | declined | converted
+  status request_status DEFAULT 'pending', -- pending | approved | declined | converted
   admin_notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Enable RLS on all tables
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.staff ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.services ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+-- ======================================
+-- 8️⃣ TRIGGERS FOR UPDATED_AT
+-- ======================================
 
--- Create security definer function to check user role
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+RETURNS TRIGGER
+LANGUAGE PLPGSQL
+AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_clients_updated_at BEFORE UPDATE ON public.clients
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_staff_updated_at BEFORE UPDATE ON public.staff
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_services_updated_at BEFORE UPDATE ON public.services
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_bookings_updated_at BEFORE UPDATE ON public.bookings
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_booking_requests_updated_at BEFORE UPDATE ON public.booking_requests
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+-- ======================================
+-- 9️⃣ FUNCTIONS
+-- ======================================
+
+-- Check if user has role
 CREATE OR REPLACE FUNCTION public.has_role(_user_id UUID, _role app_role)
 RETURNS BOOLEAN
 LANGUAGE SQL
 STABLE
 SECURITY DEFINER
-SET search_path = public
 AS $$
   SELECT EXISTS (
     SELECT 1
@@ -130,12 +167,11 @@ AS $$
   )
 $$;
 
--- Create function to handle new user creation
+-- Auto-create profile on new user
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE PLPGSQL
 SECURITY DEFINER
-SET search_path = public
 AS $$
 BEGIN
   INSERT INTO public.profiles (id, full_name, email)
@@ -148,114 +184,120 @@ BEGIN
 END;
 $$;
 
--- Create trigger for new user creation
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_new_user();
 
-  -- Keep updated_at fresh
-CREATE TRIGGER update_booking_requests_updated_at
-BEFORE UPDATE ON public.booking_requests
-FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+  -- ======================================
+-- Auto-create client if not found on booking_requests insert
+-- ======================================
 
--- Create update trigger function
-CREATE OR REPLACE FUNCTION public.update_updated_at_column()
-RETURNS TRIGGER
-LANGUAGE PLPGSQL
-AS $$
+-- Create the function
+CREATE OR REPLACE FUNCTION public.ensure_client_exists()
+RETURNS TRIGGER AS $$
+DECLARE
+  user_profile RECORD;
 BEGIN
-  NEW.updated_at = NOW();
+  RAISE NOTICE 'Trigger fired for client_id: %', NEW.client_id;
+
+  SELECT full_name, email, phone
+  INTO user_profile
+  FROM public.profiles
+  WHERE id = NEW.client_id;
+
+  IF NOT EXISTS (SELECT 1 FROM public.clients WHERE id = NEW.client_id) THEN
+    INSERT INTO public.clients (id, full_name, phone, email)
+    VALUES (
+      NEW.client_id,
+      COALESCE(user_profile.full_name, 'Auto Created Client'),
+      COALESCE(user_profile.phone, ''),
+      COALESCE(user_profile.email, '')
+    );
+  END IF;
+
   RETURN NEW;
 END;
-$$;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Create triggers for updated_at
-CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON public.profiles
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-CREATE TRIGGER update_clients_updated_at BEFORE UPDATE ON public.clients
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-CREATE TRIGGER update_staff_updated_at BEFORE UPDATE ON public.staff
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-CREATE TRIGGER update_services_updated_at BEFORE UPDATE ON public.services
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-CREATE TRIGGER update_bookings_updated_at BEFORE UPDATE ON public.bookings
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+-- Ensure it runs as postgres (bypass RLS)
+ALTER FUNCTION public.ensure_client_exists() OWNER TO postgres;
 
--- RLS Policies for profiles
-CREATE POLICY "Users can view their own profile" ON public.profiles
-  FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can update their own profile" ON public.profiles
-  FOR UPDATE USING (auth.uid() = id);
+-- Create the trigger
+CREATE TRIGGER auto_create_client
+BEFORE INSERT ON public.booking_requests
+FOR EACH ROW
+EXECUTE FUNCTION public.ensure_client_exists();
 
--- RLS Policies for user_roles
-CREATE POLICY "Users can view their own roles" ON public.user_roles
+-- ======================================
+-- 10️⃣ RLS POLICIES
+-- ======================================
+
+-- Enable RLS
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.staff ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.services ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.booking_requests ENABLE ROW LEVEL SECURITY;
+
+-- Profiles
+CREATE POLICY "Users can view/update their own profile" ON public.profiles
+  FOR ALL USING (auth.uid() = id);
+
+-- User roles
+CREATE POLICY "Users can view own roles" ON public.user_roles
   FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Owners can manage all roles" ON public.user_roles
   FOR ALL USING (public.has_role(auth.uid(), 'owner'));
 
--- RLS Policies for clients
+-- Clients
 CREATE POLICY "Authenticated users can view clients" ON public.clients
   FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Owners and receptionists can manage clients" ON public.clients
-  FOR ALL USING (
-    public.has_role(auth.uid(), 'owner') OR 
-    public.has_role(auth.uid(), 'receptionist')
-  );
+CREATE POLICY "Allow insert via trigger" ON public.clients FOR INSERT TO authenticated WITH CHECK (true);
 
--- Allow clients to create/view their own requests
-CREATE POLICY "Clients can create booking requests"
-ON public.booking_requests
-FOR INSERT TO authenticated
-WITH CHECK (true);
 
-CREATE POLICY "Clients can view their own requests"
-ON public.booking_requests
-FOR SELECT TO authenticated
-USING (auth.uid() = client_id);
-
--- Allow owners/receptionists to view/manage all
-CREATE POLICY "Admins can manage booking requests"
-ON public.booking_requests
-FOR ALL TO authenticated
-USING (
-  public.has_role(auth.uid(), 'owner') OR
-  public.has_role(auth.uid(), 'receptionist')
-);
-
--- RLS Policies for staff
+-- Staff
 CREATE POLICY "Authenticated users can view staff" ON public.staff
   FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Owners can manage staff" ON public.staff
   FOR ALL USING (public.has_role(auth.uid(), 'owner'));
 
--- RLS Policies for services
+-- Services
 CREATE POLICY "Authenticated users can view services" ON public.services
   FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Owners can manage services" ON public.services
   FOR ALL USING (public.has_role(auth.uid(), 'owner'));
 
--- RLS Policies for bookings
-CREATE POLICY "Authenticated users can view bookings" ON public.bookings
+-- Bookings
+CREATE POLICY "Authenticated users can view own bookings" ON public.bookings
   FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Owners and receptionists can manage bookings" ON public.bookings
-  FOR ALL USING (
-    public.has_role(auth.uid(), 'owner') OR 
-    public.has_role(auth.uid(), 'receptionist')
-  );
+CREATE POLICY "Owners & receptionists can manage bookings" ON public.bookings
+  FOR ALL USING (public.has_role(auth.uid(), 'owner') OR public.has_role(auth.uid(), 'receptionist'));
 
--- RLS Policies for payments
-CREATE POLICY "Authenticated users can view payments" ON public.payments
+-- Payments
+CREATE POLICY "Authenticated users can view own payments" ON public.payments
   FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Owners and receptionists can manage payments" ON public.payments
-  FOR ALL USING (
-    public.has_role(auth.uid(), 'owner') OR 
-    public.has_role(auth.uid(), 'receptionist')
-  );
+CREATE POLICY "Owners & receptionists can manage payments" ON public.payments
+  FOR ALL USING (public.has_role(auth.uid(), 'owner') OR public.has_role(auth.uid(), 'receptionist'));
 
--- Create indexes for performance
+-- Booking Requests
+CREATE POLICY "Clients can create booking requests" ON public.booking_requests
+  FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Clients can view own requests" ON public.booking_requests
+  FOR SELECT TO authenticated USING (auth.uid() = client_id);
+CREATE POLICY "Admins can manage all booking requests" ON public.booking_requests
+  FOR ALL TO authenticated USING (public.has_role(auth.uid(), 'owner') OR public.has_role(auth.uid(), 'receptionist'));
+
+-- ======================================
+-- 11️⃣ INDEXES
+-- ======================================
+
 CREATE INDEX idx_bookings_date ON public.bookings(appointment_date);
 CREATE INDEX idx_bookings_client ON public.bookings(client_id);
 CREATE INDEX idx_bookings_staff ON public.bookings(staff_id);
 CREATE INDEX idx_payments_booking ON public.payments(booking_id);
 CREATE INDEX idx_payments_date ON public.payments(payment_date);
+

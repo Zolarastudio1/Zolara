@@ -2,208 +2,341 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
-import { Plus } from "lucide-react";
 import { format } from "date-fns";
+import { Loader2, Calendar, Clock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const ClientBookings = () => {
+  const [bookings, setBookings] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
-  const [requests, setRequests] = useState<any[]>([]);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    service_id: "",
-    preferred_date: "",
-    preferred_time: "",
-    notes: "",
-  });
-
-  // TODO: replace with the logged-in client's ID dynamically
-  const clientId = "YOUR_LOGGED_IN_CLIENT_ID";
+  const [loading, setLoading] = useState(true);
+  const [rescheduleDialog, setRescheduleDialog] = useState(false);
+  const [requestDialog, setRequestDialog] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [newDate, setNewDate] = useState("");
+  const [newTime, setNewTime] = useState("");
+  const [selectedService, setSelectedService] = useState("");
+  const [preferredDate, setPreferredDate] = useState("");
+  const [preferredTime, setPreferredTime] = useState("");
+  const [notes, setNotes] = useState("");
+  const [requesting, setRequesting] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
+    fetchBookings();
     fetchServices();
-    fetchRequests();
   }, []);
 
-  const fetchServices = async () => {
+  const fetchBookings = async () => {
+    setLoading(true);
     const { data, error } = await supabase
-      .from("services")
-      .select("*")
-      .eq("is_active", true)
-      .order("name");
+      .from("bookings")
+      .select("*, staff(full_name), services(name)")
+      .eq("client_id", (await supabase.auth.getUser()).data.user?.id)
+      .order("appointment_date", { ascending: true });
 
+    if (error) {
+      toast.error(error.message);
+    } else {
+      setBookings(data || []);
+    }
+    setLoading(false);
+  };
+
+  const fetchServices = async () => {
+    const { data, error } = await supabase.from("services").select("id, name");
     if (error) toast.error("Failed to load services");
     else setServices(data || []);
   };
-const fetchRequests = async () => {
-  const { data, error } = await supabase
-    .from("booking_requests")
-    .select("*, services(name)")
-    .eq("client_id", clientId)
-    .order("created_at", { ascending: false });
 
-  if (error) toast.error("Failed to load booking requests");
-  else setRequests(data as any[] || []);
-};
+  const handleCancel = async (id: string) => {
+    const confirm = window.confirm(
+      "Are you sure you want to cancel this booking?"
+    );
+    if (!confirm) return;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+    const { error } = await supabase
+      .from("bookings")
+      .update({ status: "cancelled" })
+      .eq("id", id);
+
+    if (error) toast.error("Failed to cancel booking");
+    else {
+      toast.success("Booking cancelled successfully");
+      fetchBookings();
+    }
+  };
+
+  const handleReschedule = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.service_id || !formData.preferred_date || !formData.preferred_time) {
-      return toast.error("Please fill all required fields");
+    if (!selectedBooking) return;
+
+    const { error } = await supabase
+      .from("bookings")
+      .update({
+        appointment_date: newDate,
+        appointment_time: newTime,
+        status: "scheduled",
+      })
+      .eq("id", selectedBooking.id);
+
+    if (error) toast.error("Failed to reschedule");
+    else {
+      toast.success("Booking rescheduled successfully");
+      setRescheduleDialog(false);
+      fetchBookings();
+    }
+  };
+
+  const handleRequestBooking = async (e: React.FormEvent) => {
+    setRequesting(true);
+    e.preventDefault();
+    const user = (await supabase.auth.getUser()).data.user;
+
+    if (!user) {
+      toast.error("Please sign in first");
+      return;
     }
 
+    if (!selectedService || !preferredDate || !preferredTime) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    const { data: existingClient } = await supabase
+      .from("clients")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    if (!existingClient) {
+      await supabase.from("clients").insert({
+        id: user.id,
+        full_name: user.user_metadata.full_name,
+        email: user.email,
+        phone: user.user_metadata.phone || "",
+      });
+    }
+
+    // @ts-ignore
     const { error } = await supabase.from("booking_requests").insert([
       {
-        client_id: clientId,
-        service_id: formData.service_id,
-        preferred_date: formData.preferred_date,
-        preferred_time: formData.preferred_time,
-        notes: formData.notes,
+        client_id: user.id,
+        service_id: selectedService,
+        preferred_date: preferredDate,
+        preferred_time: preferredTime,
+        notes,
+        status: "pending",
       },
     ]);
 
-    if (error) toast.error(error.message);
-    else {
-      toast.success("Booking request submitted!");
-      setDialogOpen(false);
-      setFormData({
-        service_id: "",
-        preferred_date: "",
-        preferred_time: "",
-        notes: "",
-      });
-      fetchRequests();
+    if (error) {
+      toast.error(error.message || "Failed to request booking");
+      setRequesting(false);
+    } else {
+      fetchBookings()
+      toast.success("Booking request submitted successfully!");
+      setRequestDialog(false);
+      setSelectedService("");
+      setPreferredDate("");
+      setPreferredTime("");
+      setNotes("");
+      setRequesting(false);
     }
   };
 
   const getStatusColor = (status: string) => {
-    const map: any = {
-      pending: "bg-yellow-100 text-yellow-800",
-      approved: "bg-green-100 text-green-800",
-      declined: "bg-red-100 text-red-800",
-      converted: "bg-blue-100 text-blue-800",
+    const colors: any = {
+      scheduled: "bg-blue-100 text-blue-800",
+      confirmed: "bg-green-100 text-green-800",
+      completed: "bg-gray-100 text-gray-800",
+      cancelled: "bg-red-100 text-red-800",
+      no_show: "bg-yellow-100 text-yellow-800",
     };
-    return map[status] || "bg-gray-100 text-gray-800";
+    return colors[status] || "bg-muted text-muted-foreground";
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-6 p-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">My Booking Requests</h1>
-          <p className="text-muted-foreground">View and request salon bookings</p>
+          <h1 className="text-3xl font-bold">My Bookings</h1>
+          <p className="text-muted-foreground">
+            View, manage, or request new appointments
+          </p>
         </div>
-
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={requestDialog} onOpenChange={setRequestDialog}>
           <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              New Request
-            </Button>
+            <Button>Request New Booking</Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Request a Booking</DialogTitle>
+              <DialogTitle>Request Booking</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleRequestBooking} className="space-y-4">
               <div>
                 <Label>Service</Label>
-                <Select
-                  value={formData.service_id}
-                  onValueChange={(v) => setFormData({ ...formData, service_id: v })}
+                <select
+                  className="w-full border rounded-md p-2"
+                  value={selectedService}
+                  onChange={(e) => setSelectedService(e.target.value)}
+                  required
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select service" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {services.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <option value="">Select a service</option>
+                  {services.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Date</Label>
+                  <Label>Preferred Date</Label>
                   <Input
                     type="date"
-                    value={formData.preferred_date}
-                    onChange={(e) => setFormData({ ...formData, preferred_date: e.target.value })}
+                    value={preferredDate}
+                    onChange={(e) => setPreferredDate(e.target.value)}
                     required
                   />
                 </div>
                 <div>
-                  <Label>Time</Label>
+                  <Label>Preferred Time</Label>
                   <Input
                     type="time"
-                    value={formData.preferred_time}
-                    onChange={(e) => setFormData({ ...formData, preferred_time: e.target.value })}
+                    value={preferredTime}
+                    onChange={(e) => setPreferredTime(e.target.value)}
                     required
                   />
                 </div>
               </div>
-
               <div>
                 <Label>Notes (optional)</Label>
                 <Input
-                  placeholder="Special requests or details"
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  type="text"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Any special requests..."
                 />
               </div>
-
               <Button type="submit" className="w-full">
-                Submit Request
+                {!requesting ? "Submit Request" : "Loading..."}
               </Button>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Booking Requests */}
-      <div className="grid gap-4">
-        {requests.map((r) => (
-          <Card key={r.id} className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex justify-between items-start">
-              <div>
-                <CardTitle>{r.services?.name || "Service"}</CardTitle>
-                {r.preferred_date && (
+      {loading ? (
+        <div className="flex justify-center items-center p-8">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </div>
+      ) : bookings.length === 0 ? (
+        <Card className="p-8 text-center text-muted-foreground">
+          No bookings yet. Request your first appointment!
+        </Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {bookings.map((booking) => (
+            <Card
+              key={booking.id}
+              className="hover:shadow-lg transition-shadow"
+            >
+              <CardHeader className="flex justify-between items-start">
+                <div>
+                  <CardTitle>{booking.services?.name}</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    {format(new Date(r.preferred_date), "MMM dd, yyyy")} at {r.preferred_time}
+                    {booking.staff?.full_name || "Unassigned"}
                   </p>
-                )}
-              </div>
-              <Badge className={getStatusColor(r.status)}>{r.status}</Badge>
-            </CardHeader>
-            <CardContent>
-              {r.notes && <p className="text-sm text-muted-foreground">Note: {r.notes}</p>}
-              {r.admin_notes && (
-                <p className="text-sm mt-2 text-blue-600">
-                  Admin note: {r.admin_notes}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+                </div>
+                <Badge className={getStatusColor(booking.status)}>
+                  {booking.status}
+                </Badge>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="w-4 h-4" />
+                  {format(new Date(booking.appointment_date), "PPP")}
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className="w-4 h-4" />
+                  {booking.appointment_time}
+                </div>
 
-        {requests.length === 0 && (
-          <Card>
-            <CardContent className="text-center py-10 text-muted-foreground">
-              You haven’t made any booking requests yet.
-            </CardContent>
-          </Card>
-        )}
-      </div>
+                <div className="flex gap-2 mt-4">
+                  {booking.status === "scheduled" && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedBooking(booking);
+                          setRescheduleDialog(true);
+                        }}
+                      >
+                        Reschedule
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleCancel(booking.id)}
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Reschedule Dialog */}
+      <Dialog open={rescheduleDialog} onOpenChange={setRescheduleDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reschedule Booking</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleReschedule} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>New Date</Label>
+                <Input
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <Label>New Time</Label>
+                <Input
+                  type="time"
+                  value={newTime}
+                  onChange={(e) => setNewTime(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <Button type="submit" className="w-full">
+              Confirm Reschedule
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

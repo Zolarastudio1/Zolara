@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Mail, Phone } from "lucide-react";
+import { Plus, Mail, Phone, Trash } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,8 @@ const clientSchema = z.object({
 const Clients = () => {
   const [clients, setClients] = useState<any[]>([]);
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
+  const [deleteServiceId, setDeleteServiceId] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -125,6 +127,27 @@ const Clients = () => {
     }
   };
 
+  const handleDeleteService = async () => {
+    if (!deleteServiceId) return;
+
+    try {
+      const { error } = await supabase
+        .from("clients")
+        .delete()
+        .eq("id", deleteServiceId);
+
+      if (error) throw error;
+
+      toast.success("Service deleted successfully");
+      fetchClients();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete service");
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeleteServiceId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center p-8">
@@ -138,7 +161,7 @@ const Clients = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Clients</h1>
-          <p className="text-muted-foreground">Manage your salon clients</p>
+          <p className="text-muted-foreground">Manage your Zolara clients</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -214,6 +237,28 @@ const Clients = () => {
             </form>
           </DialogContent>
         </Dialog>
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Delete Service</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground mb-4">
+              Are you sure you want to delete this service? This action cannot
+              be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteService}>
+                Delete
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {clients.map((client) => (
@@ -252,6 +297,16 @@ const Clients = () => {
                 }}
               >
                 Edit
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => {
+                  setDeleteServiceId(client.id);
+                  setDeleteDialogOpen(true);
+                }}
+              >
+                <Trash className="w-4 h-4" />
               </Button>
             </CardHeader>
 
@@ -296,7 +351,6 @@ const Clients = () => {
               <p className="text-gray-500 dark:text-gray-400 text-lg">
                 No clients yet. Add your first client!
               </p>
-              <Plus className="mx-auto mt-4 w-8 h-8 text-green-500 animate-bounce" />
             </CardContent>
           </Card>
         )}

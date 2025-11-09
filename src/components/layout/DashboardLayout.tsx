@@ -23,6 +23,7 @@ const DashboardLayout = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isClient = user?.user_metadata?.role == "client"
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -50,6 +51,9 @@ const DashboardLayout = () => {
     navigate("/auth");
   };
 
+  console.log(location)
+
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -70,6 +74,12 @@ const DashboardLayout = () => {
     { icon: CreditCard, label: "Sales", path: "/sales" },
     { icon: FileText, label: "Reports", path: "/reports" },
   ];
+
+  const filteredNavItems = isClient
+  ? navItems.filter(item =>
+      ["Dashboard", "Bookings", "Services"].includes(item.label)
+    )
+  : navItems;
 
   return (
     <div className="min-h-screen bg-background">
@@ -117,7 +127,7 @@ const DashboardLayout = () => {
           </div>
 
           <nav className="flex-1 p-4 space-y-1">
-            {navItems.map((item) => {
+            {filteredNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
               return (
@@ -175,7 +185,7 @@ const DashboardLayout = () => {
           >
             <Menu className="w-5 h-5" />
           </Button>
-          <h1 className="font-semibold text-lg">Salon Management</h1>
+          <h1 className="font-semibold text-lg">Zolara Beauty Studio</h1>
         </header>
 
         {/* Page Content */}

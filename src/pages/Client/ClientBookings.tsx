@@ -146,8 +146,8 @@ const ClientBookings = () => {
       toast.error(error.message || "Failed to request booking");
       setRequesting(false);
     } else {
-      fetchBookings()
       toast.success("Booking request submitted successfully!");
+      fetchBookings()
       setRequestDialog(false);
       setSelectedService("");
       setPreferredDate("");

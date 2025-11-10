@@ -17,6 +17,7 @@ import ClientDashboard from "./pages/Client/ClientDashboard";
 import { useEffect, useState } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import ClientBookings from "./pages/Client/ClientBookings";
+import ViewServices from "./pages/Client/ViewServices";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,7 @@ const App = () => {
               />
               <Route path="/dashboard" element={<ClientDashboard />} />
               <Route path="/bookings" element={<ClientBookings/>} />
+              <Route path="/services" element={<ViewServices />} />
               <Route path="admin/dashboard" element={<Dashboard />} />
               <Route path="admin/bookings" element={<Bookings />} />
               <Route path="admin/clients" element={<Clients />} />

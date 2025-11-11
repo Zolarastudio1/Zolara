@@ -52,42 +52,48 @@ const Auth = () => {
   >("client");
 
   /** Handle Login */
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+const handleLogin = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
 
-    try {
-      const validated = loginSchema.parse({
-        email: loginEmail,
-        password: loginPassword,
-      });
+  try {
+    const validated = loginSchema.parse({
+      email: loginEmail,
+      password: loginPassword,
+    });
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: validated.email,
-        password: validated.password,
-      });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: validated.email,
+      password: validated.password,
+    });
 
-      if (error) throw error;
-      if (!data.user) throw new Error("User not found");
+    if (error) throw error;
+    if (!data.user) throw new Error("User not found");
 
-      // Extract role from user_metadata
-      const role = (data.user.user_metadata?.role as string) || "client";
+    // Try fetching user role from profiles table
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.user.id)
+      .single();
 
-      // Save minimal user data in localStorage
-      const userData = { id: data.user.id, email: data.user.email, role };
-      localStorage.setItem("user", JSON.stringify(userData));
+    const role = data.user.user_metadata?.role || "client";
 
-      toast.success("Login successful!");
+    // Save minimal user data in localStorage
+    const userData = { id: data.user.id, email: data.user.email, role };
+    localStorage.setItem("user", JSON.stringify(userData));
 
-      // Redirect based on role
-      redirectToDashboard(role);
-    } catch (error: any) {
-      if (error instanceof z.ZodError) toast.error(error.errors[0].message);
-      else toast.error(error.message || "Login failed");
-    } finally {
-      setLoading(false);
-    }
-  };
+    toast.success("Login successful!");
+
+    redirectToDashboard(role);
+  } catch (error: any) {
+    if (error instanceof z.ZodError) toast.error(error.errors[0].message);
+    else toast.error(error.message || "Login failed");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   /** Handle Signup */
   const handleSignup = async (e: React.FormEvent) => {

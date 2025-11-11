@@ -16,9 +16,11 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { Loader2, Calendar, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { fetchUserBookings } from "@/lib/utils";
 
 const ClientBookings = () => {
   const [bookings, setBookings] = useState<any[]>([]);
+  const [requestBookings, setRequestBookings] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [rescheduleDialog, setRescheduleDialog] = useState(false);
@@ -34,30 +36,32 @@ const ClientBookings = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchBookings();
-    fetchServices();
+    fetchData();
   }, []);
 
-  const fetchBookings = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("bookings")
-      .select("*, staff(full_name), services(name)")
-      .eq("client_id", (await supabase.auth.getUser()).data.user?.id)
-      .order("appointment_date", { ascending: true });
+  const fetchData = async () => {
+    try {
+      const [bookingsRes, requestsRes, servicesRes] = await Promise.all([
+        supabase
+          .from("bookings")
+          .select("*, clients(*), staff(*), services(*)")
+          .order("appointment_date", { ascending: false }),
+        supabase //@ts-ignore
+          .from("booking_requests")
+          .select("*, clients(*), services(*)")
+          .order("created_at", { ascending: false }),
+        supabase.from("services").select("*").order("name"),
+      ]);
 
-    if (error) {
-      toast.error(error.message);
-    } else {
-      setBookings(data || []);
+      if (bookingsRes.data) setBookings(bookingsRes.data);
+      if (requestsRes.data) setRequestBookings(requestsRes.data);
+      if (servicesRes.data) setServices(servicesRes.data);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      toast.error("Failed to load data");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
-
-  const fetchServices = async () => {
-    const { data, error } = await supabase.from("services").select("id, name");
-    if (error) toast.error("Failed to load services");
-    else setServices(data || []);
   };
 
   const handleCancel = async (id: string) => {
@@ -74,7 +78,12 @@ const ClientBookings = () => {
     if (error) toast.error("Failed to cancel booking");
     else {
       toast.success("Booking cancelled successfully");
-      fetchBookings();
+      fetchUserBookings({
+        table: "bookings",
+        setState: setBookings,
+        setLoading,
+        role: "client",
+      });
     }
   };
 
@@ -96,7 +105,20 @@ const ClientBookings = () => {
     else {
       toast.success("Booking rescheduled successfully");
       setRescheduleDialog(false);
-      fetchBookings();
+
+      fetchUserBookings({
+        table: "booking_requests",
+        setState: setRequestBookings,
+        setLoading,
+        role: "client",
+      });
+
+      fetchUserBookings({
+        table: "booking",
+        setState: setBookings,
+        setLoading,
+        role: "client",
+      });
     }
   };
 
@@ -147,7 +169,14 @@ const ClientBookings = () => {
       setRequesting(false);
     } else {
       toast.success("Booking request submitted successfully!");
-      fetchBookings()
+
+      fetchUserBookings({
+        table: "booking_requests",
+        setState: setRequestBookings,
+        setLoading,
+        role: "client",
+      });
+
       setRequestDialog(false);
       setSelectedService("");
       setPreferredDate("");
@@ -167,6 +196,8 @@ const ClientBookings = () => {
     };
     return colors[status] || "bg-muted text-muted-foreground";
   };
+
+  console.log(requestBookings)
 
   return (
     <div className="space-y-6 p-6">
@@ -243,65 +274,122 @@ const ClientBookings = () => {
         <div className="flex justify-center items-center p-8">
           <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
-      ) : bookings.length === 0 ? (
+      ) : requestBookings.length === 0 ? (
         <Card className="p-8 text-center text-muted-foreground">
           No bookings yet. Request your first appointment!
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {bookings.map((booking) => (
-            <Card
-              key={booking.id}
-              className="hover:shadow-lg transition-shadow"
-            >
-              <CardHeader className="flex justify-between items-start">
-                <div>
-                  <CardTitle>{booking.services?.name}</CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    {booking.staff?.full_name || "Unassigned"}
-                  </p>
-                </div>
-                <Badge className={getStatusColor(booking.status)}>
-                  {booking.status}
-                </Badge>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="w-4 h-4" />
-                  {format(new Date(booking.appointment_date), "PPP")}
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Clock className="w-4 h-4" />
-                  {booking.appointment_time}
-                </div>
+        <>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {requestBookings.map((booking) => (
+              <Card
+                key={booking.id}
+                className="hover:shadow-lg transition-shadow"
+              >
+                <CardHeader className="flex justify-between items-start">
+                  <div>
+                    <CardTitle>{booking.services?.name}</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {booking.staff?.full_name || "Unassigned"}
+                    </p>
+                  </div>
+                  <Badge className={getStatusColor(booking.status)}>
+                    {booking.status}
+                  </Badge>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Calendar className="w-4 h-4" />
+                    {format(new Date(booking.appointment_date), "PPP")}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="w-4 h-4" />
+                    {booking.appointment_time}
+                  </div>
 
-                <div className="flex gap-2 mt-4">
-                  {booking.status === "scheduled" && (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedBooking(booking);
-                          setRescheduleDialog(true);
-                        }}
-                      >
-                        Reschedule
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleCancel(booking.id)}
-                      >
-                        Cancel
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <div className="flex gap-2 mt-4">
+                    {booking.status === "scheduled" && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedBooking(booking);
+                            setRescheduleDialog(true);
+                          }}
+                        >
+                          Reschedule
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleCancel(booking.id)}
+                        >
+                          Cancel
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {bookings.map((booking) => (
+              <Card
+                key={booking.id}
+                className="hover:shadow-lg transition-shadow"
+              >
+                <CardHeader className="flex justify-between items-start">
+                  <div>
+                    <CardTitle>{booking.services?.name}</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {booking.staff?.full_name || "Unassigned"}
+                    </p>
+                  </div>
+                  <Badge className={getStatusColor(booking.status)}>
+                    {booking.status}
+                  </Badge>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Calendar className="w-4 h-4" />
+                    {format(new Date(booking.appointment_date), "PPP")}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="w-4 h-4" />
+                    {booking.appointment_time}
+                  </div>
+
+                  <div className="flex gap-2 mt-4">
+                    {booking.status === "scheduled" && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedBooking(booking);
+                            setRescheduleDialog(true);
+                          }}
+                        >
+                          Reschedule
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleCancel(booking.id)}
+                        >
+                          Cancel
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Reschedule Dialog */}

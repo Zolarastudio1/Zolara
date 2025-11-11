@@ -84,7 +84,7 @@ const Bookings = () => {
             .from("bookings")
             .select("*, clients(*), staff(*), services(*)")
             .order("appointment_date", { ascending: false }),
-          supabase
+          supabase //@ts-ignore
             .from("booking_requests") 
             .select("*, clients(*), services(*)")
             .order("created_at", { ascending: false }),
@@ -177,6 +177,7 @@ const Bookings = () => {
     // Handle admin approval or decline of requests
   const handleRequestStatus = async (id: string, status: "approved" | "declined") => {
     try {
+      // @ts-ignore
       const { error } = await supabase.from("booking_requests").update({ request_status }).eq("id", id);
       if (error) throw error;
 

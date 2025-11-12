@@ -167,7 +167,7 @@ const StaffLayout = () => {
           </div>
         ) : bookings.length === 0 ? (
           <Card className="p-6 text-center text-muted-foreground">
-            No bookings yet.
+            No assigned bookings for now.
           </Card>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

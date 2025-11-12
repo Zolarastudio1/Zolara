@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Scissors } from "lucide-react";
+import { Scissors, Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 import RoleSelect from "@/components/ui/role-select";
 
@@ -43,6 +43,7 @@ const Auth = () => {
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const [signupFullName, setSignupFullName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
@@ -52,48 +53,47 @@ const Auth = () => {
   >("client");
 
   /** Handle Login */
-const handleLogin = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
 
-  try {
-    const validated = loginSchema.parse({
-      email: loginEmail,
-      password: loginPassword,
-    });
+    try {
+      const validated = loginSchema.parse({
+        email: loginEmail,
+        password: loginPassword,
+      });
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: validated.email,
-      password: validated.password,
-    });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: validated.email,
+        password: validated.password,
+      });
 
-    if (error) throw error;
-    if (!data.user) throw new Error("User not found");
+      if (error) throw error;
+      if (!data.user) throw new Error("User not found");
 
-    // Try fetching user role from profiles table
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", data.user.id)
-      .single();
+      // Try fetching user role from profiles table
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
+        .single();
 
-    const role = data.user.user_metadata?.role || "client";
+      const role = data.user.user_metadata?.role || "client";
 
-    // Save minimal user data in localStorage
-    const userData = { id: data.user.id, email: data.user.email, role };
-    localStorage.setItem("user", JSON.stringify(userData));
+      // Save minimal user data in localStorage
+      const userData = { id: data.user.id, email: data.user.email, role };
+      localStorage.setItem("user", JSON.stringify(userData));
 
-    toast.success("Login successful!");
+      toast.success("Login successful!");
 
-    redirectToDashboard(role);
-  } catch (error: any) {
-    if (error instanceof z.ZodError) toast.error(error.errors[0].message);
-    else toast.error(error.message || "Login failed");
-  } finally {
-    setLoading(false);
-  }
-};
-
+      redirectToDashboard(role);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) toast.error(error.errors[0].message);
+      else toast.error(error.message || "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   /** Handle Signup */
   const handleSignup = async (e: React.FormEvent) => {
@@ -191,17 +191,27 @@ const handleLogin = async (e: React.FormEvent) => {
                     required
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="login-password">Password</Label>
+                <div className="space-y-2 relative">
+                  <Label htmlFor="signup-password">Password</Label>
                   <Input
                     id="login-password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     required
+                    className="pr-10" // space for the eye icon
                   />
+                  <button
+                    type="button"
+                    className="absolute top-[38px] right-3 text-gray-400 hover:text-gray-600"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    tabIndex={-1} // avoid focus when tabbing
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
+
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Logging in..." : "Login"}
                 </Button>
@@ -233,18 +243,27 @@ const handleLogin = async (e: React.FormEvent) => {
                     required
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 relative">
                   <Label htmlFor="signup-password">Password</Label>
                   <Input
-                    id="signup-password"
-                    type="password"
+                    id="login-password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
-                    value={signupPassword}
-                    onChange={(e) => setSignupPassword(e.target.value)}
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
                     required
-                    minLength={6}
+                    className="pr-10" // space for the eye icon
                   />
+                  <button
+                    type="button"
+                    className="absolute top-[38px] right-3 text-gray-400 hover:text-gray-600"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    tabIndex={-1} // avoid focus when tabbing
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
+
                 {/* Optional: Role Selection */}
                 <div className="space-y-2">
                   <Label htmlFor="signup-role">Role</Label>

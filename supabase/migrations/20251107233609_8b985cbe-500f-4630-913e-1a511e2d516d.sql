@@ -1,5 +1,5 @@
 -- ======================================
--- 1️⃣ ENUMS
+-- ENUMS
 -- ======================================
 
 CREATE TYPE public.app_role AS ENUM ('owner', 'receptionist', 'staff');
@@ -9,7 +9,7 @@ CREATE TYPE public.payment_status AS ENUM ('pending', 'completed', 'refunded');
 CREATE TYPE public.request_status AS ENUM ('pending', 'approved', 'declined', 'converted');
 
 -- ======================================
--- 2️⃣ USERS & ROLES
+-- USERS & ROLES
 -- ======================================
 
 -- Profiles
@@ -32,7 +32,7 @@ CREATE TABLE public.user_roles (
 );
 
 -- ======================================
--- 3️⃣ CLIENTS & STAFF
+-- CLIENTS & STAFF
 -- ======================================
 
 CREATE TABLE public.clients (
@@ -58,7 +58,7 @@ CREATE TABLE public.staff (
 );
 
 -- ======================================
--- 4️⃣ SERVICES
+-- SERVICES
 -- ======================================
 
 CREATE TABLE public.services (
@@ -74,7 +74,7 @@ CREATE TABLE public.services (
 );
 
 -- ======================================
--- 5️⃣ BOOKINGS
+-- BOOKINGS
 -- ======================================
 
 CREATE TABLE public.bookings (
@@ -91,7 +91,7 @@ CREATE TABLE public.bookings (
 );
 
 -- ======================================
--- 6️⃣ PAYMENTS
+-- PAYMENTS
 -- ======================================
 
 CREATE TABLE public.payments (
@@ -106,7 +106,7 @@ CREATE TABLE public.payments (
 );
 
 -- ======================================
--- 7️⃣ BOOKING REQUESTS
+-- BOOKING REQUESTS
 -- ======================================
 
 CREATE TABLE public.booking_requests (
@@ -122,8 +122,23 @@ CREATE TABLE public.booking_requests (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+
 -- ======================================
--- 8️⃣ TRIGGERS FOR UPDATED_AT
+-- ATTENDANCE
+-- ======================================
+
+CREATE TABLE public.attendance (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  staff_id UUID REFERENCES public.staff(id) ON DELETE SET NULL,
+  check_in TIMESTAMPTZ DEFAULT NOW(),
+  check_out TIMESTAMPTZ DEFAULT NOW(),
+  status text check (status in ('present', 'absent', 'late')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+);
+
+
+-- ======================================
+-- TRIGGERS
 -- ======================================
 
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
@@ -150,7 +165,7 @@ CREATE TRIGGER update_booking_requests_updated_at BEFORE UPDATE ON public.bookin
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- ======================================
--- 9️⃣ FUNCTIONS
+-- FUNCTIONS
 -- ======================================
 
 -- Check if user has role
@@ -230,7 +245,7 @@ FOR EACH ROW
 EXECUTE FUNCTION public.ensure_client_exists();
 
 -- ======================================
--- 10️⃣ RLS POLICIES
+--  RLS POLICIES
 -- ======================================
 
 -- Enable RLS
@@ -242,6 +257,8 @@ ALTER TABLE public.services ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.booking_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
+
 
 -- Profiles
 CREATE POLICY "Users can view/update their own profile" ON public.profiles
@@ -291,8 +308,34 @@ CREATE POLICY "Clients can view own requests" ON public.booking_requests
 CREATE POLICY "Admins can manage all booking requests" ON public.booking_requests
   FOR ALL TO authenticated USING (public.has_role(auth.uid(), 'owner') OR public.has_role(auth.uid(), 'receptionist'));
 
+--- Attendance
+-- Only owners and receptionists can manage attendance
+CREATE POLICY "Owners & receptionists can insert attendance" ON public.attendance
+FOR INSERT TO authenticated WITH CHECK (
+  has_role(auth.uid(), 'owner'::app_role) OR 
+  has_role(auth.uid(), 'receptionist'::app_role)
+);
+
+CREATE POLICY "Owners & receptionists can select attendance" ON public.attendance
+FOR SELECT TO authenticated
+USING (
+  has_role(auth.uid(), 'owner'::app_role) OR 
+  has_role(auth.uid(), 'receptionist'::app_role)
+);
+
+CREATE POLICY "Owners & receptionists can update attendance" ON public.attendance
+FOR UPDATE TO authenticated
+USING (
+  has_role(auth.uid(), 'owner'::app_role) OR 
+  has_role(auth.uid(), 'receptionist'::app_role)
+)
+WITH CHECK (
+  has_role(auth.uid(), 'owner'::app_role) OR 
+  has_role(auth.uid(), 'receptionist'::app_role)
+);
+
 -- ======================================
--- 11️⃣ INDEXES
+-- INDEXES
 -- ======================================
 
 CREATE INDEX idx_bookings_date ON public.bookings(appointment_date);

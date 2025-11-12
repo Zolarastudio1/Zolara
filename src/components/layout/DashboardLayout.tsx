@@ -14,8 +14,10 @@ import {
   LogOut,
   Menu,
   X,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const DashboardLayout = () => {
   const navigate = useNavigate();
@@ -23,7 +25,6 @@ const DashboardLayout = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const isClient = user?.user_metadata?.role == "client"
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -47,12 +48,18 @@ const DashboardLayout = () => {
   }, [navigate]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/auth");
+    try {
+      await supabase.auth.signOut();
+      setLoading(true);
+      navigate("/auth");
+    } catch (error) {
+      toast.error("Try again");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  console.log(location)
-
+  console.log(location);
 
   if (loading) {
     return (
@@ -64,22 +71,67 @@ const DashboardLayout = () => {
       </div>
     );
   }
-
-  const navItems = [
-    { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-    { icon: Calendar, label: "Bookings", path: "/bookings" },
-    { icon: Users, label: "Clients", path: "/clients" },
-    { icon: UserCog, label: "Staff", path: "/staff" },
-    { icon: Scissors, label: "Services", path: "/services" },
-    { icon: CreditCard, label: "Sales", path: "/sales" },
-    { icon: FileText, label: "Reports", path: "/reports" },
+  // 1️⃣ Define your base navItems outside the function
+  const baseNavItems = [
+    { icon: LayoutDashboard, label: "Dashboard", path: "dashboard" },
+    { icon: Calendar, label: "Bookings", path: "bookings" },
+    { icon: Users, label: "Clients", path: "clients" },
+    { icon: UserCog, label: "Staff", path: "staff" },
+    { icon: Scissors, label: "Services", path: "services" },
+    { icon: CreditCard, label: "Sales", path: "sales" },
+    { icon: FileText, label: "Reports", path: "reports" },
+    { icon: Clock, label: "Attendance", path: "attendance" },
   ];
 
-  const filteredNavItems = isClient
-  ? navItems.filter(item =>
-      ["Dashboard", "Bookings", "Services"].includes(item.label)
-    )
-  : navItems;
+  // 2️⃣ Create the role-based function (using baseNavItems)
+  const getNavItemsForRole = (role: string | undefined) => {
+    switch (role) {
+      // Owner (Full Access)
+      case "owner":
+        return baseNavItems.map((item) => ({
+          ...item,
+          path: `/admin/${item.path}`,
+        }));
+
+      // Receptionist (Limited Admin)
+      case "receptionist":
+        return baseNavItems
+          .filter((item) => !["Sales", "Reports"].includes(item.label))
+          .map((item) => ({
+            ...item,
+            path: `/staff/${item.path}`,
+          }));
+
+      // Staff (No Attendance)
+      case "staff":
+        return baseNavItems
+          .filter(
+            (item) =>
+              !["Clients", "Sales", "Reports", "Attendance"].includes(
+                item.label
+              )
+          )
+          .map((item) => ({
+            ...item,
+            path: `/staff/${item.path}`,
+          }));
+
+      // Client (Minimal UI)
+      case "client":
+      default:
+        return baseNavItems
+          .filter((item) =>
+            ["Dashboard", "Bookings", "Services"].includes(item.label)
+          )
+          .map((item) => ({
+            ...item,
+            path: `/${item.path}`,
+          }));
+    }
+  };
+
+  const role = user?.user_metadata?.role || "client";
+  const navItems = getNavItemsForRole(role);
 
   return (
     <div className="min-h-screen bg-background">
@@ -127,7 +179,7 @@ const DashboardLayout = () => {
           </div>
 
           <nav className="flex-1 p-4 space-y-1">
-            {filteredNavItems.map((item) => {
+            {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
               return (

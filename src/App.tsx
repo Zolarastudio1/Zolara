@@ -15,13 +15,12 @@ import Services from "./pages/Admin/Services";
 import Sales from "./pages/Admin/Sales";
 import Reports from "./pages/Admin/Reports";
 import NotFound from "./pages/Admin/NotFound";
-import ClientDashboard from "./pages/Client/ClientDashboard";
 import ClientBookings from "./pages/Client/ClientBookings";
 import ViewServices from "./pages/Client/ViewServices";
 import AdminLayout from "./components/layout/AdminLayout";
 import StaffLayout from "./components/layout/StaffLayout";
 import ClientLayout from "./components/layout/ClientLayout";
-import StaffDashboard from "./pages/Staff/StaffDashboard";
+import StaffBookings from "./pages/Staff/StaffBookings";
 
 const queryClient = new QueryClient();
 
@@ -32,24 +31,27 @@ const App = () => (
 
       {/* Admin Routes */}
       <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="bookings" element={<Bookings />} />
+        <Route element={<DashboardLayout />}>
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="bookings" element={<Bookings />} />
+          </Route>
         </Route>
       </Route>
 
       {/* Staff Routes */}
       <Route element={<ProtectedRoute allowedRoles={["staff"]} />}>
-        <Route path="/staff" element={<StaffLayout />}>
-          <Route path="/staff/dashboard" element={<StaffDashboard />} />
+        <Route element={<DashboardLayout />}>
+          <Route path="/staff/dashboard" element={<StaffLayout />} />
+          <Route path="/staff/bookings" element={<StaffBookings />} />
         </Route>
       </Route>
 
       {/* Client Routes */}
       <Route element={<ProtectedRoute allowedRoles={["client"]} />}>
-        <Route path="/" element={<ClientLayout />}>
-          <Route path="/dashboard" element={<ClientDashboard />} />
-          {/* <Route path="/dashboard/profile" element={<ClientProfile />} /> */}
+        <Route element={<DashboardLayout />}>
+          <Route path="/dashboard" element={<ClientLayout />} />
+          <Route path="/bookings" element={<ClientBookings />} />
         </Route>
       </Route>
 

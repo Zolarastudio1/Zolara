@@ -165,9 +165,9 @@ const Auth = () => {
           <div className="mx-auto w-12 h-12 bg-primary rounded-full flex items-center justify-center mb-2">
             <Scissors className="w-6 h-6 text-primary-foreground" />
           </div>
-          <CardTitle className="text-2xl font-bold">Salon Management</CardTitle>
+          <CardTitle className="text-2xl font-bold">Zolara Beauty Salon</CardTitle>
           <CardDescription>
-            Manage your salon operations efficiently
+            {/* Manage your salon operations efficiently */}
           </CardDescription>
         </CardHeader>
         <CardContent>

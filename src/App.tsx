@@ -34,7 +34,8 @@ const App = () => (
         <Route element={<DashboardLayout />}>
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<Dashboard />} />
-            <Route path="bookings" element={<Bookings />} />
+            <Route path="admin/bookings" element={<Bookings />} />
+            <Route path="admin/services" element={<Services />} />
           </Route>
         </Route>
       </Route>
@@ -44,6 +45,7 @@ const App = () => (
         <Route element={<DashboardLayout />}>
           <Route path="/staff/dashboard" element={<StaffLayout />} />
           <Route path="/staff/bookings" element={<StaffBookings />} />
+          <Route path="/staff/services" element={<ViewServices />} />
         </Route>
       </Route>
 
@@ -52,6 +54,7 @@ const App = () => (
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<ClientLayout />} />
           <Route path="/bookings" element={<ClientBookings />} />
+          <Route path="/services" element={<ViewServices />} />
         </Route>
       </Route>
 

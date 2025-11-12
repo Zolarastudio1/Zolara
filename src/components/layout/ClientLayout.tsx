@@ -15,7 +15,7 @@ import {
   History,
 } from "lucide-react";
 
-const ClientLayout = () => {
+const ClientDashboard = () => {
   const [bookings, setBookings] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,6 +24,7 @@ const ClientLayout = () => {
     completed: 0,
     cancelled: 0,
     upcoming: 0,
+    pending: 0,
     totalSpent: 0,
   });
 
@@ -33,50 +34,69 @@ const ClientLayout = () => {
 
   const fetchDashboardData = async () => {
     setLoading(true);
-    const user = (await supabase.auth.getUser()).data.user;
-    if (!user) return;
 
-    // Fetch bookings
-    const { data: bookingsData, error: bookingsError } = await supabase
-      .from("bookings")
-      .select("*, staff(full_name), services(name, price)")
-      .eq("client_id", user.id)
-      .order("appointment_date", { ascending: false });
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) return;
 
-    if (bookingsError) {
-      toast.error(bookingsError.message);
-      return;
+      // Fetch all data in parallel
+      const [bookingsRes, pendingRes, paymentsRes] = await Promise.all([
+        supabase
+          .from("bookings")
+          .select("*, staff(full_name), services(name, price)")
+          .eq("client_id", user.id)
+          .order("appointment_date", { ascending: false }),
+        supabase
+          .from("booking_requests")
+          .select("*")
+          .eq("client_id", user.id)
+          .eq("status", "pending")
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("payments")
+          .select("*, bookings(appointment_date, services(name))")
+          .order("payment_date", { ascending: false }),
+      ]);
+
+      if (bookingsRes.error) throw bookingsRes.error;
+      if (pendingRes.error) throw pendingRes.error;
+      if (paymentsRes.error) throw paymentsRes.error;
+
+      const bookingsData = bookingsRes.data || [];
+      const pendingRequestsData = pendingRes.data || [];
+      const paymentsData = paymentsRes.data || [];
+
+      // Compute stats
+      const computedStats = bookingsData.reduce(
+        (acc, b) => {
+          acc.total += 1;
+          if (b.status === "completed") acc.completed += 1;
+          if (b.status === "cancelled") acc.cancelled += 1;
+          if (["scheduled", "confirmed"].includes(b.status)) acc.upcoming += 1;
+          return acc;
+        },
+        {
+          total: 0,
+          completed: 0,
+          cancelled: 0,
+          upcoming: 0,
+          pending: pendingRequestsData.length,
+          totalSpent: 0,
+        }
+      );
+
+      computedStats.totalSpent =
+        paymentsData.reduce((acc, p) => acc + Number(p.amount || 0), 0) || 0;
+
+      setBookings(bookingsData);
+      setPayments(paymentsData);
+      setStats(computedStats);
+    } catch (error: any) {
+      console.error("Error fetching dashboard data:", error);
+      toast.error(error.message || "Failed to load dashboard data");
+    } finally {
+      setLoading(false);
     }
-
-    // Fetch payments
-    const { data: paymentsData, error: paymentsError } = await supabase
-      .from("payments")
-      .select("*, bookings(appointment_date, services(name))")
-      .order("payment_date", { ascending: false });
-
-    if (paymentsError) {
-      toast.error(paymentsError.message);
-    }
-
-    setBookings(bookingsData || []);
-    setPayments(paymentsData || []);
-
-    // Compute stats
-    const total = bookingsData?.length || 0;
-    const completed = bookingsData?.filter(
-      (b) => b.status === "completed"
-    ).length;
-    const cancelled = bookingsData?.filter(
-      (b) => b.status === "cancelled"
-    ).length;
-    const upcoming = bookingsData?.filter(
-      (b) => b.status === "scheduled" || b.status === "confirmed"
-    ).length;
-    const totalSpent =
-      paymentsData?.reduce((acc, p) => acc + Number(p.amount || 0), 0) || 0;
-
-    setStats({ total, completed, cancelled, upcoming, totalSpent });
-    setLoading(false);
   };
 
   const getStatusColor = (status: string) => {
@@ -101,46 +121,12 @@ const ClientLayout = () => {
       </div>
 
       {/* STATS GRID */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="flex items-center justify-between p-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Total Bookings</p>
-              <p className="text-2xl font-bold">{stats.total}</p>
-            </div>
-            <TrendingUp className="text-primary w-6 h-6" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex items-center justify-between p-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Upcoming</p>
-              <p className="text-2xl font-bold">{stats.upcoming}</p>
-            </div>
-            <Calendar className="text-blue-600 w-6 h-6" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex items-center justify-between p-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Completed</p>
-              <p className="text-2xl font-bold">{stats.completed}</p>
-            </div>
-            <TrendingUp className="text-green-600 w-6 h-6" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex items-center justify-between p-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Cancelled</p>
-              <p className="text-2xl font-bold">{stats.cancelled}</p>
-            </div>
-            <TrendingDown className="text-red-600 w-6 h-6" />
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+        <StatCard title="Total Bookings" value={stats.total} icon={<TrendingUp className="w-6 h-6 text-primary" />} />
+        <StatCard title="Upcoming" value={stats.upcoming} icon={<Calendar className="w-6 h-6 text-blue-600" />} />
+        <StatCard title="Completed" value={stats.completed} icon={<TrendingUp className="w-6 h-6 text-green-600" />} />
+        <StatCard title="Cancelled" value={stats.cancelled} icon={<TrendingDown className="w-6 h-6 text-red-600" />} />
+        <StatCard title="Pending Requests" value={stats.pending} icon={<Clock className="w-6 h-6 text-yellow-500" />} />
       </div>
 
       {/* TOTAL EXPENSES */}
@@ -236,4 +222,18 @@ const ClientLayout = () => {
   );
 };
 
-export default ClientLayout;
+export default ClientDashboard;
+
+
+// Reusable Stat Card
+const StatCard = ({ title, value, icon }: { title: string; value: number; icon: React.ReactNode }) => (
+  <Card className="rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+    <CardContent className="flex items-center justify-between p-5">
+      <div>
+        <p className="text-sm text-gray-500 uppercase tracking-wide">{title}</p>
+        <p className="text-2xl font-bold text-gray-900">{value}</p>
+      </div>
+      {icon}
+    </CardContent>
+  </Card>
+);

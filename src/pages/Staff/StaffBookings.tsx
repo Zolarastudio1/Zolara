@@ -208,66 +208,6 @@ const StaffBookings = () => {
             View, manage, or request new appointments
           </p>
         </div>
-        <Dialog open={requestDialog} onOpenChange={setRequestDialog}>
-          <DialogTrigger asChild>
-            <Button>Request New Booking</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Request Booking</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleRequestBooking} className="space-y-4">
-              <div>
-                <Label>Service</Label>
-                <select
-                  className="w-full border rounded-md p-2"
-                  value={selectedService}
-                  onChange={(e) => setSelectedService(e.target.value)}
-                  required
-                >
-                  <option value="">Select a service</option>
-                  {services.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Preferred Date</Label>
-                  <Input
-                    type="date"
-                    value={preferredDate}
-                    onChange={(e) => setPreferredDate(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label>Preferred Time</Label>
-                  <Input
-                    type="time"
-                    value={preferredTime}
-                    onChange={(e) => setPreferredTime(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-              <div>
-                <Label>Notes (optional)</Label>
-                <Input
-                  type="text"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Any special requests..."
-                />
-              </div>
-              <Button type="submit" className="w-full">
-                {!requesting ? "Submit Request" : "Loading..."}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
       </div>
 
       {loading ? (

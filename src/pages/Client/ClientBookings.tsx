@@ -13,10 +13,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { format } from "date-fns";
 import { Loader2, Calendar, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { fetchUserBookings } from "@/lib/utils";
+import { format, parseISO, isValid } from "date-fns";
 
 const ClientBookings = () => {
   const [bookings, setBookings] = useState<any[]>([]);
@@ -196,21 +196,20 @@ const ClientBookings = () => {
     };
     return colors[status] || "bg-muted text-muted-foreground";
   };
-
-  console.log(requestBookings)
-
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-8 p-4 md:p-6">
+      {/* Page Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold">My Bookings</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold text-gray-900">My Bookings</h1>
+          <p className="text-sm text-gray-500 mt-1">
             View, manage, or request new appointments
           </p>
         </div>
+
         <Dialog open={requestDialog} onOpenChange={setRequestDialog}>
           <DialogTrigger asChild>
-            <Button>Request New Booking</Button>
+            <Button className="whitespace-nowrap">Request New Booking</Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
@@ -220,7 +219,7 @@ const ClientBookings = () => {
               <div>
                 <Label>Service</Label>
                 <select
-                  className="w-full border rounded-md p-2"
+                  className="w-full border rounded-md p-2 mt-1"
                   value={selectedService}
                   onChange={(e) => setSelectedService(e.target.value)}
                   required
@@ -233,7 +232,8 @@ const ClientBookings = () => {
                   ))}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label>Preferred Date</Label>
                   <Input
@@ -241,6 +241,7 @@ const ClientBookings = () => {
                     value={preferredDate}
                     onChange={(e) => setPreferredDate(e.target.value)}
                     required
+                    className="mt-1"
                   />
                 </div>
                 <div>
@@ -250,9 +251,11 @@ const ClientBookings = () => {
                     value={preferredTime}
                     onChange={(e) => setPreferredTime(e.target.value)}
                     required
+                    className="mt-1"
                   />
                 </div>
               </div>
+
               <div>
                 <Label>Notes (optional)</Label>
                 <Input
@@ -260,8 +263,10 @@ const ClientBookings = () => {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Any special requests..."
+                  className="mt-1"
                 />
               </div>
+
               <Button type="submit" className="w-full">
                 {!requesting ? "Submit Request" : "Loading..."}
               </Button>
@@ -270,125 +275,171 @@ const ClientBookings = () => {
         </Dialog>
       </div>
 
+      {/* Loader */}
       {loading ? (
         <div className="flex justify-center items-center p-8">
           <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
       ) : requestBookings.length === 0 ? (
-        <Card className="p-8 text-center text-muted-foreground">
+        <Card className="p-8 text-center text-gray-500">
           No bookings yet. Request your first appointment!
         </Card>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {requestBookings.map((booking) => (
-              <Card
-                key={booking.id}
-                className="hover:shadow-lg transition-shadow"
-              >
-                <CardHeader className="flex justify-between items-start">
-                  <div>
-                    <CardTitle>{booking.services?.name}</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      {booking.staff?.full_name || "Unassigned"}
-                    </p>
-                  </div>
-                  <Badge className={getStatusColor(booking.status)}>
-                    {booking.status}
-                  </Badge>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Calendar className="w-4 h-4" />
-                    {format(new Date(booking.appointment_date), "PPP")}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Clock className="w-4 h-4" />
-                    {booking.appointment_time}
-                  </div>
+          {/* Booking Requests */}
+          <section className="space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+              <h2 className="text-2xl font-bold text-gray-900">
+                Booking Requests
+              </h2>
+              <p className="text-sm text-gray-500">
+                Pending appointments you’ve requested
+              </p>
+            </div>
 
-                  <div className="flex gap-2 mt-4">
-                    {booking.status === "scheduled" && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedBooking(booking);
-                            setRescheduleDialog(true);
-                          }}
-                        >
-                          Reschedule
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleCancel(booking.id)}
-                        >
-                          Cancel
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {requestBookings.map((booking) => (
+                <Card
+                  key={booking.id}
+                  className="hover:shadow-xl transition-shadow border border-gray-200 rounded-2xl overflow-hidden"
+                >
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 gap-4">
+                    {/* Left: Service & Staff */}
+                    <div className="flex-1">
+                      <CardTitle className="text-lg font-semibold text-gray-900">
+                        {booking.services?.name || "Service"}
+                      </CardTitle>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {booking.staff?.full_name || "Unassigned"}
+                      </p>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {bookings.map((booking) => (
-              <Card
-                key={booking.id}
-                className="hover:shadow-lg transition-shadow"
-              >
-                <CardHeader className="flex justify-between items-start">
-                  <div>
-                    <CardTitle>{booking.services?.name}</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      {booking.staff?.full_name || "Unassigned"}
-                    </p>
-                  </div>
-                  <Badge className={getStatusColor(booking.status)}>
-                    {booking.status}
-                  </Badge>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Calendar className="w-4 h-4" />
-                    {format(new Date(booking.appointment_date), "PPP")}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Clock className="w-4 h-4" />
-                    {booking.appointment_time}
-                  </div>
+                      <div className="flex flex-wrap gap-4 mt-3 text-gray-600">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-5 h-5 text-blue-500" />
+                          <span className="text-sm font-medium">
+                            {booking.appointment_date
+                              ? isValid(parseISO(booking.appointment_date))
+                                ? format(
+                                    parseISO(booking.appointment_date),
+                                    "PPP"
+                                  )
+                                : "Invalid Date"
+                              : "N/A"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-5 h-5 text-green-500" />
+                          <span className="text-sm font-medium">
+                            {booking.appointment_time || "N/A"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
-                  <div className="flex gap-2 mt-4">
-                    {booking.status === "scheduled" && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedBooking(booking);
-                            setRescheduleDialog(true);
-                          }}
-                        >
-                          Reschedule
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleCancel(booking.id)}
-                        >
-                          Cancel
-                        </Button>
-                      </>
-                    )}
+                    {/* Right: Status & Actions */}
+                    <div className="flex flex-col items-end gap-3 mt-4 md:mt-0">
+                      <Badge
+                        className={`${getStatusColor(
+                          booking.status
+                        )} px-4 py-1 rounded-full uppercase text-xs font-semibold`}
+                      >
+                        {booking.status}
+                      </Badge>
+
+                      {booking.status === "scheduled" && (
+                        <div className="flex gap-2 flex-wrap">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="px-4 py-2"
+                            onClick={() => {
+                              setSelectedBooking(booking);
+                              setRescheduleDialog(true);
+                            }}
+                          >
+                            Reschedule
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="px-4 py-2"
+                            onClick={() => handleCancel(booking.id)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                </Card>
+              ))}
+            </div>
+          </section>
+
+          {/* Confirmed Bookings */}
+          <section className="space-y-4 mt-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+              <h2 className="text-2xl font-bold text-gray-900">My Bookings</h2>
+              <p className="text-sm text-gray-500">
+                Confirmed and upcoming appointments
+              </p>
+            </div>
+
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {bookings.map((booking) => (
+                <Card
+                  key={booking.id}
+                  className="hover:shadow-lg transition-shadow border border-gray-200 rounded-2xl overflow-hidden"
+                >
+                  <CardHeader className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>{booking.services?.name}</CardTitle>
+                      <p className="text-sm text-gray-500">
+                        {booking.staff?.full_name || "Unassigned"}
+                      </p>
+                    </div>
+                    <Badge className={getStatusColor(booking.status)}>
+                      {booking.status}
+                    </Badge>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Calendar className="w-4 h-4" />
+                      {format(new Date(booking.appointment_date), "PPP")}
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Clock className="w-4 h-4" />
+                      {booking.appointment_time}
+                    </div>
+
+                    <div className="flex gap-2 mt-4 flex-wrap">
+                      {booking.status === "scheduled" && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedBooking(booking);
+                              setRescheduleDialog(true);
+                            }}
+                          >
+                            Reschedule
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleCancel(booking.id)}
+                          >
+                            Cancel
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
         </>
       )}
 
@@ -399,7 +450,7 @@ const ClientBookings = () => {
             <DialogTitle>Reschedule Booking</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleReschedule} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>New Date</Label>
                 <Input
@@ -407,6 +458,7 @@ const ClientBookings = () => {
                   value={newDate}
                   onChange={(e) => setNewDate(e.target.value)}
                   required
+                  className="mt-1"
                 />
               </div>
               <div>
@@ -416,6 +468,7 @@ const ClientBookings = () => {
                   value={newTime}
                   onChange={(e) => setNewTime(e.target.value)}
                   required
+                  className="mt-1"
                 />
               </div>
             </div>

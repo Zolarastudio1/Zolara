@@ -100,51 +100,65 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      // Validate
+      // Validate inputs
       const validated = signupSchema.parse({
         fullName: signupFullName,
-        email: signupEmail,
+        email: signupEmail.trim().toLowerCase(),
         password: signupPassword,
         role: signupRole,
       });
 
       let roleToAssign = validated.role;
 
-      // If selected role is not "client", confirm from staff table
+      
+      // Check staff record if not client
       if (validated.role !== "client") {
         const { data: staffRecord, error: staffError } = await supabase
-          .from("staff")
-          .select("id, email")
-          .eq("email", validated.email.toLowerCase())
-          .maybeSingle();
-
-        if (staffError) throw staffError;
+        .from("staff")
+        .select("id, email")
+        .eq("email", validated.email)
+        .maybeSingle(); // return a single record or null
+        
+        console.log("Staff result", staffRecord, staffError)
 
         if (!staffRecord) {
           toast.error(
-            "This email is not registered as staff or receptionist. Please contact the admin."
+            "No staff record found with this email. Please contact the admin."
           );
-          return; // stop signup
+          setLoading(false);
+          return;
         }
 
-        roleToAssign = staffRecord.role;
+        if (staffError) {
+          console.error("Staff check error:", staffError);
+          toast.error("Error checking staff record.");
+          setLoading(false);
+          return;
+        }
+
+
+        console.log("Staff verified:", staffRecord);
       }
+
+      // Do NOT call redirectToDashboard here
+      const emailRedirectLink = `${window.location.origin}/dashboard`;
 
       // Supabase signup
       const { data, error } = await supabase.auth.signUp({
-        email: validated.email.toLowerCase(),
+        email: validated.email,
         password: validated.password,
         options: {
           data: {
             full_name: validated.fullName,
             role: roleToAssign,
           },
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          emailRedirectTo: emailRedirectLink, // just pass the URL, don't call function
         },
       });
 
       if (error) throw error;
 
+      // After successful signup
       if (!data.user) {
         toast.success(
           "Signup successful! Please check your email to verify your account."
@@ -161,10 +175,15 @@ const Auth = () => {
       localStorage.setItem("user", JSON.stringify(userData));
 
       toast.success("Account created successfully!");
+
+      // Redirect manually (AFTER signup)
       redirectToDashboard(roleToAssign);
     } catch (error: any) {
-      if (error instanceof z.ZodError) toast.error(error.errors[0].message);
-      else toast.error(error.message || "Signup failed");
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error(error.message || "Signup failed");
+      }
     } finally {
       setLoading(false);
     }

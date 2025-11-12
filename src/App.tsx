@@ -25,43 +25,49 @@ import StaffBookings from "./pages/Staff/StaffBookings";
 const queryClient = new QueryClient();
 
 const App = () => (
-  <BrowserRouter>
-    <Routes>
-      <Route path="/auth" element={<Auth />} />
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/auth" element={<Auth />} />
 
-      {/* Admin Routes */}
-      <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
-        <Route element={<DashboardLayout />}>
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="admin/bookings" element={<Bookings />} />
-            <Route path="admin/services" element={<Services />} />
+          {/* Admin Routes */}
+          <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+            <Route element={<DashboardLayout />}>
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<Dashboard />} />
+                <Route path="admin/bookings" element={<Bookings />} />
+                <Route path="admin/services" element={<Services />} />
+              </Route>
+            </Route>
           </Route>
-        </Route>
-      </Route>
 
-      {/* Staff Routes */}
-      <Route element={<ProtectedRoute allowedRoles={["staff"]} />}>
-        <Route element={<DashboardLayout />}>
-          <Route path="/staff/dashboard" element={<StaffLayout />} />
-          <Route path="/staff/bookings" element={<StaffBookings />} />
-          <Route path="/staff/services" element={<ViewServices />} />
-        </Route>
-      </Route>
+          {/* Staff Routes */}
+          <Route element={<ProtectedRoute allowedRoles={["staff"]} />}>
+            <Route element={<DashboardLayout />}>
+              <Route path="/staff/dashboard" element={<StaffLayout />} />
+              <Route path="/staff/bookings" element={<StaffBookings />} />
+              <Route path="/staff/services" element={<ViewServices />} />
+            </Route>
+          </Route>
 
-      {/* Client Routes */}
-      <Route element={<ProtectedRoute allowedRoles={["client"]} />}>
-        <Route element={<DashboardLayout />}>
-          <Route path="/dashboard" element={<ClientLayout />} />
-          <Route path="/bookings" element={<ClientBookings />} />
-          <Route path="/services" element={<ViewServices />} />
-        </Route>
-      </Route>
+          {/* Client Routes */}
+          <Route element={<ProtectedRoute allowedRoles={["client"]} />}>
+            <Route element={<DashboardLayout />}>
+              <Route path="/dashboard" element={<ClientLayout />} />
+              <Route path="/bookings" element={<ClientBookings />} />
+              <Route path="/services" element={<ViewServices />} />
+            </Route>
+          </Route>
 
-      <Route path="/" element={<Navigate to="/auth" />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  </BrowserRouter>
+          <Route path="/" element={<Navigate to="/auth" />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
 );
 
 export default App;

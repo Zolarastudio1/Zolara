@@ -95,12 +95,12 @@ const Auth = () => {
     }
   };
 
-  /** Handle Signup */
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      // Validate
       const validated = signupSchema.parse({
         fullName: signupFullName,
         email: signupEmail,
@@ -108,31 +108,60 @@ const Auth = () => {
         role: signupRole,
       });
 
+      let roleToAssign = validated.role;
+
+      // If selected role is not "client", confirm from staff table
+      if (validated.role !== "client") {
+        const { data: staffRecord, error: staffError } = await supabase
+          .from("staff")
+          .select("id, email")
+          .eq("email", validated.email.toLowerCase())
+          .maybeSingle();
+
+        if (staffError) throw staffError;
+
+        if (!staffRecord) {
+          toast.error(
+            "This email is not registered as staff or receptionist. Please contact the admin."
+          );
+          return; // stop signup
+        }
+
+        roleToAssign = staffRecord.role;
+      }
+
+      // Supabase signup
       const { data, error } = await supabase.auth.signUp({
-        email: validated.email,
+        email: validated.email.toLowerCase(),
         password: validated.password,
         options: {
           data: {
             full_name: validated.fullName,
-            role: validated.role || "client", // default role
+            role: roleToAssign,
           },
           emailRedirectTo: `${window.location.origin}/dashboard`,
         },
       });
 
       if (error) throw error;
-      if (!data.user) throw new Error("Signup failed");
 
-      // Save minimal user data in localStorage
+      if (!data.user) {
+        toast.success(
+          "Signup successful! Please check your email to verify your account."
+        );
+        return;
+      }
+
+      // Save user locally
       const userData = {
         id: data.user.id,
         email: data.user.email,
-        role: validated.role || "client",
+        role: roleToAssign,
       };
       localStorage.setItem("user", JSON.stringify(userData));
 
       toast.success("Account created successfully!");
-      redirectToDashboard(userData.role);
+      redirectToDashboard(roleToAssign);
     } catch (error: any) {
       if (error instanceof z.ZodError) toast.error(error.errors[0].message);
       else toast.error(error.message || "Signup failed");
@@ -165,7 +194,9 @@ const Auth = () => {
           <div className="mx-auto w-12 h-12 bg-primary rounded-full flex items-center justify-center mb-2">
             <Scissors className="w-6 h-6 text-primary-foreground" />
           </div>
-          <CardTitle className="text-2xl font-bold">Zolara Beauty Salon</CardTitle>
+          <CardTitle className="text-2xl font-bold">
+            Zolara Beauty Salon
+          </CardTitle>
           <CardDescription>
             {/* Manage your salon operations efficiently */}
           </CardDescription>
@@ -249,8 +280,8 @@ const Auth = () => {
                     id="login-password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
+                    value={signupPassword}
+                    onChange={(e) => setSignupPassword(e.target.value)}
                     required
                     className="pr-10" // space for the eye icon
                   />

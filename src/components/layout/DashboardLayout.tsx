@@ -49,8 +49,8 @@ const DashboardLayout = () => {
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
       setLoading(true);
+      await supabase.auth.signOut();
       navigate("/auth");
     } catch (error) {
       toast.error("Try again");

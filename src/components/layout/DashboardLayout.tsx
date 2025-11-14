@@ -71,7 +71,7 @@ const DashboardLayout = () => {
       </div>
     );
   }
-  // 1️⃣ Define your base navItems outside the function
+  // Define your base navItems outside the function
   const baseNavItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "dashboard" },
     { icon: Calendar, label: "Bookings", path: "bookings" },
@@ -83,7 +83,7 @@ const DashboardLayout = () => {
     { icon: Clock, label: "Attendance", path: "attendance" },
   ];
 
-  // 2️⃣ Create the role-based function (using baseNavItems)
+  // Create the role-based function (using baseNavItems)
   const getNavItemsForRole = (role: string | undefined) => {
     switch (role) {
       // Owner (Full Access)
@@ -107,7 +107,7 @@ const DashboardLayout = () => {
         return baseNavItems
           .filter(
             (item) =>
-              !["Clients", "Sales", "Reports", "Attendance"].includes(
+              !["Clients", "Sales", "Reports"].includes(
                 item.label
               )
           )
@@ -132,6 +132,7 @@ const DashboardLayout = () => {
 
   const role = user?.user_metadata?.role || "client";
   const navItems = getNavItemsForRole(role);
+  // const navItems = getNavItemsForRole("owner");
 
   return (
     <div className="min-h-screen bg-background">

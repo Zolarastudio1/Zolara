@@ -16,7 +16,7 @@ CREATE TYPE public.request_status AS ENUM ('pending', 'approved', 'declined', 'c
 CREATE TABLE public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name TEXT NOT NULL,
-  phone TEXT,
+  phone TEXT,  -- yes exists
   email TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -35,7 +35,7 @@ CREATE TABLE public.user_roles (
 -- CLIENTS & STAFF
 -- ======================================
 
-CREATE TABLE public.clients (
+CREATE TABLE IF NOT EXISTS public.clients (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   full_name TEXT NOT NULL,
   phone TEXT NOT NULL,
@@ -46,7 +46,7 @@ CREATE TABLE public.clients (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE public.staff (
+CREATE TABLE IF NOT EXISTS public.staff (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   full_name TEXT NOT NULL,
   phone TEXT NOT NULL,
@@ -61,7 +61,7 @@ CREATE TABLE public.staff (
 -- SERVICES
 -- ======================================
 
-CREATE TABLE public.services (
+CREATE TABLE IF NOT EXISTS public.services (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   category TEXT NOT NULL,
@@ -77,7 +77,7 @@ CREATE TABLE public.services (
 -- BOOKINGS
 -- ======================================
 
-CREATE TABLE public.bookings (
+CREATE TABLE IF NOT EXISTS public.bookings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   client_id UUID REFERENCES public.clients(id) ON DELETE CASCADE NOT NULL,
   staff_id UUID REFERENCES public.staff(id) ON DELETE SET NULL,
@@ -94,7 +94,7 @@ CREATE TABLE public.bookings (
 -- PAYMENTS
 -- ======================================
 
-CREATE TABLE public.payments (
+CREATE TABLE IF NOT EXISTS public.payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   booking_id UUID REFERENCES public.bookings(id) ON DELETE CASCADE NOT NULL,
   amount DECIMAL(10,2) NOT NULL,
@@ -109,7 +109,7 @@ CREATE TABLE public.payments (
 -- BOOKING REQUESTS
 -- ======================================
 
-CREATE TABLE public.booking_requests (
+CREATE TABLE IF NOT EXISTS public.booking_requests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   client_id UUID REFERENCES public.clients(id) ON DELETE CASCADE NOT NULL,
   service_id UUID REFERENCES public.services(id) ON DELETE CASCADE NOT NULL,
@@ -127,14 +127,15 @@ CREATE TABLE public.booking_requests (
 -- ATTENDANCE
 -- ======================================
 
-CREATE TABLE public.attendance (
+CREATE TABLE IF NOT EXISTS public.attendance (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   staff_id UUID REFERENCES public.staff(id) ON DELETE SET NULL,
   check_in TIMESTAMPTZ DEFAULT NOW(),
-  check_out TIMESTAMPTZ DEFAULT NOW(),
-  status text check (status in ('present', 'absent', 'late')),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
+  check_out TIMESTAMPTZ,
+  status TEXT DEFAULT 'present' CHECK (status IN ('present', 'absent', 'late')),
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
 
 
 -- ======================================
@@ -307,32 +308,37 @@ CREATE POLICY "Clients can view own requests" ON public.booking_requests
   FOR SELECT TO authenticated USING (auth.uid() = client_id);
 CREATE POLICY "Admins can manage all booking requests" ON public.booking_requests
   FOR ALL TO authenticated USING (public.has_role(auth.uid(), 'owner') OR public.has_role(auth.uid(), 'receptionist'));
+CREATE POLICY "Admins can manage all attendance" ON public.attendance
+  FOR ALL TO authenticated USING (public.has_role(auth.uid(), 'owner') OR public.has_role(auth.uid(), 'receptionist'));
 
 --- Attendance
--- Only owners and receptionists can manage attendance
-CREATE POLICY "Owners & receptionists can insert attendance" ON public.attendance
-FOR INSERT TO authenticated WITH CHECK (
-  has_role(auth.uid(), 'owner'::app_role) OR 
-  has_role(auth.uid(), 'receptionist'::app_role)
+-- Owners & receptionists can insert attendance
+CREATE POLICY attendance_insert
+ON public.attendance
+FOR INSERT TO authenticated
+WITH CHECK (
+  has_role(auth.uid(), 'owner') OR 
+  has_role(auth.uid(), 'receptionist')
 );
 
-CREATE POLICY "Owners & receptionists can select attendance" ON public.attendance
-FOR SELECT TO authenticated
-USING (
-  has_role(auth.uid(), 'owner'::app_role) OR 
-  has_role(auth.uid(), 'receptionist'::app_role)
-);
-
-CREATE POLICY "Owners & receptionists can update attendance" ON public.attendance
+-- Owners & receptionists can update attendance
+CREATE POLICY attendance_update
+ON public.attendance
 FOR UPDATE TO authenticated
 USING (
-  has_role(auth.uid(), 'owner'::app_role) OR 
-  has_role(auth.uid(), 'receptionist'::app_role)
+  has_role(auth.uid(), 'owner') OR 
+  has_role(auth.uid(), 'receptionist')
 )
 WITH CHECK (
-  has_role(auth.uid(), 'owner'::app_role) OR 
-  has_role(auth.uid(), 'receptionist'::app_role)
+  has_role(auth.uid(), 'owner') OR 
+  has_role(auth.uid(), 'receptionist')
 );
+
+-- Anyone authenticated can read attendance
+CREATE POLICY attendance_read
+ON public.attendance
+FOR SELECT TO authenticated
+USING (true);
 
 -- ======================================
 -- INDEXES
@@ -343,4 +349,5 @@ CREATE INDEX idx_bookings_client ON public.bookings(client_id);
 CREATE INDEX idx_bookings_staff ON public.bookings(staff_id);
 CREATE INDEX idx_payments_booking ON public.payments(booking_id);
 CREATE INDEX idx_payments_date ON public.payments(payment_date);
-
+CREATE INDEX idx_attendance_staff_id on public.attendance(staff_id);
+CREATE INDEX idx_attendance_checkin on public.attendance(check_in);

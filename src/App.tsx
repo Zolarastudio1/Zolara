@@ -21,6 +21,8 @@ import AdminLayout from "./components/layout/AdminLayout";
 import StaffLayout from "./components/layout/StaffLayout";
 import ClientLayout from "./components/layout/ClientLayout";
 import StaffBookings from "./pages/Staff/StaffBookings";
+import Attendance from "./pages/Admin/Attendance";
+import MyAttendance from "./pages/Staff/MyAttendance";
 
 const queryClient = new QueryClient();
 
@@ -35,12 +37,16 @@ const App = () => (
 
           {/* Admin Routes */}
           <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          {/* <Route element={<ProtectedRoute allowedRoles={["client"]} />}> */}
             <Route element={<DashboardLayout />}>
-              <Route path="/admin" element={<AdminLayout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="admin/bookings" element={<Bookings />} />
-                <Route path="admin/services" element={<Services />} />
-              </Route>
+              <Route path="/admin/dashboard" element={<AdminLayout />} />
+]              <Route path="admin/bookings" element={<Bookings />} />
+              <Route path="admin/services" element={<Services />} />
+              <Route path="admin/clients" element={<Clients />} />
+              <Route path="admin/staff" element={<Staff />} />
+              <Route path="admin/sales" element={<Sales />} />
+              <Route path="admin/reports" element={<Reports />} />
+              <Route path="admin/attendance" element={<Attendance />} />
             </Route>
           </Route>
 
@@ -50,6 +56,7 @@ const App = () => (
               <Route path="/staff/dashboard" element={<StaffLayout />} />
               <Route path="/staff/bookings" element={<StaffBookings />} />
               <Route path="/staff/services" element={<ViewServices />} />
+              <Route path="/staff/attendance" element={<MyAttendance />} />
             </Route>
           </Route>
 

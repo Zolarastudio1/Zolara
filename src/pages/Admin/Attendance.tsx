@@ -2,152 +2,286 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Card } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 
-interface Attendance {
+interface AttendanceRecord {
   id: string;
   staff_id: string;
-  check_in: string;
+  check_in: string | null;
   check_out: string | null;
   status: "present" | "absent" | "late";
   created_at: string;
+  staff?: {
+    full_name: string;
+    email: string;
+  };
+}
+
+interface Staff {
+  id: string;
+  full_name: string;
+  email: string;
 }
 
 export default function Attendance() {
-  const [hasCheckedIn, setHasCheckedIn] = useState(false);
-  const [recordId, setRecordId] = useState<string | null>(null);
+  const [attendanceRecords, setAttendanceRecords] = useState<
+    AttendanceRecord[]
+  >([]);
+  const [staffList, setStaffList] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(false);
+  const [userRole, setUserRole] = useState<string>("owner");
 
   useEffect(() => {
-    checkTodayAttendance();
+    // fetchUserRole();
   }, []);
 
-  const getTodayRange = () => {
-    const todayStart = new Date();
-    todayStart.setUTCHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setUTCHours(23, 59, 59, 999);
-    return {
-      todayStart: todayStart.toISOString(),
-      todayEnd: todayEnd.toISOString(),
-    };
-  };
+  useEffect(() => {
+    if (userRole === "owner" || userRole === "receptionist") {
+      fetchStaff();
+      fetchAttendance();
+    }
+  }, [userRole]);
 
-  const checkTodayAttendance = async () => {
+  /** Fetch Logged-in User Role */
+  const fetchUserRole = async () => {
     try {
       const { data: userData } = await supabase.auth.getUser();
-      const userId = userData?.user?.id;
-      if (!userId) return;
+      const role = userData?.user?.user_metadata?.role || "";
+      setUserRole(role);
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Unable to fetch user role");
+    }
+  };
 
+  /** Fetch Staff List */
+  const fetchStaff = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("staff")
+        .select("id, full_name, email");
+
+      if (error) throw error;
+      setStaffList(data || []);
+    } catch (err: any) {
+      toast.error("Failed to load staff list");
+    }
+  };
+
+  /** Fetch Attendance Records for Today */
+  const fetchAttendance = async () => {
+    setLoading(true);
+
+    try {
       const { todayStart, todayEnd } = getTodayRange();
 
       const { data, error } = await supabase
-        //@ts-ignore
-        .from<Attendance>("attendance")
-        .select("*")
-        //@ts-ignore
-        .eq("staff_id", userId)
+        .from("attendance")
+        .select("*, staff:staff(full_name, email)") // Only works if foreign key exists
         .gte("check_in", todayStart)
-        .lte("check_in", todayEnd)
-        .maybeSingle();
+        .lte("check_in", todayEnd);
 
-      if (error) {
-        console.error("Error checking attendance:", error);
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        toast.info("No attendance records found for today");
+        setAttendanceRecords([]);
         return;
       }
 
-      if (data) {
-        setHasCheckedIn(true);
-        //@ts-ignore
-        setRecordId(data.id);
-      }
-    } catch (err) {
-      console.error(err);
+      setAttendanceRecords(data);
+    } catch (err: any) {
+      console.error("Failed to fetch attendance:", err);
+      toast.error("Failed to load attendance records");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleCheckIn = async () => {
-    if (hasCheckedIn) {
-      toast.info("You have already checked in today.");
-      return;
-    }
+  /** Utility: Today's Time Range */
+  const getTodayRange = () => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
 
-    setLoading(true);
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+
+    return { todayStart: start.toISOString(), todayEnd: end.toISOString() };
+  };
+
+  /** Check-in a Staff */
+  const handleCheckIn = async (staffId: string) => {
+    console.log("Staff ID:", staffId);
+
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData?.user?.id;
-      if (!userId) {
-        toast.error("User not authenticated");
-        setLoading(false);
+      const { todayStart, todayEnd } = getTodayRange();
+
+      // Check if there is an existing attendance for today
+      const { data: existingRecords, error: fetchError } = await supabase
+        .from("attendance")
+        .select("*")
+        .eq("staff_id", staffId)
+        .gte("check_in", todayStart)
+        .lte("check_in", todayEnd);
+
+      if (fetchError) throw fetchError;
+
+      // If a record exists and not checked out, warn
+      const ongoing = existingRecords?.find((rec) => rec.check_out === null);
+      if (ongoing) {
+        toast.info("This staff is already checked in.");
         return;
       }
 
-      const { data, error } = await supabase
-        //@ts-ignore
-
+      // Create a new attendance record if none exists
+      const { data, error: insertError } = await supabase
         .from("attendance")
-        //@ts-ignore
-
         .insert([
           {
-            staff_id: userId,
+            staff_id: staffId,
             check_in: new Date().toISOString(),
-            status: "present",
+            status: "present", // Ensure your table has this column
           },
-        ])
-        .select()
-        .maybeSingle();
+        ]);
 
-      if (error) toast.error(error.message);
-      else if (data) {
-        toast.success("Checked in successfully!");
-        setRecordId(data.id);
-        setHasCheckedIn(true);
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Something went wrong");
-    } finally {
-      setLoading(false);
+      if (insertError) throw insertError;
+
+      toast.success("Check-in recorded successfully!");
+      await fetchAttendance(); // Refresh UI
+    } catch (err: any) {
+      console.error("Check-in error:", err);
+      toast.error("Error while marking check-in");
     }
   };
 
-  const handleCheckOut = async () => {
-    if (!recordId) {
-      toast.error("No attendance record found");
-      return;
-    }
-
-    setLoading(true);
+  /** Check-out a Staff */
+  const handleCheckOut = async (staffId: string) => {
     try {
-      const { error } = await supabase
-        //@ts-ignore
-        .from("attendance")
-        //@ts-ignore
-        .update({ check_out: new Date().toISOString() })
-        .eq("id", recordId);
+      const record = attendanceRecords.find(
+        (rec) => rec.staff_id === staffId && !rec.check_out
+      );
+      if (!record) {
+        toast.info("No active check-in found for this staff.");
+        return;
+      }
 
-      if (error) toast.error(error.message);
-      else toast.success("Checked out successfully!");
-    } catch (err) {
-      console.error(err);
-      toast.error("Something went wrong");
-    } finally {
-      setLoading(false);
+      const { error } = await supabase
+        .from("attendance")
+        .update({ check_out: new Date().toISOString() })
+        .eq("id", record.id);
+
+      if (error) throw error;
+      toast.success("Check-out recorded successfully!");
+      fetchAttendance();
+    } catch (err: any) {
+      toast.error(err.message || "Error while marking check-out");
     }
   };
 
+  /** Role Restriction View */
+  if (userRole !== "owner" && userRole !== "receptionist") {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Card className="p-10 text-center max-w-lg">
+          <h2 className="text-2xl font-semibold mb-2">Access Denied</h2>
+          <p className="text-muted-foreground">
+            Only owners and receptionists can manage staff attendance.
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
+  /** Main UI */
   return (
-    <div className="max-w-md mx-auto bg-card p-6 rounded-2xl shadow">
-      <h2 className="text-lg font-semibold mb-4">Attendance</h2>
-      {!hasCheckedIn ? (
-        <Button onClick={handleCheckIn} disabled={loading}>
-          {loading ? "Checking in..." : "Check In"}
-        </Button>
-      ) : (
-        <Button onClick={handleCheckOut} disabled={loading}>
-          {loading ? "Checking out..." : "Check Out"}
-        </Button>
-      )}
+    <div className="min-h-screen bg-background p-8">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-3xl font-bold mb-6 text-foreground">
+          Attendance Management
+        </h1>
+
+        {loading ? (
+          <div className="flex justify-center items-center h-[60vh]">
+            <Loader2 className="animate-spin w-6 h-6 text-muted-foreground" />
+          </div>
+        ) : (
+          <Card className="p-4 md:p-6 shadow-md">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Staff Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {staffList.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-8">
+                      No staff found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  staffList.map((staff) => {
+                    const record = attendanceRecords.find(
+                      (rec) => rec.staff_id === staff.id
+                    );
+                    const isCheckedIn = record && !record.check_out;
+
+                    return (
+                      <TableRow key={staff.id}>
+                        <TableCell className="font-medium">
+                          {staff.full_name}
+                        </TableCell>
+                        <TableCell>{staff.email}</TableCell>
+                        <TableCell>
+                          {record
+                            ? record.check_out
+                              ? "Checked Out"
+                              : "Checked In"
+                            : "Not Checked In"}
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          {!record ? (
+                            <Button
+                              size="sm"
+                              onClick={() => handleCheckIn(staff.id)}
+                            >
+                              Check In
+                            </Button>
+                          ) : !record.check_out ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleCheckOut(staff.id)}
+                            >
+                              Check Out
+                            </Button>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">
+                              Completed
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

@@ -196,6 +196,7 @@ const ClientBookings = () => {
     };
     return colors[status] || "bg-muted text-muted-foreground";
   };
+
   return (
     <div className="space-y-8 p-4 md:p-6">
       {/* Page Header */}
@@ -286,100 +287,11 @@ const ClientBookings = () => {
         </Card>
       ) : (
         <>
-          {/* Booking Requests */}
-          <section className="space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-              <h2 className="text-2xl font-bold text-gray-900">
-                Booking Requests
-              </h2>
-              <p className="text-sm text-gray-500">
-                Pending appointments you’ve requested
-              </p>
-            </div>
-
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {requestBookings.map((booking) => (
-                <Card
-                  key={booking.id}
-                  className="hover:shadow-xl transition-shadow border border-gray-200 rounded-2xl overflow-hidden"
-                >
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 gap-4">
-                    {/* Left: Service & Staff */}
-                    <div className="flex-1">
-                      <CardTitle className="text-lg font-semibold text-gray-900">
-                        {booking.services?.name || "Service"}
-                      </CardTitle>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {booking.staff?.full_name || "Unassigned"}
-                      </p>
-
-                      <div className="flex flex-wrap gap-4 mt-3 text-gray-600">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-5 h-5 text-blue-500" />
-                          <span className="text-sm font-medium">
-                            {booking.appointment_date
-                              ? isValid(parseISO(booking.appointment_date))
-                                ? format(
-                                    parseISO(booking.appointment_date),
-                                    "PPP"
-                                  )
-                                : "Invalid Date"
-                              : "N/A"}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-5 h-5 text-green-500" />
-                          <span className="text-sm font-medium">
-                            {booking.appointment_time || "N/A"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right: Status & Actions */}
-                    <div className="flex flex-col items-end gap-3 mt-4 md:mt-0">
-                      <Badge
-                        className={`${getStatusColor(
-                          booking.status
-                        )} px-4 py-1 rounded-full uppercase text-xs font-semibold`}
-                      >
-                        {booking.status}
-                      </Badge>
-
-                      {booking.status === "scheduled" && (
-                        <div className="flex gap-2 flex-wrap">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="px-4 py-2"
-                            onClick={() => {
-                              setSelectedBooking(booking);
-                              setRescheduleDialog(true);
-                            }}
-                          >
-                            Reschedule
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="px-4 py-2"
-                            onClick={() => handleCancel(booking.id)}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </section>
-
+        
           {/* Confirmed Bookings */}
           <section className="space-y-4 mt-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-              <h2 className="text-2xl font-bold text-gray-900">My Bookings</h2>
+              <h2 className="text-2xl font-bold text-gray-900">Confirmed Bookings</h2>
               <p className="text-sm text-gray-500">
                 Confirmed and upcoming appointments
               </p>
@@ -440,6 +352,97 @@ const ClientBookings = () => {
               ))}
             </div>
           </section>
+
+          {/* Booking Requests */}
+          <section className="space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+              <h2 className="text-2xl font-bold text-gray-900">
+                Booking Requests
+              </h2>
+              <p className="text-sm text-gray-500">
+                Pending appointments you’ve requested
+              </p>
+            </div>
+
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {requestBookings.map((booking) => (
+                <Card
+                  key={booking.id}
+                  className="hover:shadow-xl transition-shadow border border-gray-200 rounded-2xl overflow-hidden"
+                >
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 gap-4">
+                    {/* Left: Service & Staff */}
+                    <div className="flex-1">
+                      <CardTitle className="text-lg font-semibold text-gray-900">
+                        {booking.services?.name || "Service"}
+                      </CardTitle>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {booking.staff?.full_name || "Unassigned"}
+                      </p>
+
+                      <div className="flex flex-wrap gap-4 mt-3 text-gray-600">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-5 h-5 text-blue-500" />
+                          <span className="text-sm font-medium">
+                            {booking.preferred_date
+                              ? isValid(parseISO(booking.preferred_date))
+                                ? format(
+                                    parseISO(booking.preferred_date),
+                                    "PPP"
+                                  )
+                                : "Invalid Date"
+                              : "N/A"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-5 h-5 text-green-500" />
+                          <span className="text-sm font-medium">
+                            {booking.preferred_time || "N/A"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Status & Actions */}
+                    <div className="flex flex-col items-end gap-3 mt-4 md:mt-0">
+                      <Badge
+                        className={`${getStatusColor(
+                          booking.status
+                        )} px-4 py-1 rounded-full uppercase text-xs font-semibold`}
+                      >
+                        {booking.status}
+                      </Badge>
+
+                      {booking.status === "scheduled" && (
+                        <div className="flex gap-2 flex-wrap">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="px-4 py-2"
+                            onClick={() => {
+                              setSelectedBooking(booking);
+                              setRescheduleDialog(true);
+                            }}
+                          >
+                            Reschedule
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="px-4 py-2"
+                            onClick={() => handleCancel(booking.id)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </section>
+
         </>
       )}
 

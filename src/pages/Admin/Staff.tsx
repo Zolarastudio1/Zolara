@@ -36,11 +36,13 @@ const Staff = () => {
   const [staff, setStaff] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     full_name: "",
     phone: "",
     email: "",
     specialization: "",
+    is_active: true,
   });
 
   useEffect(() => {
@@ -73,7 +75,7 @@ const Staff = () => {
       phone: member.phone,
       email: member.email || "",
       specialization: member.specialization || "",
-      is_active: member.is_active,
+      is_active: member.is_active !== undefined ? member.is_active : true,
     });
     setDialogOpen(true);
   };
@@ -137,7 +139,13 @@ const Staff = () => {
 
       toast.success("Staff member added successfully");
       setDialogOpen(false);
-      setFormData({ full_name: "", phone: "", email: "", specialization: "" });
+      setFormData({ 
+        full_name: "", 
+        phone: "", 
+        email: "", 
+        specialization: "",
+        is_active: true 
+      });
       fetchStaff();
     } catch (error: any) {
       if (error instanceof z.ZodError) {

@@ -157,8 +157,8 @@ const ClientBookings = () => {
       {
         client_id: user.id,
         service_id: selectedService,
-        preferred_date: preferredDate,
-        preferred_time: preferredTime,
+        appointment_date: preferredDate,
+        appointment_time: preferredTime,
         notes,
         status: "pending",
       },

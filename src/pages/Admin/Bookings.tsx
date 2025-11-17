@@ -30,6 +30,7 @@ import {
   CreditCard,
   AlertTriangle,
 } from "lucide-react";
+import PaymentDialog from "@/components/PaymentDialog";
 
 const bookingSchema = z.object({
   client_id: z.string().uuid("Invalid client selection"),
@@ -56,6 +57,8 @@ const Bookings = () => {
   const [requests, setRequests] = useState<any[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [isBookingModalOpen, setBookingModalOpen] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<any>(null);
 
   const [clients, setClients] = useState<any[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
@@ -476,6 +479,19 @@ const Bookings = () => {
                 <div className="flex justify-end gap-3 pt-2">
                   <Button
                     size="sm"
+                    variant="default"
+                    className="rounded-xl"
+                    onClick={() => {
+                      setSelectedBooking(b);
+                      setPaymentDialogOpen(true);
+                    }}
+                  >
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    Payment
+                  </Button>
+
+                  <Button
+                    size="sm"
                     variant="outline"
                     className="rounded-xl"
                     onClick={() => {
@@ -571,6 +587,16 @@ const Bookings = () => {
           )}
         </div>
       </div>
+
+      {/* Payment Dialog */}
+      {selectedBooking && (
+        <PaymentDialog
+          open={paymentDialogOpen}
+          onOpenChange={setPaymentDialogOpen}
+          booking={selectedBooking}
+          onPaymentComplete={fetchData}
+        />
+      )}
     </div>
   );
 };

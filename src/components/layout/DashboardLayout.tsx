@@ -107,7 +107,7 @@ const DashboardLayout = () => {
         return baseNavItems
           .filter(
             (item) =>
-              !["Clients", "Sales", "Reports"].includes(
+              !["Clients", "Sales", "Staff", "Reports"].includes(
                 item.label
               )
           )

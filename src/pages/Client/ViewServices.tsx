@@ -100,7 +100,7 @@ const ViewServices = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Services</h1>
-          <p className="text-muted-foreground">Manage your salon services</p>
+          <p className="text-muted-foreground">View Zolara services</p>
         </div>
       </div>
 

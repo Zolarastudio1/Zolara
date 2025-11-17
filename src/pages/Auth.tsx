@@ -116,7 +116,7 @@ const Auth = () => {
         const { data: staffRecord, error: staffError } = await supabase
         .from("staff")
         .select("id, email")
-        .eq("email", validated.email)
+        .eq("email", `${validated.email}`)
         .maybeSingle(); // return a single record or null
         
         console.log("Staff result", staffRecord, staffError)

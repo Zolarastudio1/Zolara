@@ -16,9 +16,9 @@ import { Loader2 } from "lucide-react";
 interface AttendanceRecord {
   id: string;
   staff_id: string;
-  check_in: string | null;
+  check_in: string;
   check_out: string | null;
-  status: "present" | "absent" | "late";
+  status: string;
   created_at: string;
   staff?: {
     full_name: string;
@@ -86,7 +86,7 @@ export default function Attendance() {
 
       const { data, error } = await supabase
         .from("attendance")
-        .select("*, staff:staff(full_name, email)") // Only works if foreign key exists
+        .select("*, staff:staff!staff_id(full_name, email)")
         .gte("check_in", todayStart)
         .lte("check_in", todayEnd);
 
@@ -98,7 +98,7 @@ export default function Attendance() {
         return;
       }
 
-      setAttendanceRecords(data);
+      setAttendanceRecords(data as AttendanceRecord[]);
     } catch (err: any) {
       console.error("Failed to fetch attendance:", err);
       toast.error("Failed to load attendance records");
@@ -143,13 +143,13 @@ export default function Attendance() {
       }
 
       // Create a new attendance record if none exists
-      const { data, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from("attendance")
         .insert([
           {
             staff_id: staffId,
             check_in: new Date().toISOString(),
-            status: "present", // Ensure your table has this column
+            status: "present",
           },
         ]);
 

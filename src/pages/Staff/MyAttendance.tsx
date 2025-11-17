@@ -9,9 +9,9 @@ import { format, parseISO, isValid } from "date-fns";
 interface AttendanceRecord {
   id: string;
   staff_id: string;
-  check_in: string | null;
+  check_in: string;
   check_out: string | null;
-  status: "present" | "absent" | "late";
+  status: string;
   created_at: string;
   staff?: {
     full_name: string;
@@ -50,12 +50,12 @@ export default function MyAttendance() {
     try {
       const { data, error } = await supabase
         .from("attendance")
-        .select("*, staff:staff(full_name, email)")
+        .select("*, staff:staff!staff_id(full_name, email)")
         .eq("staff_id", userId)
         .order("check_in", { ascending: false });
 
       if (error) throw error;
-      setAttendanceRecords(data || []);
+      setAttendanceRecords((data as AttendanceRecord[]) || []);
     } catch (err: any) {
       console.error(err);
       toast.error("Failed to load your attendance records");

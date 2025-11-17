@@ -121,21 +121,11 @@ const Auth = () => {
         
         console.log("Staff result", staffRecord, staffError)
 
-        if (!staffRecord) {
-          toast.error(
-            "No staff record found with this email. Please contact the admin."
-          );
+        if (staffError || !staffRecord) {
+          toast.error("Your email must be registered by an administrator before signing up. Please contact the owner.");
           setLoading(false);
           return;
         }
-
-        if (staffError) {
-          console.error("Staff check error:", staffError);
-          toast.error("Error checking staff record.");
-          setLoading(false);
-          return;
-        }
-
 
         console.log("Staff verified:", staffRecord);
       }

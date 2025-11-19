@@ -111,23 +111,21 @@ const Auth = () => {
       let roleToAssign = validated.role;
 
       
-      // Check staff record if not client
+      // Check staff record if not client using the verify_staff_email function
       if (validated.role !== "client") {
-        const { data: staffRecord, error: staffError } = await supabase
-        .from("staff")
-        .select("id, email")
-        .eq("email", `${validated.email}`)
-        .maybeSingle(); // return a single record or null
-        
-        console.log("Staff result", staffRecord, staffError)
+        const { data: isVerified, error: verifyError } = await supabase.rpc(
+          "verify_staff_email",
+          {
+            email_to_check: validated.email,
+            role_to_check: validated.role,
+          }
+        );
 
-        if (staffError || !staffRecord) {
+        if (verifyError || !isVerified) {
           toast.error("Your email must be registered by an administrator before signing up. Please contact the owner.");
           setLoading(false);
           return;
         }
-
-        console.log("Staff verified:", staffRecord);
       }
 
       // Do NOT call redirectToDashboard here

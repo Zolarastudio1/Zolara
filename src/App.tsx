@@ -22,6 +22,7 @@ import StaffLayout from "./components/layout/StaffLayout";
 import ClientLayout from "./components/layout/ClientLayout";
 import StaffBookings from "./pages/Staff/StaffBookings";
 import Attendance from "./pages/Admin/Attendance";
+import AttendanceReports from "./pages/Admin/AttendanceReports";
 import MyAttendance from "./pages/Staff/MyAttendance";
 
 const queryClient = new QueryClient();
@@ -47,6 +48,7 @@ const App = () => (
               <Route path="admin/sales" element={<Sales />} />
               <Route path="admin/reports" element={<Reports />} />
               <Route path="admin/attendance" element={<Attendance />} />
+              <Route path="admin/attendance-reports" element={<AttendanceReports />} />
             </Route>
           </Route>
 

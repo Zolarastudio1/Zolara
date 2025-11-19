@@ -81,6 +81,7 @@ const DashboardLayout = () => {
     { icon: CreditCard, label: "Sales", path: "sales" },
     { icon: FileText, label: "Reports", path: "reports" },
     { icon: Clock, label: "Attendance", path: "attendance" },
+    { icon: FileText, label: "Attendance Reports", path: "attendance-reports" },
   ];
 
   // Create the role-based function (using baseNavItems)
@@ -99,7 +100,7 @@ const DashboardLayout = () => {
           .filter((item) => !["Sales", "Reports"].includes(item.label))
           .map((item) => ({
             ...item,
-            path: `/staff/${item.path}`,
+            path: item.path === "attendance-reports" ? `/admin/${item.path}` : `/staff/${item.path}`,
           }));
 
       // Staff (No Attendance)
@@ -107,7 +108,7 @@ const DashboardLayout = () => {
         return baseNavItems
           .filter(
             (item) =>
-              !["Clients", "Sales", "Staff", "Reports"].includes(
+              !["Clients", "Sales", "Staff", "Reports", "Attendance Reports"].includes(
                 item.label
               )
           )

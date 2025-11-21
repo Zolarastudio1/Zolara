@@ -71,13 +71,6 @@ const Auth = () => {
       if (error) throw error;
       if (!data.user) throw new Error("User not found");
 
-      // Try fetching user role from profiles table
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", data.user.id)
-        .single();
-
       const role = data.user.user_metadata?.role || "client";
 
       // Save minimal user data in localStorage

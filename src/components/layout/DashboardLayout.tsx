@@ -150,8 +150,9 @@ const DashboardLayout = () => {
     }
   };
 
-  const role = user?.user_metadata?.role || "client";
-  const navItems = getNavItemsForRole(role);
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+
+  const navItems = getNavItemsForRole(storedUser.role);
 
   return (
     <div className="min-h-screen bg-background">

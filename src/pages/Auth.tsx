@@ -159,7 +159,7 @@ const Auth = () => {
         .from("user_roles")
         .insert({
           user_id: data.user.id,
-          role: roleToAssign,
+          role: roleToAssign as any, // Type will auto-update after migration
         });
 
       if (roleError) throw roleError;

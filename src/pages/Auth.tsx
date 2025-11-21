@@ -71,7 +71,14 @@ const Auth = () => {
       if (error) throw error;
       if (!data.user) throw new Error("User not found");
 
-      const role = data.user.user_metadata?.role || "client";
+      // Fetch role from user_roles table
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", data.user.id)
+        .single();
+
+      const role = roleData?.role || "client";
 
       // Save minimal user data in localStorage
       const userData = { id: data.user.id, email: data.user.email, role };
@@ -146,6 +153,16 @@ const Auth = () => {
         );
         return;
       }
+
+      // Insert role into user_roles table
+      const { error: roleError } = await supabase
+        .from("user_roles")
+        .insert({
+          user_id: data.user.id,
+          role: roleToAssign,
+        });
+
+      if (roleError) throw roleError;
 
       // Save user locally
       const userData = {

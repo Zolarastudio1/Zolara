@@ -52,6 +52,79 @@ const Auth = () => {
     "client" | "staff" | "receptionist" | "owner"
   >("client");
 
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  /** Check if user is in password recovery mode */
+  useState(() => {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    if (hashParams.get('type') === 'recovery') {
+      setIsResettingPassword(true);
+    }
+  });
+
+  /** Handle Password Reset Request */
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const validated = z.string().email().parse(resetEmail);
+      const { error } = await supabase.auth.resetPasswordForEmail(validated, {
+        redirectTo: `${window.location.origin}/auth`,
+      });
+
+      if (error) throw error;
+
+      toast.success("Password reset email sent! Check your inbox.");
+      setShowResetDialog(false);
+      setResetEmail("");
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error(error.message || "Failed to send reset email");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /** Handle New Password Update */
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      if (newPassword !== confirmPassword) {
+        throw new Error("Passwords do not match");
+      }
+
+      if (newPassword.length < 6) {
+        throw new Error("Password must be at least 6 characters");
+      }
+
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) throw error;
+
+      toast.success("Password updated successfully!");
+      setIsResettingPassword(false);
+      setNewPassword("");
+      setConfirmPassword("");
+      navigate("/auth");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update password");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   /** Handle Login */
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -204,6 +277,58 @@ const Auth = () => {
     }
   };
 
+  // If in password reset mode, show reset form
+  if (isResettingPassword) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-secondary/30 via-background to-accent/20 p-4">
+        <Card className="w-full max-w-md shadow-lg">
+          <CardHeader className="text-center space-y-2">
+            <div className="mx-auto w-12 h-12 bg-primary rounded-full flex items-center justify-center mb-2">
+              <Scissors className="w-6 h-6 text-primary-foreground" />
+            </div>
+            <CardTitle className="text-2xl font-bold">
+              Set New Password
+            </CardTitle>
+            <CardDescription>
+              Enter your new password below
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleUpdatePassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-password">New Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Updating..." : "Update Password"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-secondary/30 via-background to-accent/20 p-4">
       <Card className="w-full max-w-md shadow-lg">
@@ -263,6 +388,16 @@ const Auth = () => {
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Logging in..." : "Login"}
                 </Button>
+
+                <div className="text-center mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowResetDialog(true)}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
               </form>
             </TabsContent>
 
@@ -328,6 +463,51 @@ const Auth = () => {
           </Tabs>
         </CardContent>
       </Card>
+
+      {/* Password Reset Dialog */}
+      {showResetDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Reset Password</CardTitle>
+              <CardDescription>
+                Enter your email address and we'll send you a link to reset your password.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handlePasswordReset} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reset-email">Email</Label>
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      setShowResetDialog(false);
+                      setResetEmail("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="flex-1" disabled={loading}>
+                    {loading ? "Sending..." : "Send Reset Link"}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };

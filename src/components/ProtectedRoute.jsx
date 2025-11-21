@@ -14,9 +14,14 @@ const ProtectedRoute = ({ allowedRoles }) => {
       } = await supabase.auth.getUser();
       if (!user) return setLoading(false);
 
-      const profile = user.user_metadata;
+      // Fetch role from user_roles table
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .single();
 
-      setUserRole(profile?.role);
+      setUserRole(roleData?.role || null);
       setLoading(false);
     };
 

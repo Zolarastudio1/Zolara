@@ -12,34 +12,39 @@ const ProtectedRoute = ({ allowedRoles }) => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return setLoading(false);
 
-      // Fetch role from user_roles table
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
       const { data: roleData } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
         .single();
 
-      setUserRole(roleData?.role || null);
+      setUserRole(roleData?.role || null); // <= extract the string directly
       setLoading(false);
     };
 
     fetchUserRole();
   }, []);
 
-  if (loading)
+  if (loading) {
     return (
       <div className="flex justify-center py-8">
         <Loader2 className="w-6 h-6 animate-spin" />
       </div>
     );
+  }
 
-  return allowedRoles.includes(userRole) ? (
-    <Outlet /> // Render nested routes
-  ) : (
-    <Navigate to="/auth" replace />
-  );
+  // If no role or role not allowed → redirect to login
+  if (!userRole || !allowedRoles.includes(userRole)) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  return <Outlet />;
 };
 
 export default ProtectedRoute;

@@ -4,9 +4,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+
 import Auth from "./pages/Auth";
+
 import DashboardLayout from "./components/layout/DashboardLayout";
+import AdminLayout from "./components/layout/AdminLayout";
+import StaffLayout from "./components/layout/StaffLayout";
+import ClientLayout from "./components/layout/ClientLayout";
+
 import Dashboard from "./pages/Admin/Dashboard";
 import Bookings from "./pages/Admin/Bookings";
 import Clients from "./pages/Admin/Clients";
@@ -15,15 +20,14 @@ import Services from "./pages/Admin/Services";
 import Sales from "./pages/Admin/Sales";
 import Reports from "./pages/Admin/Reports";
 import NotFound from "./pages/Admin/NotFound";
-import ClientBookings from "./pages/Client/ClientBookings";
-import ViewServices from "./pages/Client/ViewServices";
-import AdminLayout from "./components/layout/AdminLayout";
-import StaffLayout from "./components/layout/StaffLayout";
-import ClientLayout from "./components/layout/ClientLayout";
-import StaffBookings from "./pages/Staff/StaffBookings";
 import Attendance from "./pages/Admin/Attendance";
 import AttendanceReports from "./pages/Admin/AttendanceReports";
+
+import StaffBookings from "./pages/Staff/StaffBookings";
 import MyAttendance from "./pages/Staff/MyAttendance";
+
+import ClientBookings from "./pages/Client/ClientBookings";
+import ViewServices from "./pages/Client/ViewServices";
 
 const queryClient = new QueryClient();
 
@@ -34,25 +38,28 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          {/* Auth Page */}
           <Route path="/auth" element={<Auth />} />
 
-          {/* Admin Routes */}
-          <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
-          {/* <Route element={<ProtectedRoute allowedRoles={["client"]} />}> */}
+          {/* ------------------- ADMIN ROUTES ------------------- */}
+          <Route element={<ProtectedRoute allowedRoles={["owner"]} />}>
             <Route element={<DashboardLayout />}>
               <Route path="/admin/dashboard" element={<AdminLayout />} />
-]              <Route path="admin/bookings" element={<Bookings />} />
-              <Route path="admin/services" element={<Services />} />
-              <Route path="admin/clients" element={<Clients />} />
-              <Route path="admin/staff" element={<Staff />} />
-              <Route path="admin/sales" element={<Sales />} />
-              <Route path="admin/reports" element={<Reports />} />
-              <Route path="admin/attendance" element={<Attendance />} />
-              <Route path="admin/attendance-reports" element={<AttendanceReports />} />
+              <Route path="/admin/bookings" element={<Bookings />} />
+              <Route path="/admin/services" element={<Services />} />
+              <Route path="/admin/clients" element={<Clients />} />
+              <Route path="/admin/staff" element={<Staff />} />
+              <Route path="/admin/sales" element={<Sales />} />
+              <Route path="/admin/reports" element={<Reports />} />
+              <Route path="/admin/attendance" element={<Attendance />} />
+              <Route
+                path="/admin/attendance-reports"
+                element={<AttendanceReports />}
+              />
             </Route>
           </Route>
 
-          {/* Staff Routes */}
+          {/* ------------------- STAFF ROUTES ------------------- */}
           <Route element={<ProtectedRoute allowedRoles={["staff"]} />}>
             <Route element={<DashboardLayout />}>
               <Route path="/staff/dashboard" element={<StaffLayout />} />
@@ -62,7 +69,7 @@ const App = () => (
             </Route>
           </Route>
 
-          {/* Client Routes */}
+          {/* ------------------- CLIENT ROUTES ------------------- */}
           <Route element={<ProtectedRoute allowedRoles={["client"]} />}>
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<ClientLayout />} />
@@ -71,7 +78,10 @@ const App = () => (
             </Route>
           </Route>
 
+          {/* Default redirect */}
           <Route path="/" element={<Navigate to="/auth" />} />
+
+          {/* 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

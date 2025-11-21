@@ -61,7 +61,7 @@ const Auth = () => {
   /** Check if user is in password recovery mode */
   useState(() => {
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    if (hashParams.get('type') === 'recovery') {
+    if (hashParams.get("type") === "recovery") {
       setIsResettingPassword(true);
     }
   });
@@ -72,10 +72,14 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const validated = z.string().email().parse(resetEmail);
-      const { error } = await supabase.auth.resetPasswordForEmail(validated, {
-        redirectTo: `${window.location.origin}/auth`,
-      });
+      const validatedEmail = z.string().email().parse(resetEmail);
+
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        validatedEmail,
+        {
+          redirectTo: `${window.location.origin}/auth`,
+        }
+      );
 
       if (error) throw error;
 
@@ -99,18 +103,14 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      if (newPassword !== confirmPassword) {
+      if (newPassword !== confirmPassword)
         throw new Error("Passwords do not match");
-      }
-
-      if (newPassword.length < 6) {
+      if (newPassword.length < 6)
         throw new Error("Password must be at least 6 characters");
-      }
 
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
-
       if (error) throw error;
 
       toast.success("Password updated successfully!");
@@ -145,20 +145,22 @@ const Auth = () => {
       if (!data.user) throw new Error("User not found");
 
       // Fetch role from user_roles table
-      const { data: roleData } = await supabase
+      const { data: roleData, error: roleError } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", data.user.id)
         .single();
 
-      const role = roleData?.role || "client";
+      if (roleError) throw roleError;
+      if (!roleData) throw new Error("Role not found for this user");
 
-      // Save minimal user data in localStorage
+      const role: string = roleData.role;
+
+      // Save minimal user info
       const userData = { id: data.user.id, email: data.user.email, role };
       localStorage.setItem("user", JSON.stringify(userData));
 
       toast.success("Login successful!");
-
       redirectToDashboard(role);
     } catch (error: any) {
       if (error instanceof z.ZodError) toast.error(error.errors[0].message);
@@ -168,12 +170,12 @@ const Auth = () => {
     }
   };
 
+  /** Handle Signup */
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Validate inputs
       const validated = signupSchema.parse({
         fullName: signupFullName,
         email: signupEmail.trim().toLowerCase(),
@@ -183,78 +185,58 @@ const Auth = () => {
 
       let roleToAssign = validated.role;
 
-      
-      // Check staff record if not client using the verify_staff_email function
+      // Only verify non-client staff emails
       if (validated.role !== "client") {
         const { data: isVerified, error: verifyError } = await supabase.rpc(
           "verify_staff_email",
-          {
-            email_to_check: validated.email,
-            role_to_check: validated.role,
-          }
+          { email_to_check: validated.email, role_to_check: validated.role }
         );
 
         if (verifyError || !isVerified) {
-          toast.error("Your email must be registered by an administrator before signing up. Please contact the owner.");
+          toast.error(
+            "Your email must be registered by an administrator before signing up."
+          );
           setLoading(false);
           return;
         }
       }
 
-      // Do NOT call redirectToDashboard here
-      const emailRedirectLink = `${window.location.origin}/dashboard`;
-
-      // Supabase signup
+      // Signup user
       const { data, error } = await supabase.auth.signUp({
         email: validated.email,
         password: validated.password,
         options: {
-          data: {
-            full_name: validated.fullName,
-            role: roleToAssign,
-          },
-          emailRedirectTo: emailRedirectLink, // just pass the URL, don't call function
+          data: { full_name: validated.fullName, role: roleToAssign },
+          emailRedirectTo: `${window.location.origin}/dashboard`,
         },
       });
 
       if (error) throw error;
 
-      // After successful signup
-      if (!data.user) {
-        toast.success(
-          "Signup successful! Please check your email to verify your account."
-        );
-        return;
-      }
-
       // Insert role into user_roles table
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .insert({
+      if (data.user) {
+        const { error: roleError } = await supabase.from("user_roles").insert({
           user_id: data.user.id,
-          role: roleToAssign as any, // Type will auto-update after migration
+          role: roleToAssign,
         });
+        if (roleError) throw roleError;
 
-      if (roleError) throw roleError;
+        const userData = {
+          id: data.user.id,
+          email: data.user.email,
+          role: roleToAssign,
+        };
+        localStorage.setItem("user", JSON.stringify(userData));
 
-      // Save user locally
-      const userData = {
-        id: data.user.id,
-        email: data.user.email,
-        role: roleToAssign,
-      };
-      localStorage.setItem("user", JSON.stringify(userData));
+        toast.success(
+          "Account created successfully! Please check your email to verify your account."
+        );
 
-      toast.success("Account created successfully!");
-
-      // Redirect manually (AFTER signup)
-      redirectToDashboard(roleToAssign);
-    } catch (error: any) {
-      if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
-      } else {
-        toast.error(error.message || "Signup failed");
+        redirectToDashboard(roleToAssign);
       }
+    } catch (error: any) {
+      if (error instanceof z.ZodError) toast.error(error.errors[0].message);
+      else toast.error(error.message || "Signup failed");
     } finally {
       setLoading(false);
     }
@@ -267,13 +249,12 @@ const Auth = () => {
         navigate("/admin/dashboard");
         break;
       case "receptionist":
-        navigate("/staff/dashboard");
-        break;
       case "staff":
         navigate("/staff/dashboard");
         break;
       default:
         navigate("/dashboard");
+        break;
     }
   };
 
@@ -289,9 +270,7 @@ const Auth = () => {
             <CardTitle className="text-2xl font-bold">
               Set New Password
             </CardTitle>
-            <CardDescription>
-              Enter your new password below
-            </CardDescription>
+            <CardDescription>Enter your new password below</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleUpdatePassword} className="space-y-4">
@@ -471,7 +450,8 @@ const Auth = () => {
             <CardHeader>
               <CardTitle>Reset Password</CardTitle>
               <CardDescription>
-                Enter your email address and we'll send you a link to reset your password.
+                Enter your email address and we'll send you a link to reset your
+                password.
               </CardDescription>
             </CardHeader>
             <CardContent>

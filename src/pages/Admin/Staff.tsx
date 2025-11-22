@@ -13,9 +13,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { z } from "zod";
 
+// Schema for validation
 const staffSchema = z.object({
   full_name: z
     .string()
@@ -30,6 +38,7 @@ const staffSchema = z.object({
     .optional()
     .or(z.literal("")),
   specialization: z.string().max(100, "Specialization too long").optional(),
+  role: z.enum(["staff", "receptionist"]),
 });
 
 const Staff = () => {
@@ -37,11 +46,14 @@ const Staff = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteStaffId, setDeleteStaffId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     full_name: "",
     phone: "",
     email: "",
     specialization: "",
+    role: "staff" as "staff" | "receptionist",
     is_active: true,
   });
 
@@ -55,8 +67,6 @@ const Staff = () => {
         .from("staff")
         .select("*")
         .order("full_name");
-
-      console.log("Staff data", data);
       if (error) throw error;
       setStaff(data || []);
     } catch (error) {
@@ -67,94 +77,129 @@ const Staff = () => {
     }
   };
 
-  // Open edit modal
-  const handleEditMember = (member) => {
+  const handleEditMember = (member: any) => {
     setEditingMemberId(member.id);
     setFormData({
       full_name: member.full_name,
       phone: member.phone,
       email: member.email || "",
       specialization: member.specialization || "",
-      is_active: member.is_active !== undefined ? member.is_active : true,
+      role: member.role || "staff",
+      is_active: member.is_active ?? true,
     });
     setDialogOpen(true);
   };
 
-  // Save update
-  const handleUpdateMember = async () => {
-    const { error } = await supabase
-      .from("staff")
-      .update({
-        full_name: formData.full_name,
-        phone: formData.phone,
-        email: formData.email,
-        specialization: formData.specialization,
-        is_active: formData.is_active,
-      })
-      .eq("id", editingMemberId);
+  const handleDeleteMember = async () => {
+    if (!deleteStaffId) return;
 
-    if (error) {
-      toast.error("Update failed.");
-      return;
-    }
-
-    toast.success("Staff updated!");
-    setDialogOpen(false);
-    fetchStaff();
-  };
-
-  // Delete member
-  const handleDeleteMember = async (id) => {
-    if (!confirm("Are you sure? This action cannot be undone.")) return;
-
-    const { error } = await supabase.from("staff").delete().eq("id", id);
-
-    if (error) {
-      toast.error("Failed to delete staff.");
-      return;
-    }
-
-    toast.success("Staff deleted!");
-    fetchStaff();
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+    
     try {
-      const validated = staffSchema.parse(formData);
-
-      const insertData = {
-        full_name: validated.full_name,
-        phone: validated.phone,
-        ...(validated.email && { email: validated.email }),
-        ...(validated.specialization && {
-          specialization: validated.specialization,
-        }),
-      };
-
-      const { error } = await supabase.from("staff").insert([insertData]);
+      const { error } = await supabase
+        .from("staff")
+        .delete()
+        .eq("id", deleteStaffId);
 
       if (error) throw error;
 
-      toast.success("Staff member added successfully");
-      setDialogOpen(false);
-      setFormData({ 
-        full_name: "", 
-        phone: "", 
-        email: "", 
-        specialization: "",
-        is_active: true 
-      });
+      toast.success("Staff deleted successfully");
       fetchStaff();
     } catch (error: any) {
-      if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
-      } else {
-        toast.error(error.message || "Failed to add staff");
-      }
+      toast.error(error.message || "Failed to delete staff");
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeleteStaffId(null);
     }
   };
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  try {
+    const validated = staffSchema.parse(formData);
+
+    if (editingMemberId) {
+      // UPDATE existing staff
+      const { error } = await supabase
+        .from("staff")
+        .update({
+          full_name: validated.full_name,
+          phone: validated.phone,
+          email: validated.email || null,
+          specialization: validated.specialization || null,
+          is_active: formData.is_active,
+        })
+        .eq("id", editingMemberId);
+
+      if (error) throw error;
+
+      toast.success("Staff updated!");
+    } else {
+      // CREATE staff via Supabase first
+      const { data: newStaff, error } = await supabase
+        .from("staff")
+        .insert([
+          {
+            full_name: validated.full_name,
+            phone: validated.phone,
+            email: validated.email || null,
+            specialization: validated.specialization || null,
+            is_active: true,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success(
+        `${validated.role === "receptionist" ? "Receptionist" : "Staff"} added successfully!`
+      );
+
+      // Call backend endpoint to send invite email
+      if (validated.email) {
+        try {
+          const response = await fetch("http://localhost:5000/api/invite", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: validated.email,
+              full_name: validated.full_name,
+              role: validated.role,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            throw new Error(result.error || "Failed to send invite email");
+          }
+
+          toast.success("Invite email sent successfully!");
+        } catch (inviteError: any) {
+          console.error("Invite email error:", inviteError);
+          toast.error(inviteError.message || "Failed to send invite email");
+        }
+      }
+    }
+
+    setDialogOpen(false);
+    setEditingMemberId(null);
+    setFormData({
+      full_name: "",
+      phone: "",
+      email: "",
+      specialization: "",
+      role: "staff",
+      is_active: true,
+    });
+
+    fetchStaff();
+  } catch (error: any) {
+    if (error instanceof z.ZodError) toast.error(error.errors[0].message);
+    else toast.error(error.message || "Failed to save staff");
+  }
+};
+
 
   if (loading) {
     return (
@@ -166,22 +211,28 @@ const Staff = () => {
 
   return (
     <div className="space-y-6">
+      {/* Header and Add Button */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Staff</h1>
           <p className="text-muted-foreground">Manage your salon staff</p>
         </div>
+
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="w-4 h-4 mr-2" />
-              Add Staff
+              {editingMemberId ? "Edit Staff" : "Add Staff / Receptionist"}
             </Button>
           </DialogTrigger>
+
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Add New Staff Member</DialogTitle>
+              <DialogTitle>
+                {editingMemberId ? "Edit Member" : "Add New Member"}
+              </DialogTitle>
             </DialogHeader>
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label>Full Name *</Label>
@@ -194,6 +245,7 @@ const Staff = () => {
                   required
                 />
               </div>
+
               <div className="space-y-2">
                 <Label>Phone *</Label>
                 <Input
@@ -206,6 +258,7 @@ const Staff = () => {
                   required
                 />
               </div>
+
               <div className="space-y-2">
                 <Label>Email</Label>
                 <Input
@@ -217,6 +270,7 @@ const Staff = () => {
                   }
                 />
               </div>
+
               <div className="space-y-2">
                 <Label>Specialization</Label>
                 <Input
@@ -227,14 +281,57 @@ const Staff = () => {
                   }
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label>Role *</Label>
+                <Select
+                  value={formData.role}
+                  onValueChange={(value: "staff" | "receptionist") =>
+                    setFormData({ ...formData, role: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="staff">Staff</SelectItem>
+                    <SelectItem value="receptionist">Receptionist</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <Button type="submit" className="w-full">
-                Add Staff Member
+                {editingMemberId ? "Update Member" : "Add Member"}
               </Button>
             </form>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Delete staff</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground mb-4">
+              Are you sure you want to delete this staff? This action cannot
+              be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteMember}>
+                Delete
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
+      {/* Staff List */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {staff.map((member) => (
           <Card
@@ -246,17 +343,16 @@ const Staff = () => {
                 <CardTitle className="text-lg font-semibold">
                   {member.full_name}
                 </CardTitle>
-
                 <Badge variant={member.is_active ? "default" : "secondary"}>
                   {member.is_active ? "Active" : "Inactive"}
                 </Badge>
               </div>
-
               {member.specialization && (
                 <p className="text-sm text-gray-500 mt-1">
                   {member.specialization}
                 </p>
               )}
+              {/* <p className="text-sm mt-1 font-medium">Role: {member.user_metadata.role}</p> */}
             </CardHeader>
 
             <CardContent className="space-y-3">
@@ -264,7 +360,6 @@ const Staff = () => {
                 <Phone className="w-4 h-4" />
                 <span>{member.phone}</span>
               </div>
-
               {member.email && (
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Mail className="w-4 h-4" />
@@ -286,7 +381,10 @@ const Staff = () => {
                   size="sm"
                   variant="outline"
                   className="rounded-xl text-red-500 border-red-300"
-                  onClick={() => handleDeleteMember(member.id)}
+                  onClick={() => {
+                    setDeleteStaffId(member.id);
+                    setDeleteDialogOpen(true);
+                  }}
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
@@ -294,11 +392,12 @@ const Staff = () => {
             </CardContent>
           </Card>
         ))}
+
         {staff.length === 0 && (
           <Card className="col-span-full">
             <CardContent className="text-center py-12">
               <p className="text-muted-foreground">
-                No staff members yet. Add your first staff member!
+                No staff members yet. Add your first staff or receptionist!
               </p>
             </CardContent>
           </Card>

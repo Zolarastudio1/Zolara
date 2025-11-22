@@ -68,3 +68,18 @@ export const fetchUserBookings = async ({
     setLoading(false);
   }
 };
+
+
+export const sendInvite = async ({email, full_name, role}) => {
+  const res = await fetch("http://localhost:5000/api/invite", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, full_name, role }),
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Invite failed");
+  return json;
+};

@@ -59,6 +59,8 @@ const Bookings = () => {
   const [isBookingModalOpen, setBookingModalOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const [clients, setClients] = useState<any[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
@@ -168,15 +170,24 @@ const Bookings = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this booking?")) return;
+  const handleDelete = async () => {
+    if (!deleteBookingId) return;
+
     try {
-      const { error } = await supabase.from("bookings").delete().eq("id", id);
+      const { error } = await supabase
+        .from("bookings")
+        .delete()
+        .eq("id", deleteBookingId);
+
       if (error) throw error;
+
       toast.success("Booking deleted successfully");
       fetchData();
-    } catch (error) {
+    } catch (error: any) {
       toast.error("Failed to delete booking");
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeleteBookingId(null);
     }
   };
 
@@ -425,6 +436,28 @@ const Bookings = () => {
             </form>
           </DialogContent>
         </Dialog>
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Delete Booking</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground mb-4">
+              Are you sure you want to delete this booking? This action cannot
+              be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDelete}>
+                Delete
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Bookings List */}
@@ -473,8 +506,8 @@ const Bookings = () => {
                 </div>
 
                 <p className="text-gray-500 italic border-l-4 border-gray-300 pl-3">
-                    {b.notes || "no note"}
-                  </p>
+                  {b.notes || "no note"}
+                </p>
 
                 <div className="flex justify-end gap-3 pt-2">
                   <Button
@@ -512,7 +545,10 @@ const Bookings = () => {
                     size="sm"
                     variant="outline"
                     className="rounded-xl text-red-500 border-red-300"
-                    onClick={() => handleDelete(b.id)}
+                    onClick={() => {
+                      setDeleteDialogOpen(true);
+                      setDeleteBookingId(b.id);
+                    }}
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>

@@ -1,11 +1,3 @@
--- ======================================
--- INSERT (Allow trigger & authenticated inserts)
--- ======================================
-CREATE POLICY "Allow insert via trigger"
-ON public.clients
-FOR INSERT
-TO authenticated
-WITH CHECK (true);
 
 -- ======================================
 -- \SELECT (Restrict to owners & receptionists)

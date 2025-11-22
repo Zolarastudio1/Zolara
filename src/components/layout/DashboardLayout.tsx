@@ -211,8 +211,8 @@ const DashboardLayout = () => {
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
                     isActive
-                      ? "bg-white text-black"
-                      : "hover:bg-white/20 text-white"
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "hover:bg-sidebar-accent/50 text-sidebar-foreground"
                   )}
                 >
                   <Icon className="w-5 h-5" />

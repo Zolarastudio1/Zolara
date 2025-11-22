@@ -36,7 +36,7 @@ const clientSchema = z.object({
 const Clients = () => {
   const [clients, setClients] = useState<any[]>([]);
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
-  const [deleteServiceId, setDeleteServiceId] = useState<string | null>(null);
+  const [deleteClientId, setDeleteClientId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
@@ -127,14 +127,14 @@ const Clients = () => {
     }
   };
 
-  const handleDeleteService = async () => {
-    if (!deleteServiceId) return;
+  const handleDeleteClient = async () => {
+    if (!deleteClientId) return;
 
     try {
       const { error } = await supabase
         .from("clients")
         .delete()
-        .eq("id", deleteServiceId);
+        .eq("id", deleteClientId);
 
       if (error) throw error;
 
@@ -144,7 +144,7 @@ const Clients = () => {
       toast.error(error.message || "Failed to delete service");
     } finally {
       setDeleteDialogOpen(false);
-      setDeleteServiceId(null);
+      setDeleteClientId(null);
     }
   };
 
@@ -253,7 +253,7 @@ const Clients = () => {
               >
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={handleDeleteService}>
+              <Button variant="destructive" onClick={handleDeleteClient}>
                 Delete
               </Button>
             </div>
@@ -302,7 +302,7 @@ const Clients = () => {
                 size="sm"
                 variant="destructive"
                 onClick={() => {
-                  setDeleteServiceId(client.id);
+                  setDeleteClientId(client.id);
                   setDeleteDialogOpen(true);
                 }}
               >

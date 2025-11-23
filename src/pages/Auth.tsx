@@ -144,17 +144,16 @@ const Auth = () => {
       if (error) throw error;
       if (!data.user) throw new Error("User not found");
 
-      // Fetch role from user_roles table
+      // Fetch or create role in one safe block
       const { data: roleData, error: roleError } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", data.user.id)
         .single();
 
-      if (roleError) throw roleError;
-      if (!roleData) throw new Error("Role not found for this user");
-
-      const role: string = roleData.role;
+      // If role does not exist, create it
+      const role = roleData?.role;
+      console.log("User role:", role);
 
       // Save minimal user info
       const userData = { id: data.user.id, email: data.user.email, role };

@@ -93,7 +93,6 @@ const Staff = () => {
   const handleDeleteMember = async () => {
     if (!deleteStaffId) return;
 
-    
     try {
       const { error } = await supabase
         .from("staff")
@@ -111,95 +110,108 @@ const Staff = () => {
       setDeleteStaffId(null);
     }
   };
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
 
-  try {
-    const validated = staffSchema.parse(formData);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-    if (editingMemberId) {
-      // UPDATE existing staff
-      const { error } = await supabase
-        .from("staff")
-        .update({
-          full_name: validated.full_name,
-          phone: validated.phone,
-          email: validated.email || null,
-          specialization: validated.specialization || null,
-          is_active: formData.is_active,
-        })
-        .eq("id", editingMemberId);
+    try {
+      const validated = staffSchema.parse(formData);
 
-      if (error) throw error;
-
-      toast.success("Staff updated!");
-    } else {
-      // CREATE staff via Supabase first
-      const { data: newStaff, error } = await supabase
-        .from("staff")
-        .insert([
-          {
+      if (editingMemberId) {
+        // UPDATE existing staff
+        const { error } = await supabase
+          .from("staff")
+          .update({
             full_name: validated.full_name,
             phone: validated.phone,
             email: validated.email || null,
             specialization: validated.specialization || null,
-            is_active: true,
-          },
-        ])
-        .select()
-        .single();
+            is_active: formData.is_active,
+          })
+          .eq("id", editingMemberId);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      toast.success(
-        `${validated.role === "receptionist" ? "Receptionist" : "Staff"} added successfully!`
-      );
-
-      // Call backend endpoint to send invite email
-      if (validated.email) {
-        try {
-          const response = await fetch("http://localhost:5000/api/invite", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: validated.email,
+        toast.success("Staff updated!");
+      } else {
+        // CREATE staff via Supabase first
+        const { data: newStaff, error } = await supabase
+          .from("staff")
+          .insert([
+            {
               full_name: validated.full_name,
-              role: validated.role,
-            }),
-          });
+              phone: validated.phone,
+              email: validated.email || null,
+              specialization: validated.specialization || null,
+              is_active: true,
+            },
+          ])
+          .select()
+          .single();
 
-          const result = await response.json();
+        if (error) throw error;
 
-          if (!response.ok) {
-            throw new Error(result.error || "Failed to send invite email");
+        /** -------------------------------
+         *  CREATE USER ROLE IMMEDIATELY
+         *  -------------------------------- */
+        const { error: roleError } = await supabase.from("user_roles").insert([
+          {
+            user_id: newStaff.id, // staff primary key
+            role: validated.role, // "receptionist" | "staff"
+          },
+        ]);
+
+        if (roleError) throw roleError;
+        toast.success(
+          `${
+            validated.role === "receptionist" ? "Receptionist" : "Staff"
+          } added successfully!`
+        );
+
+        // Call backend endpoint to send invite email
+        if (validated.email) {
+          try {
+            const response = await fetch("http://192.168.0.200:5000/api/invite", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                email: validated.email,
+                full_name: validated.full_name,
+                role: validated.role,
+              }),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+              throw new Error(result.error || "Failed to send invite email");
+            }
+
+            toast.success("Invite email sent successfully!");
+          } catch (inviteError: any) {
+            console.error("Invite email error:", inviteError);
+            toast.error(inviteError.message || "Failed to send invite email");
           }
-
-          toast.success("Invite email sent successfully!");
-        } catch (inviteError: any) {
-          console.error("Invite email error:", inviteError);
-          toast.error(inviteError.message || "Failed to send invite email");
         }
       }
+
+      setDialogOpen(false);
+      setEditingMemberId(null);
+      setFormData({
+        full_name: "",
+        phone: "",
+        email: "",
+        specialization: "",
+        role: "staff",
+        is_active: true,
+      });
+
+      fetchStaff();
+    } catch (error: any) {
+      if (error instanceof z.ZodError) toast.error(error.errors[0].message);
+      else toast.error(error.message || "Failed to save staff");
     }
-
-    setDialogOpen(false);
-    setEditingMemberId(null);
-    setFormData({
-      full_name: "",
-      phone: "",
-      email: "",
-      specialization: "",
-      role: "staff",
-      is_active: true,
-    });
-
-    fetchStaff();
-  } catch (error: any) {
-    if (error instanceof z.ZodError) toast.error(error.errors[0].message);
-    else toast.error(error.message || "Failed to save staff");
-  }
-};
-
+  };
 
   if (loading) {
     return (
@@ -313,8 +325,8 @@ const handleSubmit = async (e: React.FormEvent) => {
               <DialogTitle>Delete staff</DialogTitle>
             </DialogHeader>
             <p className="text-sm text-muted-foreground mb-4">
-              Are you sure you want to delete this staff? This action cannot
-              be undone.
+              Are you sure you want to delete this staff? This action cannot be
+              undone.
             </p>
             <div className="flex justify-end gap-2">
               <Button

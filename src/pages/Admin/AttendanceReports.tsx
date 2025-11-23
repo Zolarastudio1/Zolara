@@ -4,7 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Loader2, Download, Calendar } from "lucide-react";
-import { format, parseISO, differenceInMinutes, startOfMonth, endOfMonth } from "date-fns";
+import {
+  format,
+  parseISO,
+  differenceInMinutes,
+  startOfMonth,
+  endOfMonth,
+} from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -36,12 +42,18 @@ const LATE_THRESHOLD_MINUTES = 15;
 const EARLY_THRESHOLD_MINUTES = 15;
 
 export default function AttendanceReports() {
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<
+    AttendanceRecord[]
+  >([]);
   const [reports, setReports] = useState<StaffReport[]>([]);
   const [loading, setLoading] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [startDate, setStartDate] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
-  const [endDate, setEndDate] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
+  const [startDate, setStartDate] = useState(
+    format(startOfMonth(new Date()), "yyyy-MM-dd")
+  );
+  const [endDate, setEndDate] = useState(
+    format(endOfMonth(new Date()), "yyyy-MM-dd")
+  );
 
   useEffect(() => {
     fetchUserRole();
@@ -55,10 +67,8 @@ export default function AttendanceReports() {
 
   const fetchUserRole = async () => {
     try {
-      const { data: userData, error } = await supabase.auth.getUser();
-      if (error) throw error;
-      const role = userData.user?.user_metadata?.role || "client";
-      setUserRole(role);
+      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+      setUserRole(storedUser.role);
     } catch (err: any) {
       console.error(err);
       toast.error("Unable to fetch user role");
@@ -126,7 +136,12 @@ export default function AttendanceReports() {
 
       // Check for early checkout (before 4:45 PM)
       const expectedEnd = new Date(checkOut);
-      expectedEnd.setHours(EXPECTED_END_HOUR - 1, 60 - EARLY_THRESHOLD_MINUTES, 0, 0);
+      expectedEnd.setHours(
+        EXPECTED_END_HOUR - 1,
+        60 - EARLY_THRESHOLD_MINUTES,
+        0,
+        0
+      );
       if (checkOut < expectedEnd) {
         report.early_checkouts += 1;
       }
@@ -168,7 +183,10 @@ export default function AttendanceReports() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `attendance-report-${startDate}-to-${endDate}.csv`);
+    link.setAttribute(
+      "download",
+      `attendance-report-${startDate}-to-${endDate}.csv`
+    );
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
@@ -181,7 +199,9 @@ export default function AttendanceReports() {
     return (
       <div className="min-h-screen bg-background p-8">
         <Card className="p-6 text-center">
-          <p className="text-destructive">Access Denied. Only owners and receptionists can view reports.</p>
+          <p className="text-destructive">
+            Access Denied. Only owners and receptionists can view reports.
+          </p>
         </Card>
       </div>
     );
@@ -231,7 +251,9 @@ export default function AttendanceReports() {
           </div>
         ) : reports.length === 0 ? (
           <Card className="p-6 text-center">
-            <p className="text-muted-foreground">No attendance data found for the selected period.</p>
+            <p className="text-muted-foreground">
+              No attendance data found for the selected period.
+            </p>
           </Card>
         ) : (
           <Card className="overflow-hidden">
@@ -272,15 +294,28 @@ export default function AttendanceReports() {
                         {report.total_hours.toFixed(2)} hrs
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {(report.total_hours / report.total_days).toFixed(2)} hrs
+                        {(report.total_hours / report.total_days).toFixed(2)}{" "}
+                        hrs
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={report.late_check_ins > 0 ? "text-orange-500 font-medium" : ""}>
+                        <span
+                          className={
+                            report.late_check_ins > 0
+                              ? "text-orange-500 font-medium"
+                              : ""
+                          }
+                        >
                           {report.late_check_ins}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={report.early_checkouts > 0 ? "text-orange-500 font-medium" : ""}>
+                        <span
+                          className={
+                            report.early_checkouts > 0
+                              ? "text-orange-500 font-medium"
+                              : ""
+                          }
+                        >
                           {report.early_checkouts}
                         </span>
                       </td>

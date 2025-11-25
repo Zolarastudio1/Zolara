@@ -144,55 +144,13 @@ const Staff = () => {
               email: validated.email || null,
               specialization: validated.specialization || null,
               is_active: true,
+              role: validated.role || null,
             },
           ])
           .select()
           .single();
 
         if (error) throw error;
-
-        /** -------------------------------
-         *  CREATE USER ROLE IMMEDIATELY
-         *  -------------------------------- */
-        const { error: roleError } = await supabase.from("user_roles").insert([
-          {
-            user_id: newStaff.id, // staff primary key
-            role: validated.role, // "receptionist" | "staff"
-          },
-        ]);
-
-        if (roleError) throw roleError;
-        toast.success(
-          `${
-            validated.role === "receptionist" ? "Receptionist" : "Staff"
-          } added successfully!`
-        );
-
-        // Call backend endpoint to send invite email
-        if (validated.email) {
-          try {
-            const response = await fetch("http://192.168.0.200:5000/api/invite", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                email: validated.email,
-                full_name: validated.full_name,
-                role: validated.role,
-              }),
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-              throw new Error(result.error || "Failed to send invite email");
-            }
-
-            toast.success("Invite email sent successfully!");
-          } catch (inviteError: any) {
-            console.error("Invite email error:", inviteError);
-            toast.error(inviteError.message || "Failed to send invite email");
-          }
-        }
       }
 
       setDialogOpen(false);

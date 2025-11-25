@@ -30,11 +30,12 @@ const signupSchema = z.object({
     .min(1, "Name is required")
     .max(100, "Name too long"),
   email: z.string().email("Invalid email address").max(255, "Email too long"),
+  phone: z.string().max(13, "Phone number too long"),
   password: z
     .string()
     .min(6, "Password must be at least 6 characters")
-    .max(72, "Password too long"),
-  role: z.enum(["client", "staff", "receptionist", "owner"]).optional(),
+    .max(12, "Password too long"),
+  role: z.enum(["client", "staff", "receptionist"]).optional(),
 });
 
 const Auth = () => {
@@ -47,9 +48,10 @@ const Auth = () => {
 
   const [signupFullName, setSignupFullName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
+  const [signupPhone, setSignupPhone] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupRole, setSignupRole] = useState<
-    "client" | "staff" | "receptionist" | "owner"
+    "client" | "staff" | "receptionist"
   >("client");
 
   const [showResetDialog, setShowResetDialog] = useState(false);
@@ -175,33 +177,78 @@ const Auth = () => {
     setLoading(true);
 
     try {
+      // Validate form data
       const validated = signupSchema.parse({
-        fullName: signupFullName,
+        fullName: signupFullName.trim(),
         email: signupEmail.trim().toLowerCase(),
+        phone: signupPhone.trim(),
         password: signupPassword,
         role: signupRole,
       });
 
-      let roleToAssign = validated.role;
+      const roleToAssign = validated.role;
 
-      // Only verify non-client staff emails
-      if (validated.role !== "client") {
+      // Staff/receptionist must exist before signup
+      if (roleToAssign !== "client") {
         const { data: isVerified, error: verifyError } = await supabase.rpc(
           "verify_staff_email",
-          { email_to_check: validated.email, role_to_check: validated.role }
+          {
+            email_to_check: validated.email,
+            role_to_check: roleToAssign,
+          }
         );
 
+        console.log(
+          "Verified or not:",
+          isVerified,
+          "Role:",
+          roleToAssign,
+          "Error",
+          verifyError
+        );
+
+        // Ensure it's explicitly true
         if (verifyError || !isVerified) {
           toast.error(
-            "Your email must be registered by an administrator before signing up."
+            "Your email must be registered by an administrator with the correct role before signing up."
+          );
+          return;
+        }
+      }
+
+      // Clients: check if they already exist
+      if (roleToAssign === "client") {
+        const { data: existingClient, error: clientError } = await supabase
+          .from("clients")
+          .select("id")
+          .eq("email", validated.email)
+          .single();
+
+        if (clientError && clientError.code !== "PGRST116") throw clientError;
+
+        if (existingClient) {
+          // Update existing client info instead of creating new
+          const { error: updateError } = await supabase
+            .from("clients")
+            .update({
+              full_name: validated.fullName,
+              phone: validated.phone,
+              is_active: true,
+            })
+            .eq("email", validated.email);
+
+          if (updateError) throw updateError;
+
+          toast.success(
+            "Your account exists. Updated info successfully. Please login."
           );
           setLoading(false);
           return;
         }
       }
 
-      // Signup user
-      const { data, error } = await supabase.auth.signUp({
+      // Create Supabase auth user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: validated.email,
         password: validated.password,
         options: {
@@ -210,19 +257,14 @@ const Auth = () => {
         },
       });
 
-      if (error) throw error;
+      if (authError) throw authError;
 
-      // Insert role into user_roles table
-      if (data.user) {
-        const { error: roleError } = await supabase.from("user_roles").insert({
-          user_id: data.user.id,
-          role: roleToAssign,
-        });
-        if (roleError) throw roleError;
-
+      // Save user info locally
+      if (authData.user) {
         const userData = {
-          id: data.user.id,
-          email: data.user.email,
+          id: authData.user.id,
+          email: authData.user.email,
+          phone: validated.phone,
           role: roleToAssign,
         };
         localStorage.setItem("user", JSON.stringify(userData));
@@ -401,6 +443,17 @@ const Auth = () => {
                     placeholder="you@example.com"
                     value={signupEmail}
                     onChange={(e) => setSignupEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-phone">phone</Label>
+                  <Input
+                    id="signup-phone"
+                    type="phone"
+                    placeholder="+233 30 1234567"
+                    value={signupPhone}
+                    onChange={(e) => setSignupPhone(e.target.value)}
                     required
                   />
                 </div>

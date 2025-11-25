@@ -24,7 +24,7 @@ const ProtectedRoute = ({ allowedRoles }) => {
         .eq("user_id", user.id)
         .single();
 
-      setUserRole(roleData?.role || null); // <= extract the string directly
+      setUserRole(roleData?.role || null);
       setLoading(false);
     };
 

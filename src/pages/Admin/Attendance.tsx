@@ -38,10 +38,10 @@ export default function Attendance() {
   >([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(false);
-  const [userRole, setUserRole] = useState<string>("owner");
+  const [userRole, setUserRole] = useState<string>("");
 
   useEffect(() => {
-    // fetchUserRole();
+    fetchUserRole();
   }, []);
 
   useEffect(() => {
@@ -54,9 +54,22 @@ export default function Attendance() {
   /** Fetch Logged-in User Role */
   const fetchUserRole = async () => {
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const role = userData?.user?.user_metadata?.role || "";
-      setUserRole(role);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .single();
+
+      setUserRole(roleData?.role || null);
     } catch (err: any) {
       console.error(err);
       toast.error("Unable to fetch user role");
@@ -143,15 +156,13 @@ export default function Attendance() {
       }
 
       // Create a new attendance record if none exists
-      const { error: insertError } = await supabase
-        .from("attendance")
-        .insert([
-          {
-            staff_id: staffId,
-            check_in: new Date().toISOString(),
-            status: "present",
-          },
-        ]);
+      const { error: insertError } = await supabase.from("attendance").insert([
+        {
+          staff_id: staffId,
+          check_in: new Date().toISOString(),
+          status: "present",
+        },
+      ]);
 
       if (insertError) throw insertError;
 

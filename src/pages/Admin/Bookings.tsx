@@ -533,11 +533,14 @@ const Bookings = () => {
                     className="rounded-xl"
                     onClick={() => {
                       setEditingBookingId(b.id);
+                      // Format time to HH:MM (remove seconds if present)
+                      const timeFormatted = b.appointment_time.substring(0, 5);
                       setFormData({
                         ...b,
                         client_id: b.client_id,
                         staff_id: b.staff_id || "",
                         service_id: b.service_id,
+                        appointment_time: timeFormatted,
                       });
                       setDialogOpen(true);
                     }}

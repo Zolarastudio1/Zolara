@@ -33,73 +33,94 @@ const ClientDashboard = () => {
   }, []);
 
   const fetchDashboardData = async () => {
-    setLoading(true);
+  setLoading(true);
 
-    try {
-      const user = (await supabase.auth.getUser()).data.user;
-      if (!user) return;
+  try {
+    const user = (await supabase.auth.getUser()).data.user;
+    if (!user) return;
 
-      const [bookingsRes, pendingRes, paymentsRes] = await Promise.all([
-        supabase
-          .from("bookings")
-          .select("*, staff(full_name), services(name, price)")
-          .eq("client_id", user.id)
-          .order("appointment_date", { ascending: false }),
+    // --- Fetch this user's booking IDs for filtering payments ---
+    const bookingIdsRes = await supabase
+      .from("bookings")
+      .select("id")
+      .eq("client_id", user.id);
 
-        supabase
-          .from("booking_requests")
-          .select("*")
-          .eq("client_id", user.id)
-          .eq("status", "pending")
-          .order("created_at", { ascending: false }),
+    const bookingIds = bookingIdsRes.data?.map(b => b.id) || [];
 
-        supabase
-          .from("payments")
-          .select("*, bookings:booking_id(appointment_date, services(name))")
-          .eq("bookings.client_id", user.id)
+    const [bookingsRes, pendingRes, paymentsRes] = await Promise.all([
+      // 1. Fetch user's bookings
+      supabase
+        .from("bookings")
+        .select("*, staff(full_name), services(name, price)")
+        .eq("client_id", user.id)
+        .order("appointment_date", { ascending: false }),
 
-          .order("payment_date", { ascending: false }),
-      ]);
+      // 2. Fetch user's pending booking requests
+      supabase
+        .from("booking_requests")
+        .select("*")
+        .eq("client_id", user.id)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false }),
 
-      if (bookingsRes.error) throw bookingsRes.error;
-      if (pendingRes.error) throw pendingRes.error;
-      if (paymentsRes.error) throw paymentsRes.error;
+      // 3. Fetch user's payments by limiting to their booking IDs
+      supabase
+        .from("payments")
+        .select(`
+          *,
+          bookings:booking_id(
+            appointment_date,
+            services(name)
+          )
+        `)
+        .in("booking_id", bookingIds) // ← FIXED
+        .order("payment_date", { ascending: false }),
+    ]);
 
-      const bookingsData = bookingsRes.data || [];
-      const pendingRequestsData = pendingRes.data || [];
-      const paymentsData = paymentsRes.data || [];
+    if (bookingsRes.error) throw bookingsRes.error;
+    if (pendingRes.error) throw pendingRes.error;
+    if (paymentsRes.error) throw paymentsRes.error;
 
-      const computedStats = bookingsData.reduce(
-        (acc, b) => {
-          acc.total += 1;
-          if (b.status === "completed") acc.completed += 1;
-          if (b.status === "cancelled") acc.cancelled += 1;
-          if (["scheduled", "confirmed"].includes(b.status)) acc.upcoming += 1;
-          return acc;
-        },
-        {
-          total: 0,
-          completed: 0,
-          cancelled: 0,
-          upcoming: 0,
-          pending: pendingRequestsData.length,
-          totalSpent: 0,
-        }
-      );
+    const bookingsData = bookingsRes.data || [];
+    const pendingRequestsData = pendingRes.data || [];
+    const paymentsData = paymentsRes.data || [];
 
-      computedStats.totalSpent =
-        paymentsData.reduce((acc, p) => acc + Number(p.amount || 0), 0) || 0;
+    // --- Compute stats ---
+    const computedStats = bookingsData.reduce(
+      (acc, b) => {
+        acc.total += 1;
+        if (b.status === "completed") acc.completed += 1;
+        if (b.status === "pending") acc.pending += 1;
+        if (b.status === "cancelled") acc.cancelled += 1;
+        if (["scheduled", "confirmed"].includes(b.status)) acc.upcoming += 1;
+        return acc;
+      },
+      {
+        total: 0,
+        completed: 0,
+        cancelled: 0,
+        upcoming: 0,
+        pending: pendingRequestsData.length,
+        totalSpent: 0,
+      }
+    );
 
-      setBookings(bookingsData);
-      setPayments(paymentsData);
-      setStats(computedStats);
-    } catch (error: any) {
-      console.error("Error fetching dashboard data:", error);
-      toast.error(error.message || "Failed to load dashboard data");
-    } finally {
-      setLoading(false);
-    }
-  };
+    computedStats.totalSpent =
+      paymentsData.reduce((acc, p) => acc + Number(p.amount || 0), 0) || 0;
+
+    // --- Update UI state ---
+    setBookings(bookingsData);
+    setPayments(paymentsData);
+    setStats(computedStats);
+
+  } catch (error: any) {
+    console.error("Error fetching dashboard data:", error);
+    toast.error(error.message || "Failed to load dashboard data");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const getStatusColor = (status: string) => {
     const colors: any = {

@@ -276,8 +276,18 @@ const Auth = () => {
         redirectToDashboard(roleToAssign);
       }
     } catch (error: any) {
-      if (error instanceof z.ZodError) toast.error(error.errors[0].message);
-      else toast.error(error.message || "Signup failed");
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else if (
+        error?.code === "user_already_exists" ||
+        error?.message?.toLowerCase().includes("user already registered")
+      ) {
+        toast.error(
+          "An account with this email already exists. Please log in or reset your password."
+        );
+      } else {
+        toast.error(error.message || "Signup failed");
+      }
     } finally {
       setLoading(false);
     }

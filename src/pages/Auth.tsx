@@ -212,14 +212,8 @@ const Auth = () => {
 
       if (error) throw error;
 
-      // Insert role into user_roles table
+      // The trigger automatically creates profile and assigns role
       if (data.user) {
-        const { error: roleError } = await supabase.from("user_roles").insert({
-          user_id: data.user.id,
-          role: roleToAssign,
-        });
-        if (roleError) throw roleError;
-
         const userData = {
           id: data.user.id,
           email: data.user.email,

@@ -162,7 +162,7 @@ const Reports = () => {
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold text-primary">
-                  ₦{reportData.totalRevenue.toLocaleString()}
+                  GH₵{reportData.totalRevenue.toLocaleString()}
                 </p>
               </CardContent>
             </Card>
@@ -189,7 +189,7 @@ const Reports = () => {
                       <p className="font-medium">{service}</p>
                       <p className="text-sm text-muted-foreground">{data.count} bookings</p>
                     </div>
-                    <p className="font-bold text-primary">₦{data.revenue.toLocaleString()}</p>
+                    <p className="font-bold text-primary">GH₵{data.revenue.toLocaleString()}</p>
                   </div>
                 ))}
               </div>
@@ -208,7 +208,7 @@ const Reports = () => {
                       <p className="font-medium">{staff}</p>
                       <p className="text-sm text-muted-foreground">{data.count} bookings</p>
                     </div>
-                    <p className="font-bold text-primary">₦{data.revenue.toLocaleString()}</p>
+                    <p className="font-bold text-primary">GH₵{data.revenue.toLocaleString()}</p>
                   </div>
                 ))}
               </div>

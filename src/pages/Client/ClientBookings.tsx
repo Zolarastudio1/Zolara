@@ -17,6 +17,13 @@ import { Loader2, Calendar, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { fetchUserBookings } from "@/lib/utils";
 import { format, parseISO, isValid } from "date-fns";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const ClientBookings = () => {
   const [bookings, setBookings] = useState<any[]>([]);
@@ -31,6 +38,7 @@ const ClientBookings = () => {
   const [selectedService, setSelectedService] = useState("");
   const [preferredDate, setPreferredDate] = useState("");
   const [preferredTime, setPreferredTime] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
   const [notes, setNotes] = useState("");
   const [requesting, setRequesting] = useState(false);
   const navigate = useNavigate();
@@ -40,16 +48,30 @@ const ClientBookings = () => {
   }, []);
 
   const fetchData = async () => {
+    setLoading(true);
     try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        toast.error("Please sign in first");
+        return;
+      }
+
       const [bookingsRes, requestsRes, servicesRes] = await Promise.all([
+        // Fetch bookings for this user only
         supabase
           .from("bookings")
           .select("*, clients(*), staff(*), services(*)")
+          .eq("client_id", user.id)
           .order("appointment_date", { ascending: false }),
-        supabase //@ts-ignore
+
+        // Fetch booking requests for this user only
+        supabase
           .from("booking_requests")
           .select("*, clients(*), services(*)")
+          .eq("client_id", user.id)
           .order("created_at", { ascending: false }),
+
+        // Fetch all services
         supabase.from("services").select("*").order("name"),
       ]);
 
@@ -157,8 +179,9 @@ const ClientBookings = () => {
       {
         client_id: user.id,
         service_id: selectedService,
-        appointment_date: preferredDate,
-        appointment_time: preferredTime,
+        preferred_date: preferredDate,
+        preferred_time: preferredTime,
+        payment_method: paymentMethod,
         notes,
         status: "pending",
       },
@@ -256,6 +279,27 @@ const ClientBookings = () => {
                   />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="payment-method">Payment Method</Label>
+                <Select
+                  value={paymentMethod}
+                  onValueChange={(value) =>
+                    setPaymentMethod(
+                      value as "cash" | "card" | "momo" | "bank_transfer"
+                    )
+                  }
+                >
+                  <SelectTrigger id="payment-method">
+                    <SelectValue placeholder="Select payment method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="card">Card (Paystack)</SelectItem>
+                    <SelectItem value="momo">Mobile Money</SelectItem>
+                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               <div>
                 <Label>Notes (optional)</Label>
@@ -287,11 +331,12 @@ const ClientBookings = () => {
         </Card>
       ) : (
         <>
-        
           {/* Confirmed Bookings */}
           <section className="space-y-4 mt-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-              <h2 className="text-2xl font-bold text-gray-900">Confirmed Bookings</h2>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Confirmed Bookings
+              </h2>
               <p className="text-sm text-gray-500">
                 Confirmed and upcoming appointments
               </p>
@@ -379,6 +424,10 @@ const ClientBookings = () => {
                       <p className="text-sm text-gray-500 mt-1">
                         {booking.staff?.full_name || "Unassigned"}
                       </p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Preferred payment method:{" "}
+                        {booking.payment_method || "none"}
+                      </p>
 
                       <div className="flex flex-wrap gap-4 mt-3 text-gray-600">
                         <div className="flex items-center gap-1">
@@ -442,7 +491,6 @@ const ClientBookings = () => {
               ))}
             </div>
           </section>
-
         </>
       )}
 

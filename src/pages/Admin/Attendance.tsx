@@ -199,7 +199,7 @@ export default function Attendance() {
   };
 
   /** Role Restriction View */
-  if (userRole !== "owner" && userRole !== "receptionist") {
+  if (!loading && userRole !== "owner" && userRole !== "receptionist") {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Card className="p-10 text-center max-w-lg">

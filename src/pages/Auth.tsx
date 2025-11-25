@@ -30,7 +30,7 @@ const signupSchema = z.object({
     .min(1, "Name is required")
     .max(100, "Name too long"),
   email: z.string().email("Invalid email address").max(255, "Email too long"),
-  phone: z.string().max(13, "Phone number too long"),
+  phone: z.string().max(15, "Phone number too long"),
   password: z
     .string()
     .min(6, "Password must be at least 6 characters")
@@ -143,6 +143,8 @@ const Auth = () => {
         password: validated.password,
       });
 
+      const metaDataRole = data.user.user_metadata.role
+
       if (error) throw error;
       if (!data.user) throw new Error("User not found");
 
@@ -154,7 +156,7 @@ const Auth = () => {
         .single();
 
       // If role does not exist, create it
-      const role = roleData?.role;
+      const role = roleData?.role || metaDataRole;
       console.log("User role:", role);
 
       // Save minimal user info

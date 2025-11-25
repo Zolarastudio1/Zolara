@@ -71,7 +71,7 @@ const Sales = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-4xl font-bold text-primary">₦{totalRevenue.toLocaleString()}</p>
+          <p className="text-4xl font-bold text-primary">GH₵{totalRevenue.toLocaleString()}</p>
         </CardContent>
       </Card>
 
@@ -85,7 +85,7 @@ const Sales = () => {
                   <p className="text-sm text-muted-foreground">{payment.bookings?.services?.name}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-bold text-primary">₦{Number(payment.amount).toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-primary">GH₵{Number(payment.amount).toLocaleString()}</p>
                   <div className="flex gap-2 mt-2">
                     <Badge className={getPaymentMethodColor(payment.payment_method)}>
                       {payment.payment_method}

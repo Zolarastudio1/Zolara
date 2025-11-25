@@ -39,22 +39,25 @@ const ClientDashboard = () => {
       const user = (await supabase.auth.getUser()).data.user;
       if (!user) return;
 
-      // Fetch all data in parallel
       const [bookingsRes, pendingRes, paymentsRes] = await Promise.all([
         supabase
           .from("bookings")
           .select("*, staff(full_name), services(name, price)")
           .eq("client_id", user.id)
           .order("appointment_date", { ascending: false }),
+
         supabase
           .from("booking_requests")
           .select("*")
           .eq("client_id", user.id)
           .eq("status", "pending")
           .order("created_at", { ascending: false }),
+
         supabase
           .from("payments")
-          .select("*, bookings(appointment_date, services(name))")
+          .select("*, bookings:booking_id(appointment_date, services(name))")
+          .eq("bookings.client_id", user.id)
+
           .order("payment_date", { ascending: false }),
       ]);
 
@@ -66,7 +69,6 @@ const ClientDashboard = () => {
       const pendingRequestsData = pendingRes.data || [];
       const paymentsData = paymentsRes.data || [];
 
-      // Compute stats
       const computedStats = bookingsData.reduce(
         (acc, b) => {
           acc.total += 1;
@@ -122,11 +124,31 @@ const ClientDashboard = () => {
 
       {/* STATS GRID */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
-        <StatCard title="Total Bookings" value={stats.total} icon={<TrendingUp className="w-6 h-6 text-primary" />} />
-        <StatCard title="Upcoming" value={stats.upcoming} icon={<Calendar className="w-6 h-6 text-blue-600" />} />
-        <StatCard title="Completed" value={stats.completed} icon={<TrendingUp className="w-6 h-6 text-green-600" />} />
-        <StatCard title="Cancelled" value={stats.cancelled} icon={<TrendingDown className="w-6 h-6 text-red-600" />} />
-        <StatCard title="Pending Requests" value={stats.pending} icon={<Clock className="w-6 h-6 text-yellow-500" />} />
+        <StatCard
+          title="Total Bookings"
+          value={stats.total}
+          icon={<TrendingUp className="w-6 h-6 text-primary" />}
+        />
+        <StatCard
+          title="Upcoming"
+          value={stats.upcoming}
+          icon={<Calendar className="w-6 h-6 text-blue-600" />}
+        />
+        <StatCard
+          title="Completed"
+          value={stats.completed}
+          icon={<TrendingUp className="w-6 h-6 text-green-600" />}
+        />
+        <StatCard
+          title="Cancelled"
+          value={stats.cancelled}
+          icon={<TrendingDown className="w-6 h-6 text-red-600" />}
+        />
+        <StatCard
+          title="Pending Requests"
+          value={stats.pending}
+          icon={<Clock className="w-6 h-6 text-yellow-500" />}
+        />
       </div>
 
       {/* Optional: Mobile-friendly horizontal scroll */}
@@ -247,9 +269,16 @@ const ClientDashboard = () => {
 
 export default ClientDashboard;
 
-
 // Reusable Stat Card
-const StatCard = ({ title, value, icon }: { title: string; value: number; icon: React.ReactNode }) => (
+const StatCard = ({
+  title,
+  value,
+  icon,
+}: {
+  title: string;
+  value: number;
+  icon: React.ReactNode;
+}) => (
   <Card className="rounded-2xl shadow-sm hover:shadow-md transition-shadow">
     <CardContent className="flex items-center justify-between p-5">
       <div>

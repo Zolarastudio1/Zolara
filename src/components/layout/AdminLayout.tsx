@@ -1,14 +1,20 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Calendar, 
-  Users, 
-  DollarSign, 
+import {
+  Calendar,
+  Users,
+  DollarSign,
   TrendingUp,
-  Scissors
+  Scissors,
 } from "lucide-react";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+} from "date-fns";
 
 const AdminLayout = () => {
   const [stats, setStats] = useState({
@@ -18,7 +24,7 @@ const AdminLayout = () => {
     monthlyRevenue: 0,
     totalClients: 0,
     activeStaff: 0,
-    topService: "N/A"
+    topService: "N/A",
   });
   const [loading, setLoading] = useState(true);
 
@@ -85,18 +91,23 @@ const AdminLayout = () => {
         return acc;
       }, {});
 
-      const topService = serviceCounts 
-        ? Object.entries(serviceCounts).sort((a: any, b: any) => b[1] - a[1])[0]?.[0] || "N/A"
+      const topService = serviceCounts
+        ? Object.entries(serviceCounts).sort(
+            (a: any, b: any) => b[1] - a[1]
+          )[0]?.[0] || "N/A"
         : "N/A";
 
       setStats({
         todayBookings: todayBookings?.length || 0,
-        todayRevenue: todayPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0,
-        weeklyRevenue: weeklyPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0,
-        monthlyRevenue: monthlyPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0,
+        todayRevenue:
+          todayPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0,
+        weeklyRevenue:
+          weeklyPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0,
+        monthlyRevenue:
+          monthlyPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0,
         totalClients: clientCount || 0,
         activeStaff: staffCount || 0,
-        topService
+        topService,
       });
     } catch (error) {
       console.error("Error fetching stats:", error);
@@ -122,50 +133,52 @@ const AdminLayout = () => {
       value: stats.todayBookings,
       icon: Calendar,
       color: "text-primary",
-      bgColor: "bg-primary/10"
+      bgColor: "bg-primary/10",
     },
     {
       title: "Today's Revenue",
-      value: `₦${stats.todayRevenue.toLocaleString()}`,
+      value: `GH₵${stats.todayRevenue.toLocaleString()}`,
       icon: DollarSign,
       color: "text-success",
-      bgColor: "bg-success/10"
+      bgColor: "bg-success/10",
     },
     {
       title: "Weekly Revenue",
-      value: `₦${stats.weeklyRevenue.toLocaleString()}`,
+      value: `GH₵${stats.weeklyRevenue.toLocaleString()}`,
       icon: TrendingUp,
       color: "text-info",
-      bgColor: "bg-info/10"
+      bgColor: "bg-info/10",
     },
     {
       title: "Monthly Revenue",
-      value: `₦${stats.monthlyRevenue.toLocaleString()}`,
+      value: `GH₵${stats.monthlyRevenue.toLocaleString()}`,
       icon: TrendingUp,
       color: "text-accent",
-      bgColor: "bg-accent/10"
+      bgColor: "bg-accent/10",
     },
     {
       title: "Total Clients",
       value: stats.totalClients,
       icon: Users,
       color: "text-primary",
-      bgColor: "bg-primary/10"
+      bgColor: "bg-primary/10",
     },
     {
       title: "Active Staff",
       value: stats.activeStaff,
       icon: Users,
       color: "text-secondary-foreground",
-      bgColor: "bg-secondary"
-    }
+      bgColor: "bg-secondary",
+    },
   ];
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome back! Here's your salon overview</p>
+        <p className="text-muted-foreground">
+          Welcome back! Here's your salon overview
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -197,7 +210,9 @@ const AdminLayout = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-semibold text-primary">{stats.topService}</p>
+          <p className="text-2xl font-semibold text-primary">
+            {stats.topService}
+          </p>
         </CardContent>
       </Card>
     </div>

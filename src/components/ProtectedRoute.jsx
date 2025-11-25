@@ -23,8 +23,9 @@ const ProtectedRoute = ({ allowedRoles }) => {
         .select("role")
         .eq("user_id", user.id)
         .single();
+      const metaDataRole = user.user_metadata.role;
 
-      setUserRole(roleData?.role || null);
+      setUserRole(roleData?.role || metaDataRole);
       setLoading(false);
     };
 

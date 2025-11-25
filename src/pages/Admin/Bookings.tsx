@@ -75,7 +75,7 @@ const Bookings = () => {
     appointment_date: "",
     appointment_time: "",
     status: "scheduled",
-    // payment_mode: "cash",
+    payment_method: "",
     payment_status: "unpaid",
     notes: "",
   });
@@ -127,7 +127,7 @@ const Bookings = () => {
         appointment_date: validated.appointment_date,
         appointment_time: validated.appointment_time,
         status: validated.status || "scheduled",
-        // payment_mode: validated.payment_mode || "cash",
+        // payment_method: validated.payment_method,
         // payment_status: validated.payment_status || "unpaid",
         notes: validated.notes || "",
       };
@@ -156,7 +156,7 @@ const Bookings = () => {
         appointment_date: "",
         appointment_time: "",
         status: "scheduled",
-        // payment_mode: "cash",
+        // payment_method: validated.payment_method,
         // payment_status: "unpaid",
         notes: "",
       });
@@ -220,6 +220,7 @@ const Bookings = () => {
               service_id: request.service_id,
               appointment_date: request.preferred_date,
               appointment_time: request.preferred_time,
+              payment_method: request.payment_method,
               status: "scheduled",
               notes: request.notes,
             },
@@ -378,13 +379,13 @@ const Bookings = () => {
               </div>
 
               {/* Payment */}
-              {/* <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Payment Mode</Label>
+                  <Label>Payment Method</Label>
                   <Select
-                    value={formData.payment_mode}
+                    value={formData.payment_method}
                     onValueChange={(value) =>
-                      setFormData({ ...formData, payment_mode: value })
+                      setFormData({ ...formData, payment_method: value })
                     }
                   >
                     <SelectTrigger>
@@ -392,8 +393,11 @@ const Bookings = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="card">Card</SelectItem>
-                      <SelectItem value="transfer">Transfer</SelectItem>
+                      <SelectItem value="card">Card (Paystack)</SelectItem>
+                      <SelectItem value="momo">Mobile Money</SelectItem>
+                      <SelectItem value="bank_transfer">
+                        Bank Transfer
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -416,7 +420,7 @@ const Bookings = () => {
                     </SelectContent>
                   </Select>
                 </div>
-              </div> */}
+              </div>
 
               {/* Notes */}
               <div>

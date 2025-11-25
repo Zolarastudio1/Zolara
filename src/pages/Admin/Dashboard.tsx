@@ -126,21 +126,21 @@ const Dashboard = () => {
     },
     {
       title: "Today's Revenue",
-      value: `₦${stats.todayRevenue.toLocaleString()}`,
+      value: `GH₵${stats.todayRevenue.toLocaleString()}`,
       icon: DollarSign,
       color: "text-success",
       bgColor: "bg-success/10"
     },
     {
       title: "Weekly Revenue",
-      value: `₦${stats.weeklyRevenue.toLocaleString()}`,
+      value: `GH₵${stats.weeklyRevenue.toLocaleString()}`,
       icon: TrendingUp,
       color: "text-info",
       bgColor: "bg-info/10"
     },
     {
       title: "Monthly Revenue",
-      value: `₦${stats.monthlyRevenue.toLocaleString()}`,
+      value: `GH₵${stats.monthlyRevenue.toLocaleString()}`,
       icon: TrendingUp,
       color: "text-accent",
       bgColor: "bg-accent/10"

@@ -38,7 +38,6 @@ const ClientBookings = () => {
   const [selectedService, setSelectedService] = useState("");
   const [preferredDate, setPreferredDate] = useState("");
   const [preferredTime, setPreferredTime] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("");
   const [notes, setNotes] = useState("");
   const [requesting, setRequesting] = useState(false);
   const navigate = useNavigate();
@@ -174,14 +173,12 @@ const ClientBookings = () => {
       });
     }
 
-    // @ts-ignore
     const { error } = await supabase.from("booking_requests").insert([
       {
         client_id: user.id,
         service_id: selectedService,
-        preferred_date: preferredDate,
-        preferred_time: preferredTime,
-        payment_method: paymentMethod,
+        appointment_date: preferredDate,
+        appointment_time: preferredTime,
         notes,
         status: "pending",
       },
@@ -278,27 +275,6 @@ const ClientBookings = () => {
                     className="mt-1"
                   />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="payment-method">Payment Method</Label>
-                <Select
-                  value={paymentMethod}
-                  onValueChange={(value) =>
-                    setPaymentMethod(
-                      value as "cash" | "card" | "momo" | "bank_transfer"
-                    )
-                  }
-                >
-                  <SelectTrigger id="payment-method">
-                    <SelectValue placeholder="Select payment method" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="card">Card (Paystack)</SelectItem>
-                    <SelectItem value="momo">Mobile Money</SelectItem>
-                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
 
               <div>
@@ -421,22 +397,18 @@ const ClientBookings = () => {
                       <CardTitle className="text-lg font-semibold text-gray-900">
                         {booking.services?.name || "Service"}
                       </CardTitle>
-                      <p className="text-sm text-gray-500 mt-1">
+                       <p className="text-sm text-gray-500 mt-1">
                         {booking.staff?.full_name || "Unassigned"}
-                      </p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Preferred payment method:{" "}
-                        {booking.payment_method || "none"}
                       </p>
 
                       <div className="flex flex-wrap gap-4 mt-3 text-gray-600">
                         <div className="flex items-center gap-1">
                           <Calendar className="w-5 h-5 text-blue-500" />
                           <span className="text-sm font-medium">
-                            {booking.preferred_date
-                              ? isValid(parseISO(booking.preferred_date))
+                            {booking.appointment_date
+                              ? isValid(parseISO(booking.appointment_date))
                                 ? format(
-                                    parseISO(booking.preferred_date),
+                                    parseISO(booking.appointment_date),
                                     "PPP"
                                   )
                                 : "Invalid Date"
@@ -446,7 +418,7 @@ const ClientBookings = () => {
                         <div className="flex items-center gap-1">
                           <Clock className="w-5 h-5 text-green-500" />
                           <span className="text-sm font-medium">
-                            {booking.preferred_time || "N/A"}
+                            {booking.appointment_time || "N/A"}
                           </span>
                         </div>
                       </div>

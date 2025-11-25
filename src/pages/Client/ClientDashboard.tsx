@@ -39,6 +39,14 @@ const ClientDashboard = () => {
       const user = (await supabase.auth.getUser()).data.user;
       if (!user) return;
 
+      // First get user's bookings
+      const { data: userBookings } = await supabase
+        .from("bookings")
+        .select("id")
+        .eq("client_id", user.id);
+
+      const bookingIds = userBookings?.map(b => b.id) || [];
+
       const [bookingsRes, pendingRes, paymentsRes] = await Promise.all([
         supabase
           .from("bookings")
@@ -53,12 +61,13 @@ const ClientDashboard = () => {
           .eq("status", "pending")
           .order("created_at", { ascending: false }),
 
-        supabase
-          .from("payments")
-          .select("*, bookings:booking_id(appointment_date, services(name))")
-          .eq("bookings.client_id", user.id)
-
-          .order("payment_date", { ascending: false }),
+        bookingIds.length > 0
+          ? supabase
+              .from("payments")
+              .select("*, bookings:booking_id(appointment_date, services(name))")
+              .in("booking_id", bookingIds)
+              .order("payment_date", { ascending: false })
+          : Promise.resolve({ data: [], error: null }),
       ]);
 
       if (bookingsRes.error) throw bookingsRes.error;

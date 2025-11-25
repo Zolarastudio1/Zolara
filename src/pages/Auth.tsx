@@ -259,7 +259,7 @@ const Auth = () => {
 
       if (authError) throw authError;
 
-      // Save user info locally
+      // The trigger automatically creates profile and assigns role
       if (authData.user) {
         const userData = {
           id: authData.user.id,

@@ -151,11 +151,6 @@ const Reports = () => {
         const appointmentDate = booking?.appointment_date ?? "";
         const appointmentTime = booking?.appointment_time ?? "";
 
-        console.log(
-          "Date & Time",
-          formatDateTime(appointmentDate, appointmentTime)
-        );
-
         return {
           AppointmentDateTime: formatDateTime(appointmentDate, appointmentTime),
           Client: booking?.clients?.full_name ?? "",
@@ -283,7 +278,7 @@ const Reports = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <TrendingUp className="w-5 h-5 text-primary" />
-                  Total Revenue
+                  Total Income
                 </CardTitle>
               </CardHeader>
               <CardContent>

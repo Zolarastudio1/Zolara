@@ -29,6 +29,8 @@ interface PaymentDialogProps {
   onPaymentComplete: () => void;
 }
 
+// Webhook Url: https://ekvjnydomfresnkealpb.supabase.co/functions/v1/confirm-payment
+
 export default function PaymentDialog({
   admin,
   open,
@@ -57,6 +59,9 @@ export default function PaymentDialog({
     ? `Record Payment for ${booking?.clients?.full_name} - ${booking?.services?.name}`
     : `Make Payment for ${booking?.clients?.full_name} - ${booking?.services?.name}`;
 
+  const callbackUrl = admin
+    ? `${window.location.origin}/admin/bookings`
+    : `${window.location.origin}/bookings`;
   // -----------------------------------
   // SAVE OR UPDATE PAYMENT ACCOUNT INFO
   // -----------------------------------
@@ -99,8 +104,9 @@ export default function PaymentDialog({
               email: booking.clients?.email,
               amount: paymentAmount,
               booking_id: booking.id,
-              callback_url: `${window.location.origin}/admin/bookings`,
+              callback_url: callbackUrl,
               metadata: {
+                booking_id: booking.id,
                 client_name: booking.clients?.full_name,
                 service_name: booking.services?.name,
               },
@@ -347,17 +353,26 @@ export default function PaymentDialog({
               )}
             </div>
           )}
-
-          {/* SUBMIT BUTTON */}
+          {/* PAYMENT BUTTON */}
           <Button
             onClick={handlePaymentSubmit}
             disabled={loading}
             className="w-full"
           >
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            {paymentMethod === "bank_transfer"
-              ? "Click to use Paystack instead"
-              : "Process Payment"}
+
+            {/* ADMIN LOGIC */}
+            {admin &&
+            (paymentMethod === "bank_transfer" || paymentMethod === "cash") ? (
+              "Confirm Payment"
+            ) : (
+              <>
+                {/* NON-ADMIN LOGIC */}
+                {paymentMethod === "bank_transfer"
+                  ? "Click to use Paystack"
+                  : "Process Payment"}
+              </>
+            )}
           </Button>
         </div>
       </DialogContent>

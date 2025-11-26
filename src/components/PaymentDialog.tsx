@@ -37,12 +37,48 @@ export default function PaymentDialog({
   onPaymentComplete,
 }: PaymentDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+
   const [paymentMethod, setPaymentMethod] = useState<
     "cash" | "card" | "momo" | "bank_transfer"
   >("cash");
+
   const [amount, setAmount] = useState<string>(booking?.services?.price || "");
   const [notes, setNotes] = useState<string>("");
 
+  const [paymentInfo, setPaymentInfo] = useState({
+    id: null,
+    bank_name: "",
+    account_name: "",
+    account_number: "",
+  });
+
+  const label = admin
+    ? `Record Payment for ${booking?.clients?.full_name} - ${booking?.services?.name}`
+    : `Make Payment for ${booking?.clients?.full_name} - ${booking?.services?.name}`;
+
+  // -----------------------------------
+  // SAVE OR UPDATE PAYMENT ACCOUNT INFO
+  // -----------------------------------
+  const handleSavePaymentInfo = async () => {
+    const { data, error } = await supabase.from("payment_settings").upsert({
+      id: paymentInfo.id || 1, // force single row
+      bank_name: paymentInfo.bank_name,
+      account_name: paymentInfo.account_name,
+      account_number: paymentInfo.account_number,
+    });
+
+    if (error) {
+      toast.error("Failed to save bank information");
+      return;
+    }
+
+    toast.success("Bank details updated!");
+  };
+
+  // -----------------------------------
+  // PAYMENT SUBMISSION
+  // -----------------------------------
   const handlePaymentSubmit = async () => {
     setLoading(true);
 
@@ -54,7 +90,7 @@ export default function PaymentDialog({
 
       const paymentAmount = parseFloat(amount);
 
-      // Non-cash payments (card, momo, bank_transfer)
+      // Non-cash payments use Paystack edge function
       if (paymentMethod !== "cash") {
         const { data, error } = await supabase.functions.invoke(
           "initialize-payment",
@@ -72,22 +108,19 @@ export default function PaymentDialog({
           }
         );
 
-        if (error)
-          throw new Error(error.message || "Failed to initialize payment");
+        if (error) throw new Error(error.message);
 
         if (data?.authorization_url) {
-          toast.success("Redirecting to payment gateway...");
+          toast.success("Redirecting...");
           window.open(data.authorization_url, "_blank");
           onOpenChange(false);
           onPaymentComplete();
-        } else if (data?.error) {
-          throw new Error(data.error);
         } else {
-          throw new Error("Payment URL not returned");
+          throw new Error("Payment URL missing");
         }
       } else {
+        // CASH PAYMENT (admin only)
         if (admin) {
-          // Cash, Mobile Money, Bank Transfer
           const { error: paymentError } = await supabase
             .from("payments")
             .insert([
@@ -102,32 +135,44 @@ export default function PaymentDialog({
 
           if (paymentError) throw paymentError;
 
-          toast.success("Payment recorded successfully!");
+          toast.success("Payment recorded!");
           onOpenChange(false);
           onPaymentComplete();
         }
       }
     } catch (err: any) {
-      console.error("Payment error:", err);
       toast.error(err.message || "Failed to process payment");
     } finally {
       setLoading(false);
     }
   };
 
-  const [paymentInfo, setPaymentInfo] = useState<any>(null);
-
+  // -----------------------------------
+  // FETCH PAYMENT ACCOUNT DETAILS
+  // -----------------------------------
   useEffect(() => {
     const fetchPaymentInfo = async () => {
       const { data, error } = await supabase
         .from("payment_settings")
         .select("*")
-        .single(); // Get the single row
-      if (!error) setPaymentInfo(data);
+        .single();
+
+      if (!error && data) {
+        setPaymentInfo({
+          id: data.id,
+          bank_name: data.bank_name,
+          account_name: data.account_name,
+          account_number: data.account_number,
+        });
+      }
     };
+
     fetchPaymentInfo();
   }, []);
 
+  // -----------------------------------
+  // UI
+  // -----------------------------------
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -136,111 +181,155 @@ export default function PaymentDialog({
             <CreditCard className="w-5 h-5" />
             {admin ? "Record Payment" : "Make payment"}
           </DialogTitle>
-          <DialogDescription>
-            {admin
-              ? `Record Payment for ${booking?.clients?.full_name} - ${booking?.services?.name}`
-              : `Make Payment for ${booking?.clients?.full_name} - ${booking?.services?.name}`}
-          </DialogDescription>
+          <DialogDescription>{label}</DialogDescription>
         </DialogHeader>
 
+        {/* ADMIN EDIT MODAL */}
+        {showEditModal && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6">
+            <div className="bg-white p-6 rounded-md w-full max-w-md space-y-4">
+              <h2 className="font-semibold text-lg">
+                {paymentInfo.bank_name
+                  ? "Edit Bank Details"
+                  : "Add Bank Details"}
+              </h2>
+
+              <Input
+                placeholder="Bank Name"
+                value={paymentInfo.bank_name}
+                onChange={(e) =>
+                  setPaymentInfo({ ...paymentInfo, bank_name: e.target.value })
+                }
+              />
+
+              <Input
+                placeholder="Account Name"
+                value={paymentInfo.account_name}
+                onChange={(e) =>
+                  setPaymentInfo({
+                    ...paymentInfo,
+                    account_name: e.target.value,
+                  })
+                }
+              />
+
+              <Input
+                placeholder="Account Number"
+                value={paymentInfo.account_number}
+                onChange={(e) =>
+                  setPaymentInfo({
+                    ...paymentInfo,
+                    account_number: e.target.value,
+                  })
+                }
+              />
+
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowEditModal(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    handleSavePaymentInfo();
+                    setShowEditModal(false);
+                  }}
+                >
+                  Save
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4">
+          {/* SELECT PAYMENT METHOD */}
           <div className="space-y-2">
-            <Label htmlFor="payment-method">Payment Method</Label>
+            <Label>Payment Method</Label>
             <Select
               value={paymentMethod}
               onValueChange={(value) =>
                 setPaymentMethod(
-                  value as "cash" | "card" | "momo" | "bank_transfer"
+                  value as "card" | "momo" | "bank_transfer" | "cash"
                 )
               }
             >
-              <SelectTrigger id="payment-method">
+              <SelectTrigger>
                 <SelectValue placeholder="Select payment method" />
               </SelectTrigger>
               <SelectContent>
-                {admin && <SelectItem value="cash">Cash</SelectItem>}
                 <SelectItem value="card">Card</SelectItem>
                 <SelectItem value="momo">Mobile Money</SelectItem>
                 <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                {admin && <SelectItem value="cash">Cash</SelectItem>}
               </SelectContent>
             </Select>
           </div>
 
+          {/* AMOUNT */}
           <div className="space-y-2">
-            <Label htmlFor="amount">Amount (GH₵)</Label>
+            <Label>Amount (GH₵)</Label>
             <Input
-              id="amount"
               type="number"
-              placeholder="Enter amount"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              min="0"
-              step="0.01"
             />
           </div>
 
-          {paymentMethod === "cash" ? (
+          {/* NOTES (CASH ONLY) */}
+          {paymentMethod === "cash" && (
             <div className="space-y-2">
-              <Label htmlFor="notes">Notes (Optional)</Label>
+              <Label>Notes (Optional)</Label>
               <Textarea
-                id="notes"
-                placeholder="Add any notes about this payment"
+                placeholder="Add notes..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                rows={3}
               />
-            </div>
-          ) : (
-            <div className="bg-muted p-3 rounded-md text-sm">
-              <p className="text-muted-foreground">
-                Click "Process Payment" to open Paystack payment page where the
-                customer can complete the payment.
-              </p>
             </div>
           )}
 
+          {/* BANK TRANSFER DETAILS */}
           {paymentMethod === "bank_transfer" && (
-            <div className="bg-muted p-4 rounded-md text-sm space-y-2">
-              <p className="font-medium">Bank Transfer Details</p>
-              {paymentMethod === "bank_transfer" && paymentInfo && (
-                <div className="bg-muted p-3 rounded-md text-sm">
+            <div className="bg-muted rounded-md text-sm space-y-3">
+              <p className="font-medium flex justify-between">
+                Bank Transfer Details
+                {admin && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowEditModal(true)}
+                  >
+                    {paymentInfo.bank_name ? "Edit" : "Add"}
+                  </Button>
+                )}
+              </p>
+
+              {paymentInfo.bank_name ? (
+                <div className="bg-background border p-3 rounded-md space-y-1">
                   <p>Bank Name: {paymentInfo.bank_name}</p>
                   <p>Account Name: {paymentInfo.account_name}</p>
                   <p>Account Number: {paymentInfo.account_number}</p>
-                  <p>Amount: GH₵ {amount || booking?.services?.price}</p>
                 </div>
+              ) : (
+                <p className="text-gray-500 text-sm">
+                  No bank details added yet.
+                </p>
               )}
-
-              <p className="text-gray-500 text-xs">
-                After making the transfer, please note the reference and update
-                us.
-              </p>
             </div>
           )}
 
-          {/* {paymentMethod !== "cash" && (
-            <div className="bg-muted p-3 rounded-md text-sm">
-              <p className="text-muted-foreground">
-                Click "Process Payment" to open Paystack payment page where the
-                customer can complete the payment.
-              </p>
-            </div>
-          )} */}
+          {/* SUBMIT BUTTON */}
           <Button
             onClick={handlePaymentSubmit}
             disabled={loading}
             className="w-full"
           >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Processing...
-              </>
-            ) : paymentMethod === "bank_transfer" ? (
-              "Cick to use Paystack instead"
-            ) : (
-              "Process Payment"
-            )}
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {paymentMethod === "bank_transfer"
+              ? "Click to use Paystack instead"
+              : "Process Payment"}
           </Button>
         </div>
       </DialogContent>

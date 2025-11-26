@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { CreditCard, Loader2 } from "lucide-react";
+import { Clipboard, CreditCard, Loader2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
 interface PaymentDialogProps {
@@ -307,10 +307,38 @@ export default function PaymentDialog({
               </p>
 
               {paymentInfo.bank_name ? (
-                <div className="bg-background border p-3 rounded-md space-y-1">
-                  <p>Bank Name: {paymentInfo.bank_name}</p>
-                  <p>Account Name: {paymentInfo.account_name}</p>
-                  <p>Account Number: {paymentInfo.account_number}</p>
+                <div className="bg-background border p-3 rounded-md space-y-2">
+                  {["Bank Name", "Account Name", "Account Number"].map(
+                    (label, idx) => {
+                      const value =
+                        label === "Bank Name"
+                          ? paymentInfo.bank_name
+                          : label === "Account Name"
+                          ? paymentInfo.account_name
+                          : paymentInfo.account_number;
+
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between"
+                        >
+                          <p>
+                            <span className="font-medium">{label}:</span>{" "}
+                            {value}
+                          </p>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(value);
+                              toast.success(`${label} copied!`);
+                            }}
+                            className="p-1 hover:bg-gray-200 rounded"
+                          >
+                            <Clipboard className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    }
+                  )}
                 </div>
               ) : (
                 <p className="text-gray-500 text-sm">

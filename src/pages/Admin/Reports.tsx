@@ -25,6 +25,58 @@ const Reports = () => {
   const [reportData, setReportData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
+  const formatDateTime = (date: string, time: string) => {
+    if (!date || !time) return "";
+
+    let day, month, year;
+
+    // Normalize separators
+    const normalized = date.replace(/\//g, "-");
+    const parts = normalized.split("-");
+
+    // Detect format: DD-MM-YYYY or YYYY-MM-DD
+    if (parts[0].length === 4) {
+      // YYYY-MM-DD
+      year = parseInt(parts[0], 10);
+      month = parseInt(parts[1], 10) - 1;
+      day = parseInt(parts[2], 10);
+    } else {
+      // DD-MM-YYYY
+      day = parseInt(parts[0], 10);
+      month = parseInt(parts[1], 10) - 1;
+      year = parseInt(parts[2], 10);
+    }
+
+    // Time handling
+    const [h, m = "0", s = "0"] = time.split(":");
+    const hour = parseInt(h, 10);
+    const minute = parseInt(m, 10);
+    const second = parseInt(s, 10);
+
+    const dt = new Date(year, month, day, hour, minute, second);
+
+    if (isNaN(dt.getTime())) {
+      console.log("Invalid parsed date:", {
+        date,
+        time,
+        parts,
+        year,
+        month,
+        day,
+      });
+      return "";
+    }
+
+    return dt.toLocaleString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+    });
+  };
+
   /* ===============================
    GENERATE REPORT (CLEAN VERSION)
 ================================= */
@@ -96,9 +148,16 @@ const Reports = () => {
       const exportRows = data.map((p) => {
         const booking = Array.isArray(p.bookings) ? p.bookings[0] : p.bookings;
 
+        const appointmentDate = booking?.appointment_date ?? "";
+        const appointmentTime = booking?.appointment_time ?? "";
+
+        console.log(
+          "Date & Time",
+          formatDateTime(appointmentDate, appointmentTime)
+        );
+
         return {
-          Date: booking?.appointment_date ?? "",
-          Time: booking?.appointment_time ?? "",
+          AppointmentDateTime: formatDateTime(appointmentDate, appointmentTime),
           Client: booking?.clients?.full_name ?? "",
           Staff: booking?.staff?.full_name ?? "",
           Service: booking?.services?.name ?? "",

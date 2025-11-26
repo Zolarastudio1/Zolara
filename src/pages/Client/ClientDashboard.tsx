@@ -15,6 +15,15 @@ import {
   History,
 } from "lucide-react";
 
+interface Payment {
+  id: string;
+  amount: number;
+  payment_method: string;
+  payment_status: string;
+  payment_date: string;
+  booking_id: string;
+}
+
 const ClientDashboard = () => {
   const [bookings, setBookings] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
@@ -34,63 +43,49 @@ const ClientDashboard = () => {
 
   const fetchDashboardData = async () => {
   setLoading(true);
-
   try {
     const user = (await supabase.auth.getUser()).data.user;
     if (!user) return;
 
-    // --- Fetch this user's booking IDs for filtering payments ---
-    const bookingIdsRes = await supabase
+    // Fetch bookings
+    const { data: bookingsData = [], error: bookingsError } = await supabase
       .from("bookings")
-      .select("id")
-      .eq("client_id", user.id);
+      .select("id, appointment_date, appointment_time, status, staff(full_name), services(name, category), clients(full_name)")
+      .eq("client_id", user.id)
+      .order("appointment_date", { ascending: false });
+    if (bookingsError) throw bookingsError;
 
-    const bookingIds = bookingIdsRes.data?.map(b => b.id) || [];
+    // Fetch pending booking requests
+    const { data: pendingData = [], error: pendingError } = await supabase
+      .from("booking_requests")
+      .select("*")
+      .eq("client_id", user.id)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    if (pendingError) throw pendingError;
 
-    const [bookingsRes, pendingRes, paymentsRes] = await Promise.all([
-      // 1. Fetch user's bookings
-      supabase
-        .from("bookings")
-        .select("*, staff(full_name), services(name, price)")
-        .eq("client_id", user.id)
-        .order("appointment_date", { ascending: false }),
+    // Fetch payments (no embedded bookings)
+    const { data: paymentsData = [], error: paymentsError } = await supabase
+      .from("payments")
+      .select("id, amount, payment_method, payment_status, payment_date, booking_id")
+      .eq("bookings.client_id", user.id)
+      .order("payment_date", { ascending: false });
 
-      // 2. Fetch user's pending booking requests
-      supabase
-        .from("booking_requests")
-        .select("*")
-        .eq("client_id", user.id)
-        .eq("status", "pending")
-        .order("created_at", { ascending: false }),
+      console.log(paymentsError)
+    if (paymentsError) throw paymentsError;
 
-      // 3. Fetch user's payments by limiting to their booking IDs
-      supabase
-        .from("payments")
-        .select(`
-          *,
-          bookings:booking_id(
-            appointment_date,
-            services(name)
-          )
-        `)
-        .in("booking_id", bookingIds) // ← FIXED
-        .order("payment_date", { ascending: false }),
-    ]);
+    // Map bookings to payments manually
+    const bookingsMap = Object.fromEntries(bookingsData.map(b => [b.id, b]));
+    const paymentsWithBooking = paymentsData.map(p => ({
+      ...p,
+      booking: bookingsMap[p.booking_id] || null,
+    }));
 
-    if (bookingsRes.error) throw bookingsRes.error;
-    if (pendingRes.error) throw pendingRes.error;
-    if (paymentsRes.error) throw paymentsRes.error;
-
-    const bookingsData = bookingsRes.data || [];
-    const pendingRequestsData = pendingRes.data || [];
-    const paymentsData = paymentsRes.data || [];
-
-    // --- Compute stats ---
+    // Compute dashboard stats
     const computedStats = bookingsData.reduce(
       (acc, b) => {
         acc.total += 1;
         if (b.status === "completed") acc.completed += 1;
-        if (b.status === "pending") acc.pending += 1;
         if (b.status === "cancelled") acc.cancelled += 1;
         if (["scheduled", "confirmed"].includes(b.status)) acc.upcoming += 1;
         return acc;
@@ -100,22 +95,22 @@ const ClientDashboard = () => {
         completed: 0,
         cancelled: 0,
         upcoming: 0,
-        pending: pendingRequestsData.length,
+        pending: pendingData.length,
         totalSpent: 0,
       }
     );
 
     computedStats.totalSpent =
-      paymentsData.reduce((acc, p) => acc + Number(p.amount || 0), 0) || 0;
+      paymentsWithBooking.reduce((acc, p) => acc + Number(p.amount || 0), 0) || 0;
 
-    // --- Update UI state ---
+    // Update state
     setBookings(bookingsData);
-    setPayments(paymentsData);
+    setPayments(paymentsWithBooking);
     setStats(computedStats);
 
-  } catch (error: any) {
-    console.error("Error fetching dashboard data:", error);
-    toast.error(error.message || "Failed to load dashboard data");
+  } catch (err: any) {
+    console.error("Error fetching dashboard data:", err);
+    toast.error(err.message || "Failed to load dashboard data");
   } finally {
     setLoading(false);
   }
@@ -170,29 +165,6 @@ const ClientDashboard = () => {
           value={stats.pending}
           icon={<Clock className="w-6 h-6 text-yellow-500" />}
         />
-      </div>
-
-      {/* Optional: Mobile-friendly horizontal scroll */}
-      <div className="md:hidden overflow-x-auto">
-        <div className="flex gap-4 w-max">
-          {["Total", "Upcoming", "Completed", "Cancelled", "Pending"].map(
-            (label, i) => (
-              <Card
-                key={i}
-                className="rounded-2xl shadow-sm border border-gray-100 w-40 flex-shrink-0"
-              >
-                <CardContent className="flex flex-col items-start p-4">
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">
-                    {label}
-                  </p>
-                  <p className="text-xl font-bold text-gray-900">
-                    {Object.values(stats)[i]}
-                  </p>
-                </CardContent>
-              </Card>
-            )
-          )}
-        </div>
       </div>
 
       {/* TOTAL EXPENSES */}
@@ -270,7 +242,7 @@ const ClientDashboard = () => {
               >
                 <div>
                   <p className="font-medium">
-                    {p.bookings?.services?.name || "Service Payment"}
+                    {p.booking?.services?.name || "Service Payment"}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {format(new Date(p.payment_date), "PPP")}

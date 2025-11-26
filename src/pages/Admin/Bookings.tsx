@@ -634,6 +634,7 @@ const Bookings = () => {
       {/* Payment Dialog */}
       {selectedBooking && (
         <PaymentDialog
+          admin={true}
           open={paymentDialogOpen}
           onOpenChange={setPaymentDialogOpen}
           booking={selectedBooking}

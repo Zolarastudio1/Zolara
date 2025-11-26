@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import PaymentDialog from "@/components/PaymentDialog";
 
 const ClientBookings = () => {
   const [bookings, setBookings] = useState<any[]>([]);
@@ -41,6 +42,8 @@ const ClientBookings = () => {
   const [paymentMethod, setPaymentMethod] = useState("");
   const [notes, setNotes] = useState("");
   const [requesting, setRequesting] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -359,7 +362,8 @@ const ClientBookings = () => {
                       {booking.status}
                     </Badge>
                   </CardHeader>
-                  <CardContent className="space-y-2">
+
+                  <CardContent className="space-y-3">
                     <div className="flex items-center gap-2 text-sm">
                       <Calendar className="w-4 h-4" />
                       {format(new Date(booking.appointment_date), "PPP")}
@@ -391,6 +395,27 @@ const ClientBookings = () => {
                           </Button>
                         </>
                       )}
+
+                      {/* Make Payment button - visible for pending or scheduled bookings */}
+                      {["scheduled", "pending_payment"].includes(
+                        booking.status
+                      ) && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedBooking(booking);
+                            setPaymentDialogOpen(true); // open your PaymentDialog
+                          }}
+                        >
+                          Make Payment
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Optional: show price */}
+                    <div className="mt-2 text-sm font-medium text-gray-700">
+                      Amount: GH₵ {booking.services?.price.toFixed(2)}
                     </div>
                   </CardContent>
                 </Card>
@@ -529,6 +554,17 @@ const ClientBookings = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Payment Dialog */}
+      {selectedBooking && (
+        <PaymentDialog
+          admin={false}
+          open={paymentDialogOpen}
+          onOpenChange={setPaymentDialogOpen}
+          booking={selectedBooking}
+          onPaymentComplete={fetchData}
+        />
+      )}
     </div>
   );
 };

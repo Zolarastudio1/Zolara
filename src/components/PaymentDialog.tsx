@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +22,7 @@ import { CreditCard, Loader2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
 interface PaymentDialogProps {
+  admin: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   booking: any;
@@ -29,13 +30,16 @@ interface PaymentDialogProps {
 }
 
 export default function PaymentDialog({
+  admin,
   open,
   onOpenChange,
   booking,
   onPaymentComplete,
 }: PaymentDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "momo" | "bank_transfer">("cash");
+  const [paymentMethod, setPaymentMethod] = useState<
+    "cash" | "card" | "momo" | "bank_transfer"
+  >("cash");
   const [amount, setAmount] = useState<string>(booking?.services?.price || "");
   const [notes, setNotes] = useState<string>("");
 
@@ -45,71 +49,84 @@ export default function PaymentDialog({
     try {
       if (!amount || parseFloat(amount) <= 0) {
         toast.error("Please enter a valid amount");
-        setLoading(false);
         return;
       }
 
       const paymentAmount = parseFloat(amount);
 
-      // For card payments, initialize Paystack
-      if (paymentMethod === "card") {
+      // Non-cash payments (card, momo, bank_transfer)
+      if (paymentMethod !== "cash") {
         const { data, error } = await supabase.functions.invoke(
           "initialize-payment",
           {
             body: {
-              email: booking.clients?.email || "customer@example.com",
+              email: booking.clients?.email,
               amount: paymentAmount,
               booking_id: booking.id,
               callback_url: `${window.location.origin}/admin/bookings`,
               metadata: {
                 client_name: booking.clients?.full_name,
-                service: booking.services?.name,
+                service_name: booking.services?.name,
               },
             },
           }
         );
 
-        if (error) {
-          console.error("Payment initialization error:", error);
+        if (error)
           throw new Error(error.message || "Failed to initialize payment");
-        }
 
         if (data?.authorization_url) {
           toast.success("Redirecting to payment gateway...");
-          // Open Paystack payment page in new window
           window.open(data.authorization_url, "_blank");
-          
-          // Close dialog and refresh after a delay
-          setTimeout(() => {
-            onOpenChange(false);
-            onPaymentComplete();
-          }, 2000);
+          onOpenChange(false);
+          onPaymentComplete();
+        } else if (data?.error) {
+          throw new Error(data.error);
         } else {
-          throw new Error("Failed to get payment URL");
+          throw new Error("Payment URL not returned");
         }
       } else {
-        // For cash/momo/bank_transfer, record payment directly
-        const { error: paymentError } = await supabase.from("payments").insert([{
-          booking_id: booking.id,
-          amount: paymentAmount,
-          payment_method: paymentMethod,
-          payment_status: "completed",
-          notes: notes || `Payment via ${paymentMethod}`,
-        }]);
+        if (admin) {
+          // Cash, Mobile Money, Bank Transfer
+          const { error: paymentError } = await supabase
+            .from("payments")
+            .insert([
+              {
+                booking_id: booking.id,
+                amount: paymentAmount,
+                payment_method: paymentMethod,
+                payment_status: "completed",
+                notes: notes || `Payment via ${paymentMethod}`,
+              },
+            ]);
 
-        if (paymentError) throw paymentError;
+          if (paymentError) throw paymentError;
 
-        toast.success("Payment recorded successfully!");
-        onOpenChange(false);
-        onPaymentComplete();
+          toast.success("Payment recorded successfully!");
+          onOpenChange(false);
+          onPaymentComplete();
+        }
       }
-    } catch (error: any) {
-      console.error("Payment error:", error);
-      toast.error(error.message || "Failed to process payment");
+    } catch (err: any) {
+      console.error("Payment error:", err);
+      toast.error(err.message || "Failed to process payment");
     } finally {
       setLoading(false);
     }
   };
+
+  const [paymentInfo, setPaymentInfo] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchPaymentInfo = async () => {
+      const { data, error } = await supabase
+        .from("payment_settings")
+        .select("*")
+        .single(); // Get the single row
+      if (!error) setPaymentInfo(data);
+    };
+    fetchPaymentInfo();
+  }, []);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -117,27 +134,32 @@ export default function PaymentDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CreditCard className="w-5 h-5" />
-            Record Payment
+            {admin ? "Record Payment" : "Make payment"}
           </DialogTitle>
           <DialogDescription>
-            Record payment for {booking?.clients?.full_name} -{" "}
-            {booking?.services?.name}
+            {admin
+              ? `Record Payment for ${booking?.clients?.full_name} - ${booking?.services?.name}`
+              : `Make Payment for ${booking?.clients?.full_name} - ${booking?.services?.name}`}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="payment-method">Payment Method</Label>
-            <Select 
-              value={paymentMethod} 
-              onValueChange={(value) => setPaymentMethod(value as "cash" | "card" | "momo" | "bank_transfer")}
+            <Select
+              value={paymentMethod}
+              onValueChange={(value) =>
+                setPaymentMethod(
+                  value as "cash" | "card" | "momo" | "bank_transfer"
+                )
+              }
             >
               <SelectTrigger id="payment-method">
                 <SelectValue placeholder="Select payment method" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="cash">Cash</SelectItem>
-                <SelectItem value="card">Card (Paystack)</SelectItem>
+                {admin && <SelectItem value="cash">Cash</SelectItem>}
+                <SelectItem value="card">Card</SelectItem>
                 <SelectItem value="momo">Mobile Money</SelectItem>
                 <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
               </SelectContent>
@@ -157,7 +179,7 @@ export default function PaymentDialog({
             />
           </div>
 
-          {paymentMethod !== "card" && (
+          {paymentMethod === "cash" ? (
             <div className="space-y-2">
               <Label htmlFor="notes">Notes (Optional)</Label>
               <Textarea
@@ -168,9 +190,7 @@ export default function PaymentDialog({
                 rows={3}
               />
             </div>
-          )}
-
-          {paymentMethod === "card" && (
+          ) : (
             <div className="bg-muted p-3 rounded-md text-sm">
               <p className="text-muted-foreground">
                 Click "Process Payment" to open Paystack payment page where the
@@ -179,6 +199,33 @@ export default function PaymentDialog({
             </div>
           )}
 
+          {paymentMethod === "bank_transfer" && (
+            <div className="bg-muted p-4 rounded-md text-sm space-y-2">
+              <p className="font-medium">Bank Transfer Details</p>
+              {paymentMethod === "bank_transfer" && paymentInfo && (
+                <div className="bg-muted p-3 rounded-md text-sm">
+                  <p>Bank Name: {paymentInfo.bank_name}</p>
+                  <p>Account Name: {paymentInfo.account_name}</p>
+                  <p>Account Number: {paymentInfo.account_number}</p>
+                  <p>Amount: GH₵ {amount || booking?.services?.price}</p>
+                </div>
+              )}
+
+              <p className="text-gray-500 text-xs">
+                After making the transfer, please note the reference and update
+                us.
+              </p>
+            </div>
+          )}
+
+          {/* {paymentMethod !== "cash" && (
+            <div className="bg-muted p-3 rounded-md text-sm">
+              <p className="text-muted-foreground">
+                Click "Process Payment" to open Paystack payment page where the
+                customer can complete the payment.
+              </p>
+            </div>
+          )} */}
           <Button
             onClick={handlePaymentSubmit}
             disabled={loading}
@@ -189,6 +236,8 @@ export default function PaymentDialog({
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Processing...
               </>
+            ) : paymentMethod === "bank_transfer" ? (
+              "Cick to use Paystack instead"
             ) : (
               "Process Payment"
             )}

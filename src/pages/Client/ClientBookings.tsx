@@ -374,7 +374,7 @@ const ClientBookings = () => {
                     </div>
 
                     <div className="flex gap-2 mt-4 flex-wrap">
-                      {booking.status === "scheduled" && (
+                      {/* {booking.status === "scheduled" && (
                         <>
                           <Button
                             variant="outline"
@@ -394,7 +394,7 @@ const ClientBookings = () => {
                             Cancel
                           </Button>
                         </>
-                      )}
+                      )} */}
 
                       {/* Make Payment button - visible for pending or scheduled bookings */}
                       {["scheduled", "pending_payment"].includes(

@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
 import { format } from "date-fns";
 import {
   Loader2,
@@ -14,6 +12,7 @@ import {
   TrendingDown,
   History,
 } from "lucide-react";
+import { fetchStaffBookings, fetchStaffPayments } from "@/lib/utils";
 
 const StaffLayout = () => {
   const [bookings, setBookings] = useState<any[]>([]);
@@ -24,7 +23,7 @@ const StaffLayout = () => {
     completed: 0,
     cancelled: 0,
     upcoming: 0,
-    totalSpent: 0,
+    totalEarned: 0,
   });
 
   useEffect(() => {
@@ -34,51 +33,21 @@ const StaffLayout = () => {
   const fetchDashboardData = async () => {
     setLoading(true);
     const user = (await supabase.auth.getUser()).data.user;
+
     if (!user) return;
 
-    // Fetch bookings
-    const { data: bookingsData, error: bookingsError } = await supabase
-      .from("bookings")
-      .select("*, staff(full_name), services(name, price)")
-      .eq("client_id", user.id)
-      .order("appointment_date", { ascending: false });
+    const bookings = await fetchStaffBookings(user.id);
+    setBookings(bookings);
 
-    if (bookingsError) {
-      toast.error(bookingsError.message);
-      return;
-    }
+    const { paymentsWithBooking, stats } = await fetchStaffPayments(user.id);
 
-    // Fetch payments
-    const { data: paymentsData, error: paymentsError } = await supabase
-      .from("payments")
-      .select("*, bookings(appointment_date, services(name))")
-      .order("payment_date", { ascending: false });
+    setPayments(paymentsWithBooking);
+    setStats(stats);
 
-    if (paymentsError) {
-      toast.error(paymentsError.message);
-    }
-
-    setBookings(bookingsData || []);
-    setPayments(paymentsData || []);
-
-    // Compute stats
-    const total = bookingsData?.length || 0;
-    const completed = bookingsData?.filter(
-      (b) => b.status === "completed"
-    ).length;
-    const cancelled = bookingsData?.filter(
-      (b) => b.status === "cancelled"
-    ).length;
-    const upcoming = bookingsData?.filter(
-      (b) => b.status === "scheduled" || b.status === "confirmed"
-    ).length;
-    const totalSpent =
-      paymentsData?.reduce((acc, p) => acc + Number(p.amount || 0), 0) || 0;
-
-    setStats({ total, completed, cancelled, upcoming, totalSpent });
     setLoading(false);
   };
 
+  console.log("Stats", stats, "Bookings", bookings)
   const getStatusColor = (status: string) => {
     const colors: any = {
       scheduled: "bg-blue-100 text-blue-800",
@@ -96,7 +65,7 @@ const StaffLayout = () => {
       <div>
         <h1 className="text-3xl font-bold">Dashboard Overview</h1>
         <p className="text-muted-foreground">
-          Track your activity, spending, and appointment history
+          Track your bookings, payments, and performance
         </p>
       </div>
 
@@ -143,7 +112,7 @@ const StaffLayout = () => {
         </Card>
       </div>
 
-      {/* TOTAL EXPENSES */}
+      {/* TOTAL EARNINGS */}
       <Card className="bg-primary/5 border border-primary/20">
         <CardHeader>
           <CardTitle className="flex justify-between items-center">
@@ -153,7 +122,7 @@ const StaffLayout = () => {
         </CardHeader>
         <CardContent>
           <p className="text-3xl font-bold text-primary">
-            GH₵{stats.totalSpent.toLocaleString()}
+            GH₵{stats.totalEarned.toLocaleString()}
           </p>
         </CardContent>
       </Card>
@@ -176,9 +145,6 @@ const StaffLayout = () => {
                 <CardHeader className="flex justify-between items-start">
                   <div>
                     <CardTitle>{booking.services?.name}</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      {booking.staff?.full_name || "Unassigned"}
-                    </p>
                   </div>
                   <Badge className={getStatusColor(booking.status)}>
                     {booking.status}
@@ -205,6 +171,7 @@ const StaffLayout = () => {
         <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
           <History className="w-5 h-5" /> Payment Logs
         </h2>
+
         {payments.length === 0 ? (
           <Card className="p-6 text-center text-muted-foreground">
             No payments recorded yet.
@@ -218,7 +185,7 @@ const StaffLayout = () => {
               >
                 <div>
                   <p className="font-medium">
-                    {p.bookings?.services?.name || "Service Payment"}
+                    {p.booking?.services?.name || "Service Payment"}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {format(new Date(p.payment_date), "PPP")}
@@ -236,4 +203,4 @@ const StaffLayout = () => {
   );
 };
 
-export default StaffLayout
+export default StaffLayout;

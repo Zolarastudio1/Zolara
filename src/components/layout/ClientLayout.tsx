@@ -14,6 +14,7 @@ import {
   TrendingDown,
   History,
 } from "lucide-react";
+import { fetchClientBookings, fetchClientPayments } from "@/lib/utils";
 
 const ClientDashboard = () => {
   const [bookings, setBookings] = useState<any[]>([]);
@@ -39,58 +40,29 @@ const ClientDashboard = () => {
       const user = (await supabase.auth.getUser()).data.user;
       if (!user) return;
 
-      // Fetch all data in parallel
-      const [bookingsRes, pendingRes, paymentsRes] = await Promise.all([
-        supabase
-          .from("bookings")
-          .select("*, staff(full_name), services(name, price)")
-          .eq("client_id", user.id)
-          .order("appointment_date", { ascending: false }),
-        supabase
-          .from("booking_requests")
-          .select("*")
-          .eq("client_id", user.id)
-          .eq("status", "pending")
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("payments")
-          .select("*, bookings(appointment_date, services(name))")
-          .order("payment_date", { ascending: false }),
-      ]);
+      // Fetch client bookings
+      const bookings = await fetchClientBookings(user.id);
+      setBookings(bookings);
 
-      if (bookingsRes.error) throw bookingsRes.error;
-      if (pendingRes.error) throw pendingRes.error;
-      if (paymentsRes.error) throw paymentsRes.error;
+      // Fetch client payments + stats
+      const { paymentsWithBooking, stats } = await fetchClientPayments(user.id);
+      setPayments(paymentsWithBooking);
 
-      const bookingsData = bookingsRes.data || [];
-      const pendingRequestsData = pendingRes.data || [];
-      const paymentsData = paymentsRes.data || [];
+      // Fetch pending booking requests for this client
+      const { data: pendingRequests = [], error: pendingError } = await supabase
+        .from("booking_requests")
+        .select("*, clients(*), services(*)")
+        .eq("client_id", user.id) // fetch only requests for this client
+        .eq("status", "pending") // only pending requests
+        .order("created_at", { ascending: false });
 
-      // Compute stats
-      const computedStats = bookingsData.reduce(
-        (acc, b) => {
-          acc.total += 1;
-          if (b.status === "completed") acc.completed += 1;
-          if (b.status === "cancelled") acc.cancelled += 1;
-          if (["scheduled", "confirmed"].includes(b.status)) acc.upcoming += 1;
-          return acc;
-        },
-        {
-          total: 0,
-          completed: 0,
-          cancelled: 0,
-          upcoming: 0,
-          pending: pendingRequestsData.length,
-          totalSpent: 0,
-        }
-      );
+      if (pendingError) throw pendingError;
 
-      computedStats.totalSpent =
-        paymentsData.reduce((acc, p) => acc + Number(p.amount || 0), 0) || 0;
-
-      setBookings(bookingsData);
-      setPayments(paymentsData);
-      setStats(computedStats);
+      // Update stats including pending requests
+      setStats({
+        ...stats,
+        pending: pendingRequests.length, // add number of pending requests
+      });
     } catch (error: any) {
       console.error("Error fetching dashboard data:", error);
       toast.error(error.message || "Failed to load dashboard data");
@@ -122,11 +94,31 @@ const ClientDashboard = () => {
 
       {/* STATS GRID */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
-        <StatCard title="Total Bookings" value={stats.total} icon={<TrendingUp className="w-6 h-6 text-primary" />} />
-        <StatCard title="Upcoming" value={stats.upcoming} icon={<Calendar className="w-6 h-6 text-blue-600" />} />
-        <StatCard title="Completed" value={stats.completed} icon={<TrendingUp className="w-6 h-6 text-green-600" />} />
-        <StatCard title="Cancelled" value={stats.cancelled} icon={<TrendingDown className="w-6 h-6 text-red-600" />} />
-        <StatCard title="Pending Requests" value={stats.pending} icon={<Clock className="w-6 h-6 text-yellow-500" />} />
+        <StatCard
+          title="Total Bookings"
+          value={stats.total}
+          icon={<TrendingUp className="w-6 h-6 text-primary" />}
+        />
+        <StatCard
+          title="Upcoming"
+          value={stats.upcoming}
+          icon={<Calendar className="w-6 h-6 text-blue-600" />}
+        />
+        <StatCard
+          title="Completed"
+          value={stats.completed}
+          icon={<TrendingUp className="w-6 h-6 text-green-600" />}
+        />
+        <StatCard
+          title="Cancelled"
+          value={stats.cancelled}
+          icon={<TrendingDown className="w-6 h-6 text-red-600" />}
+        />
+        <StatCard
+          title="Pending Requests"
+          value={stats.pending}
+          icon={<Clock className="w-6 h-6 text-yellow-500" />}
+        />
       </div>
 
       {/* TOTAL EXPENSES */}
@@ -134,12 +126,13 @@ const ClientDashboard = () => {
         <CardHeader>
           <CardTitle className="flex justify-between items-center">
             <span>Total Expenses</span>
-            <DollarSign className="w-6 h-6 text-primary" />
+            GH₵
+            {/* <DollarSign className="w-6 h-6 text-primary" /> */}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-3xl font-bold text-primary">
-            GH₵{stats.totalSpent.toLocaleString()}
+            GH₵{stats.totalSpent}
           </p>
         </CardContent>
       </Card>
@@ -224,9 +217,16 @@ const ClientDashboard = () => {
 
 export default ClientDashboard;
 
-
 // Reusable Stat Card
-const StatCard = ({ title, value, icon }: { title: string; value: number; icon: React.ReactNode }) => (
+const StatCard = ({
+  title,
+  value,
+  icon,
+}: {
+  title: string;
+  value: number;
+  icon: React.ReactNode;
+}) => (
   <Card className="rounded-2xl shadow-sm hover:shadow-md transition-shadow">
     <CardContent className="flex items-center justify-between p-5">
       <div>

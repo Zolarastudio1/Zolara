@@ -51,12 +51,14 @@ const AdminLayout = () => {
       const { data: todayPayments } = await supabase
         .from("payments")
         .select("amount")
+        .eq("payment_status", "completed")
         .gte("payment_date", startOfToday);
 
       // Weekly revenue
       const { data: weeklyPayments } = await supabase
         .from("payments")
         .select("amount")
+        .eq("payment_status", "completed")
         .gte("payment_date", startOfThisWeek)
         .lte("payment_date", endOfThisWeek);
 
@@ -64,6 +66,7 @@ const AdminLayout = () => {
       const { data: monthlyPayments } = await supabase
         .from("payments")
         .select("amount")
+        .eq("payment_status", "completed")
         .gte("payment_date", startOfThisMonth)
         .lte("payment_date", endOfThisMonth);
 

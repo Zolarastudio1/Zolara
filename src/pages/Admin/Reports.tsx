@@ -290,7 +290,7 @@ const Reports = () => {
 
             <Card>
               <CardHeader>
-                <CardTitle>Total Bookings</CardTitle>
+                <CardTitle>Total Completed Bookings</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold">{reportData.totalBookings}</p>

@@ -238,6 +238,26 @@ const Bookings = () => {
     }
   };
 
+  const handleStatusUpdate = async (bookingId: string, newStatus: string) => {
+  try {
+    const { error } = await supabase
+      .from("bookings")
+      // @ts-ignore
+      .update({ status: newStatus })
+      .eq("id", bookingId);
+
+    if (error) throw error;
+
+    toast.success("Booking status updated");
+
+    // Refresh booking list
+    fetchData();
+
+  } catch (err: any) {
+    toast.error(err.message || "Status update failed");
+  }
+};
+
   const getStatusColor = (status: string) => {
     const colors: any = {
       scheduled: "bg-blue-100 text-blue-800",
@@ -512,6 +532,29 @@ const Bookings = () => {
                 <p className="text-gray-500 italic border-l-4 border-gray-300 pl-3">
                   {b.notes || "no note"}
                 </p>
+
+                <div className="flex justify-between items-center">
+                  <span>Update status</span>
+                  <select
+                    className="border rounded-lg px-2 py-1 text-sm"
+                    value={b.status}
+                    onChange={(e) => handleStatusUpdate(b.id, e.target.value)}
+                  >
+                    <option value="scheduled">Scheduled</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="no_show">No response</option>
+                  </select>
+
+                  {/* <Badge
+                    className={`${getStatusColor(
+                      b.status
+                    )} text-xs px-3 py-1 rounded-full`}
+                  >
+                    {b.status}
+                  </Badge> */}
+                </div>
 
                 <div className="flex justify-end gap-3 pt-2">
                   <Button

@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { z } from "zod";
 import PhoneInput from "@/lib/phoneInput";
-import AvatarUpload from "@/components/AvatarUpload";
+import {AvatarUpload} from "@/components/AvatarUpload";
 
 const clientSchema = z.object({
   full_name: z

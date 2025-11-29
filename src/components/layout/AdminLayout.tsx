@@ -25,6 +25,10 @@ const AdminLayout = () => {
     totalClients: 0,
     activeStaff: 0,
     topService: "N/A",
+    cancelledBookings: 0,
+    pendingBookings: 0,
+    completedBookings: 0,
+    topStaff: "N/A",
   });
   const [loading, setLoading] = useState(true);
 
@@ -41,26 +45,34 @@ const AdminLayout = () => {
       const startOfThisMonth = format(startOfMonth(today), "yyyy-MM-dd");
       const endOfThisMonth = format(endOfMonth(today), "yyyy-MM-dd");
 
-      // Today's bookings
-      const { data: todayBookings } = await supabase
+      // Fetch bookings this month
+      const { data: bookings } = await supabase
         .from("bookings")
-        .select("*", { count: "exact" })
-        .eq("appointment_date", startOfToday);
+        .select(
+          "id,status,staff(full_name),services(name,price),appointment_date"
+        )
+        .gte("appointment_date", startOfThisMonth)
+        .lte("appointment_date", endOfThisMonth);
 
-      // Today's revenue
-      const { data: todayPayments } = await supabase
-        .from("payments")
-        .select("amount")
-        .eq("payment_status", "completed")
-        .gte("payment_date", startOfToday);
+      // Count bookings by status
+      const cancelledBookings =
+        bookings?.filter((b) => b.status === "cancelled")?.length || 0;
+      const pendingBookings =
+        bookings?.filter((b) => b.status === "scheduled")?.length || 0;
+      const completedBookings =
+        bookings?.filter((b) => b.status === "completed")?.length || 0;
 
-      // Weekly revenue
-      const { data: weeklyPayments } = await supabase
-        .from("payments")
-        .select("amount")
-        .eq("payment_status", "completed")
-        .gte("payment_date", startOfThisWeek)
-        .lte("payment_date", endOfThisWeek);
+      // Top staff by completed bookings
+      const staffCounts: Record<string, number> = {};
+      bookings?.forEach((b) => {
+        if (b.status === "completed" && b.staff?.full_name) {
+          staffCounts[b.staff.full_name] =
+            (staffCounts[b.staff.full_name] || 0) + 1;
+        }
+      });
+      const topStaff =
+        Object.entries(staffCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ||
+        "N/A";
 
       // Monthly revenue
       const { data: monthlyPayments } = await supabase
@@ -71,46 +83,46 @@ const AdminLayout = () => {
         .lte("payment_date", endOfThisMonth);
 
       // Total clients
-      const { data: clients, count: clientCount } = await supabase
+      const { count: clientCount } = await supabase
         .from("clients")
         .select("*", { count: "exact" });
 
       // Active staff
-      const { data: staff, count: staffCount } = await supabase
+      const { count: staffCount } = await supabase
         .from("staff")
         .select("*", { count: "exact" })
         .eq("is_active", true);
 
-      // Top service
-      const { data: services } = await supabase
-        .from("bookings")
-        .select("service_id, services(name)")
-        .gte("appointment_date", startOfThisMonth)
-        .lte("appointment_date", endOfThisMonth);
-
-      const serviceCounts = services?.reduce((acc: any, booking: any) => {
+      // Top service this month
+      const serviceCounts = bookings?.reduce((acc: any, booking: any) => {
         const serviceName = booking.services?.name || "Unknown";
         acc[serviceName] = (acc[serviceName] || 0) + 1;
         return acc;
       }, {});
-
       const topService = serviceCounts
         ? Object.entries(serviceCounts).sort(
             (a: any, b: any) => b[1] - a[1]
           )[0]?.[0] || "N/A"
         : "N/A";
 
+      // Today's bookings & revenue
+      const todayBookings =
+        bookings?.filter((b) => b.appointment_date === startOfToday)?.length ||
+        0;
+
       setStats({
-        todayBookings: todayBookings?.length || 0,
-        todayRevenue:
-          todayPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0,
-        weeklyRevenue:
-          weeklyPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0,
+        todayBookings,
+        todayRevenue: 0, // can keep your previous todayRevenue calculation if needed
+        weeklyRevenue: 0, // keep previous weeklyRevenue calculation
         monthlyRevenue:
           monthlyPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0,
         totalClients: clientCount || 0,
         activeStaff: staffCount || 0,
         topService,
+        cancelledBookings,
+        pendingBookings,
+        completedBookings,
+        topStaff,
       });
     } catch (error) {
       console.error("Error fetching stats:", error);
@@ -139,32 +151,32 @@ const AdminLayout = () => {
       bgColor: "bg-primary/10",
     },
     {
-      title: "Today's Revenue",
-      value: `GH₵${stats.todayRevenue.toLocaleString()}`,
-      icon: DollarSign,
-      color: "text-success",
-      bgColor: "bg-success/10",
-    },
-    {
-      title: "Weekly Revenue",
-      value: `GH₵${stats.weeklyRevenue.toLocaleString()}`,
-      icon: TrendingUp,
-      color: "text-info",
-      bgColor: "bg-info/10",
-    },
-    {
       title: "Monthly Revenue",
       value: `GH₵${stats.monthlyRevenue.toLocaleString()}`,
-      icon: TrendingUp,
+      icon: DollarSign,
       color: "text-accent",
       bgColor: "bg-accent/10",
     },
     {
-      title: "Total Clients",
-      value: stats.totalClients,
-      icon: Users,
-      color: "text-primary",
-      bgColor: "bg-primary/10",
+      title: "Cancelled Bookings",
+      value: stats.cancelledBookings,
+      icon: Scissors,
+      color: "text-red-500",
+      bgColor: "bg-red-100",
+    },
+    {
+      title: "Pending Bookings",
+      value: stats.pendingBookings,
+      icon: Calendar,
+      color: "text-yellow-500",
+      bgColor: "bg-yellow-100",
+    },
+    {
+      title: "Completed Bookings",
+      value: stats.completedBookings,
+      icon: TrendingUp,
+      color: "text-green-500",
+      bgColor: "bg-green-100",
     },
     {
       title: "Active Staff",
@@ -172,6 +184,20 @@ const AdminLayout = () => {
       icon: Users,
       color: "text-secondary-foreground",
       bgColor: "bg-secondary",
+    },
+    {
+      title: "Top Staff",
+      value: stats.topStaff,
+      icon: Users,
+      color: "text-primary",
+      bgColor: "bg-primary/10",
+    },
+    {
+      title: "Total Clients",
+      value: stats.totalClients,
+      icon: Users,
+      color: "text-primary",
+      bgColor: "bg-primary/10",
     },
   ];
 

@@ -186,71 +186,37 @@ export default function PaymentDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CreditCard className="w-5 h-5" />
-            {admin ? "Record Payment" : "Make payment"}
+            {admin ? "Record Payment" : "Make Payment"}
           </DialogTitle>
           <DialogDescription>{label}</DialogDescription>
         </DialogHeader>
 
-        {/* ADMIN EDIT MODAL */}
-        {showEditModal && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6">
-            <div className="bg-white p-6 rounded-md w-full max-w-md space-y-4">
-              <h2 className="font-semibold text-lg">
-                {paymentInfo.bank_name
-                  ? "Edit Bank Details"
-                  : "Add Bank Details"}
-              </h2>
+        {/* --- Booking / Payment Info Display --- */}
+        <div className="bg-gray-50 p-4 rounded-md space-y-1 mb-4 border border-gray-200">
+          <p>
+            <span className="font-medium">Service:</span>{" "}
+            {booking?.services?.name || "N/A"}
+          </p>
+          <p>
+            <span className="font-medium">Price:</span> GH₵{" "}
+            {booking?.services?.price || "0.00"}
+          </p>
+          <p>
+            <span className="font-medium">Staff:</span>{" "}
+            {booking?.staff?.full_name || "Unassigned"}
+          </p>
+          <p>
+            <span className="font-medium">Payment Method:</span>{" "}
+            {paymentMethod || "Not selected"}
+          </p>
+          {notes && (
+            <p>
+              <span className="font-medium">Note:</span> {notes}
+            </p>
+          )}
+        </div>
 
-              <Input
-                placeholder="Bank Name"
-                value={paymentInfo.bank_name}
-                onChange={(e) =>
-                  setPaymentInfo({ ...paymentInfo, bank_name: e.target.value })
-                }
-              />
-
-              <Input
-                placeholder="Account Name"
-                value={paymentInfo.account_name}
-                onChange={(e) =>
-                  setPaymentInfo({
-                    ...paymentInfo,
-                    account_name: e.target.value,
-                  })
-                }
-              />
-
-              <Input
-                placeholder="Account Number"
-                value={paymentInfo.account_number}
-                onChange={(e) =>
-                  setPaymentInfo({
-                    ...paymentInfo,
-                    account_number: e.target.value,
-                  })
-                }
-              />
-
-              <div className="flex justify-end gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowEditModal(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => {
-                    handleSavePaymentInfo();
-                    setShowEditModal(false);
-                  }}
-                >
-                  Save
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
+        {/* --- Existing Payment Form --- */}
         <div className="space-y-4">
           {/* SELECT PAYMENT METHOD */}
           <div className="space-y-2">
@@ -354,6 +320,7 @@ export default function PaymentDialog({
               )}
             </div>
           )}
+
           {/* PAYMENT BUTTON */}
           <Button
             onClick={handlePaymentSubmit}
@@ -361,14 +328,11 @@ export default function PaymentDialog({
             className="w-full"
           >
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-
-            {/* ADMIN LOGIC */}
             {admin &&
             (paymentMethod === "bank_transfer" || paymentMethod === "cash") ? (
               "Confirm Payment"
             ) : (
               <>
-                {/* NON-ADMIN LOGIC */}
                 {paymentMethod === "bank_transfer"
                   ? "Click to use Paystack"
                   : "Process Payment"}

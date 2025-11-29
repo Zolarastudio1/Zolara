@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { z } from "zod";
+import PhoneInput from "@/lib/phoneInput";
 
 // Schema for validation
 const staffSchema = z.object({
@@ -192,7 +193,7 @@ const Staff = () => {
           <DialogTrigger asChild>
             <Button>
               <Plus className="w-4 h-4 mr-2" />
-              {editingMemberId ? "Edit Staff" : "Add Staff / Receptionist"}
+              Add Staff / Receptionist
             </Button>
           </DialogTrigger>
 
@@ -217,15 +218,9 @@ const Staff = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>Phone *</Label>
-                <Input
-                  type="tel"
-                  placeholder="+233..."
+                <PhoneInput
                   value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
-                  required
+                  onChange={(v) => setFormData({ ...formData, phone: v })}
                 />
               </div>
 

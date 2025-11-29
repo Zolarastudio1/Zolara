@@ -143,7 +143,7 @@ const Auth = () => {
         password: validated.password,
       });
 
-      const metaDataRole = data.user.user_metadata.role
+      const metaDataRole = data.user.user_metadata.role;
 
       if (error) throw error;
       if (!data.user) throw new Error("User not found");
@@ -200,17 +200,8 @@ const Auth = () => {
           }
         );
 
-        console.log(
-          "Verified or not:",
-          isVerified,
-          "Role:",
-          roleToAssign,
-          "Error",
-          verifyError
-        );
-
-        // Ensure it's explicitly true
-        if (verifyError || !isVerified) {
+        if (verifyError) throw verifyError;
+        if (!isVerified) {
           toast.error(
             "Your email must be registered by an administrator with the correct role before signing up."
           );
@@ -224,8 +215,9 @@ const Auth = () => {
           .from("clients")
           .select("id")
           .eq("email", validated.email)
-          .single();
+          .maybeSingle();
 
+        // Ignore "no rows" error
         if (clientError && clientError.code !== "PGRST116") throw clientError;
 
         if (existingClient) {
@@ -244,8 +236,7 @@ const Auth = () => {
           toast.success(
             "Your account exists. Updated info successfully. Please login."
           );
-          setLoading(false);
-          return;
+          return; // Stop further execution
         }
       }
 
@@ -259,24 +250,32 @@ const Auth = () => {
         },
       });
 
-      if (authError) throw authError;
-
-      // The trigger automatically creates profile and assigns role
-      if (authData.user) {
-        const userData = {
-          id: authData.user.id,
-          email: authData.user.email,
-          phone: validated.phone,
-          role: roleToAssign,
-        };
-        localStorage.setItem("user", JSON.stringify(userData));
-
-        toast.success(
-          "Account created successfully! Please check your email to verify your account."
-        );
-
-        redirectToDashboard(roleToAssign);
+      // Explicitly stop if signup fails
+      if (authError) {
+        console.error("Signup error:", authError);
+        toast.error(authError.message || "Signup failed");
+        return;
       }
+
+      if (!authData?.user) {
+        toast.error("Signup failed: user was not created");
+        return;
+      }
+
+      // Success: save user data locally
+      const userData = {
+        id: authData.user.id,
+        email: authData.user.email,
+        phone: validated.phone,
+        role: roleToAssign,
+      };
+      localStorage.setItem("user", JSON.stringify(userData));
+
+      toast.success(
+        "Account created successfully! Please check your email to verify your account."
+      );
+
+      redirectToDashboard(roleToAssign);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);

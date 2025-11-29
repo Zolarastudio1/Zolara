@@ -38,6 +38,7 @@ export default function PaymentDialog({
   booking,
   onPaymentComplete,
 }: PaymentDialogProps) {
+  console.log(booking);
   const [loading, setLoading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
 
@@ -55,9 +56,7 @@ export default function PaymentDialog({
     account_number: "",
   });
 
-  const label = admin
-    ? `Record Payment for ${booking?.clients?.full_name} - ${booking?.services?.name}`
-    : `Make Payment for ${booking?.clients?.full_name} - ${booking?.services?.name}`;
+  const label = admin ? `Record Payment` : `Make Payment`;
 
   const callbackUrl = admin
     ? `${window.location.origin}/admin/bookings`
@@ -188,11 +187,16 @@ export default function PaymentDialog({
             <CreditCard className="w-5 h-5" />
             {admin ? "Record Payment" : "Make Payment"}
           </DialogTitle>
-          <DialogDescription>{label}</DialogDescription>
         </DialogHeader>
 
         {/* --- Booking / Payment Info Display --- */}
         <div className="bg-gray-50 p-4 rounded-md space-y-1 mb-4 border border-gray-200">
+          {admin && (
+            <p>
+              <span className="font-medium">Client:</span>{" "}
+              {booking?.clients?.full_name || "N/A"}
+            </p>
+          )}
           <p>
             <span className="font-medium">Service:</span>{" "}
             {booking?.services?.name || "N/A"}

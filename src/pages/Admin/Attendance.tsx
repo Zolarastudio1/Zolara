@@ -45,7 +45,7 @@ export default function Attendance() {
   }, []);
 
   useEffect(() => {
-    if (userRole === "owner" || userRole === "receptionist") {
+    if (userRole == "owner" || userRole == "receptionist") {
       fetchStaff();
       fetchAttendance();
     }
@@ -69,7 +69,9 @@ export default function Attendance() {
         .eq("user_id", user.id)
         .single();
 
-      setUserRole(roleData?.role || null);
+      const metaDataRole = user.user_metadata.role;
+
+      setUserRole(roleData?.role || metaDataRole);
     } catch (err: any) {
       console.error(err);
       toast.error("Unable to fetch user role");
@@ -197,6 +199,8 @@ export default function Attendance() {
       toast.error(err.message || "Error while marking check-out");
     }
   };
+
+  console.log(attendanceRecords)
 
   /** Role Restriction View */
   if (!loading && userRole !== "owner" && userRole !== "receptionist") {

@@ -45,6 +45,7 @@ const Clients = () => {
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [userRole, setUserRole] = useState<string>("");
   const [formData, setFormData] = useState<any>({
     full_name: "",
     phone: "",
@@ -56,7 +57,35 @@ const Clients = () => {
 
   useEffect(() => {
     fetchClients();
+    fetchUserRole();
   }, []);
+
+  /** Fetch Logged-in User Role */
+  const fetchUserRole = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .single();
+
+      const metaDataRole = user.user_metadata.role;
+
+      setUserRole(roleData?.role || metaDataRole);
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Unable to fetch user role");
+    }
+  };
 
   const fetchClients = async () => {
     try {
@@ -364,18 +393,19 @@ const Clients = () => {
                 >
                   <Pencil className="w-4 h-4" />
                 </Button>
-
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="rounded-xl text-red-500 border-red-300"
-                  onClick={() => {
-                    setDeleteClientId(client.id);
-                    setDeleteDialogOpen(true);
-                  }}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                {userRole === "owner" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-xl text-red-500 border-red-300"
+                    onClick={() => {
+                      setDeleteClientId(client.id);
+                      setDeleteDialogOpen(true);
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>

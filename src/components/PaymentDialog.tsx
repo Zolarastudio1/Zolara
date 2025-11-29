@@ -29,8 +29,6 @@ interface PaymentDialogProps {
   onPaymentComplete: () => void;
 }
 
-// Webhook Url: https://ekvjnydomfresnkealpb.supabase.co/functions/v1/confirm-payment
-
 export default function PaymentDialog({
   admin,
   open,

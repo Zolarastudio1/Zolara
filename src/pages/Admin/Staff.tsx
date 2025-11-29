@@ -52,6 +52,7 @@ const Staff = () => {
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteStaffId, setDeleteStaffId] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string>("");
   const [formData, setFormData] = useState({
     full_name: "",
     phone: "",
@@ -64,7 +65,35 @@ const Staff = () => {
 
   useEffect(() => {
     fetchStaff();
+    fetchUserRole();
   }, []);
+
+  /** Fetch Logged-in User Role */
+  const fetchUserRole = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .single();
+
+      const metaDataRole = user.user_metadata.role;
+
+      setUserRole(roleData?.role || metaDataRole);
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Unable to fetch user role");
+    }
+  };
 
   const fetchStaff = async () => {
     try {
@@ -393,18 +422,19 @@ const Staff = () => {
                 >
                   <Pencil className="w-4 h-4" />
                 </Button>
-
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="rounded-xl text-red-500 border-red-300"
-                  onClick={() => {
-                    setDeleteStaffId(member.id);
-                    setDeleteDialogOpen(true);
-                  }}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                {userRole === "owner" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-xl text-red-500 border-red-300"
+                    onClick={() => {
+                      setDeleteStaffId(member.id);
+                      setDeleteDialogOpen(true);
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>

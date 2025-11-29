@@ -41,7 +41,7 @@ const staffSchema = z.object({
     .or(z.literal("")),
   specialization: z.string().max(100, "Specialization too long").optional(),
   role: z.enum(["staff", "receptionist"]),
-  image: z.instanceof(File).optional(), // NEW: image field
+  image: z.union([z.instanceof(File), z.null()]).optional(),
 });
 
 const Staff = () => {
@@ -59,7 +59,7 @@ const Staff = () => {
     specialization: "",
     role: "staff" as "staff" | "receptionist",
     is_active: true,
-    image: null as File | string | null, // <-- new
+    image: null as File | string | null,
   });
 
   useEffect(() => {

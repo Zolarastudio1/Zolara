@@ -33,7 +33,7 @@ const clientSchema = z.object({
     .or(z.literal("")),
   address: z.string().max(500, "Address too long").optional(),
   notes: z.string().max(1000, "Notes too long").optional(),
-  image: z.instanceof(File).optional(), // NEW: image field
+  image: z.union([z.instanceof(File), z.null()]).optional(),
 });
 
 const Clients = () => {

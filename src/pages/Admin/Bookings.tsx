@@ -31,6 +31,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import PaymentDialog from "@/components/PaymentDialog";
+import { Textarea } from "@/components/ui/textarea";
 
 const bookingSchema = z.object({
   client_id: z.string().uuid("Invalid client selection"),
@@ -239,34 +240,39 @@ const Bookings = () => {
   };
 
   const handleStatusUpdate = async (bookingId: string, newStatus: string) => {
-  try {
-    const { error } = await supabase
-      .from("bookings")
-      // @ts-ignore
-      .update({ status: newStatus })
-      .eq("id", bookingId);
+    try {
+      const { error } = await supabase
+        .from("bookings")
+        // @ts-ignore
+        .update({ status: newStatus })
+        .eq("id", bookingId);
 
-    if (error) throw error;
+      if (error) throw error;
 
-    toast.success("Booking status updated");
+      toast.success("Booking status updated");
 
-    // Refresh booking list
-    fetchData();
-
-  } catch (err: any) {
-    toast.error(err.message || "Status update failed");
-  }
-};
+      // Refresh booking list
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.message || "Status update failed");
+    }
+  };
 
   const getStatusColor = (status: string) => {
-    const colors: any = {
-      scheduled: "bg-blue-100 text-blue-800",
-      confirmed: "bg-indigo-100 text-indigo-800",
-      completed: "bg-green-100 text-green-800",
-      cancelled: "bg-red-100 text-red-800",
-      no_show: "bg-yellow-100 text-yellow-800",
-    };
-    return colors[status] || "bg-gray-100 text-gray-800";
+    switch (status) {
+      case "scheduled":
+        return "bg-blue-100 text-blue-800";
+      case "confirmed":
+        return "bg-yellow-100 text-yellow-800";
+      case "completed":
+        return "bg-green-100 text-green-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
+      case "no_show":
+        return "bg-gray-100 text-gray-700";
+      default:
+        return "bg-gray-100 text-gray-700";
+    }
   };
 
   if (loading) {
@@ -286,7 +292,6 @@ const Bookings = () => {
             Manage and track all appointments
           </p>
         </div>
-
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -306,7 +311,7 @@ const Bookings = () => {
               <div>
                 <Label>Client</Label>
                 <Select
-                  value={formData.client_id}
+                  value={formData.client_id || ""}
                   onValueChange={(value) =>
                     setFormData({ ...formData, client_id: value })
                   }
@@ -328,7 +333,7 @@ const Bookings = () => {
               <div>
                 <Label>Service</Label>
                 <Select
-                  value={formData.service_id}
+                  value={formData.service_id || ""}
                   onValueChange={(value) =>
                     setFormData({ ...formData, service_id: value })
                   }
@@ -350,7 +355,7 @@ const Bookings = () => {
               <div>
                 <Label>Staff</Label>
                 <Select
-                  value={formData.staff_id}
+                  value={formData.staff_id || ""}
                   onValueChange={(value) =>
                     setFormData({ ...formData, staff_id: value })
                   }
@@ -374,20 +379,22 @@ const Bookings = () => {
                   <Label>Date</Label>
                   <Input
                     type="date"
-                    value={formData.appointment_date}
+                    value={formData.appointment_date || ""}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
                         appointment_date: e.target.value,
                       })
                     }
+                    className="pl-3 pr-10 py-2 text-sm rounded-lg border border-gray-300"
                   />
                 </div>
+
                 <div>
                   <Label>Time</Label>
                   <Input
                     type="time"
-                    value={formData.appointment_time}
+                    value={formData.appointment_time || ""}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
@@ -403,7 +410,7 @@ const Bookings = () => {
                 <div>
                   <Label>Payment Method</Label>
                   <Select
-                    value={formData.payment_method}
+                    value={formData.payment_method || ""}
                     onValueChange={(value) =>
                       setFormData({ ...formData, payment_method: value })
                     }
@@ -425,7 +432,7 @@ const Bookings = () => {
                 <div>
                   <Label>Payment Status</Label>
                   <Select
-                    value={formData.payment_status}
+                    value={formData.payment_status || ""}
                     onValueChange={(value) =>
                       setFormData({ ...formData, payment_status: value })
                     }
@@ -445,12 +452,13 @@ const Bookings = () => {
               {/* Notes */}
               <div>
                 <Label>Notes</Label>
-                <Input
+                <Textarea
                   placeholder="Optional notes"
-                  value={formData.notes}
+                  value={formData.notes || ""}
                   onChange={(e) =>
                     setFormData({ ...formData, notes: e.target.value })
                   }
+                  rows={3}
                 />
               </div>
 
@@ -460,6 +468,7 @@ const Bookings = () => {
             </form>
           </DialogContent>
         </Dialog>
+
         <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
@@ -493,12 +502,14 @@ const Bookings = () => {
               className="rounded-2xl border border-gray-200/60 shadow-sm hover:shadow-lg bg-white/70 backdrop-blur-sm transition-all"
             >
               <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start gap-2">
                   <div>
                     <CardTitle className="text-lg font-semibold">
-                      {b.clients?.full_name}
+                      {b.clients?.full_name || "Unknown Client"}
                     </CardTitle>
-                    <p className="text-sm text-gray-500">{b.services?.name}</p>
+                    <p className="text-sm text-gray-500">
+                      {b.services?.name || "No service"}
+                    </p>
                   </div>
 
                   <Badge
@@ -506,12 +517,12 @@ const Bookings = () => {
                       b.status
                     )} text-xs px-3 py-1 rounded-full`}
                   >
-                    {b.status}
+                    {b.status.charAt(0).toUpperCase() + b.status.slice(1)}
                   </Badge>
                 </div>
               </CardHeader>
 
-              <CardContent className="space-y-4 text-sm">
+              <CardContent className="space-y-3 text-sm">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-gray-500 text-xs">Staff</p>
@@ -529,12 +540,16 @@ const Bookings = () => {
                   </div>
                 </div>
 
-                <p className="text-gray-500 italic border-l-4 border-gray-300 pl-3">
-                  {b.notes || "no note"}
+                {/* Notes */}
+                <p className="text-gray-600 italic border-l-4 border-gray-300 pl-3">
+                  {b.notes || "No note"}
                 </p>
 
-                <div className="flex justify-between items-center">
-                  <span>Update status</span>
+                {/* Status update */}
+                <div className="flex justify-between items-center mt-2">
+                  <span className="text-gray-600 text-sm font-medium">
+                    Update status
+                  </span>
                   <select
                     className="border rounded-lg px-2 py-1 text-sm"
                     value={b.status}
@@ -546,27 +561,20 @@ const Bookings = () => {
                     <option value="cancelled">Cancelled</option>
                     <option value="no_show">No response</option>
                   </select>
-
-                  {/* <Badge
-                    className={`${getStatusColor(
-                      b.status
-                    )} text-xs px-3 py-1 rounded-full`}
-                  >
-                    {b.status}
-                  </Badge> */}
                 </div>
 
+                {/* Action buttons */}
                 <div className="flex justify-end gap-3 pt-2">
                   <Button
                     size="sm"
                     variant="default"
-                    className="rounded-xl"
+                    className="rounded-xl flex items-center gap-1"
                     onClick={() => {
                       setSelectedBooking(b);
                       setPaymentDialogOpen(true);
                     }}
                   >
-                    <CreditCard className="w-4 h-4 mr-2" />
+                    <CreditCard className="w-4 h-4" />
                     Payment
                   </Button>
 
@@ -576,8 +584,8 @@ const Bookings = () => {
                     className="rounded-xl"
                     onClick={() => {
                       setEditingBookingId(b.id);
-                      // Format time to HH:MM (remove seconds if present)
-                      const timeFormatted = b.appointment_time.substring(0, 5);
+                      const timeFormatted =
+                        b.appointment_time?.substring(0, 5) || "00:00";
                       setFormData({
                         ...b,
                         client_id: b.client_id,

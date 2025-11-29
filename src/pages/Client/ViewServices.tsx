@@ -65,19 +65,19 @@ const ViewServices = () => {
       const { data, error } = await supabase
         .from("services")
         .select("*")
-        .order("category")
-        .order("name");
+        .eq("is_active", true) // only fetch active services
+        .order("order", { ascending: true }) // order by the 'order' field
+        .order("name", { ascending: true }); // secondary ordering by name
 
       if (error) throw error;
       setServices(data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching services:", error);
       toast.error("Failed to load services");
     } finally {
       setLoading(false);
     }
   };
-
 
   if (loading) {
     return (

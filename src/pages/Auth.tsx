@@ -166,8 +166,16 @@ const Auth = () => {
       toast.success("Login successful!");
       redirectToDashboard(role);
     } catch (error: any) {
-      if (error instanceof z.ZodError) toast.error(error.errors[0].message);
-      else toast.error(error.message || "Login failed");
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else if (error.message?.includes("user_metadata")) {
+        // Friendly fallback for null user_metadata
+        toast.error(
+          "Please confirm your email before logging in. Check your inbox."
+        );
+      } else {
+        toast.error(error.message || "Login failed");
+      }
     } finally {
       setLoading(false);
     }

@@ -61,6 +61,18 @@ const App = () => (
             </Route>
           </Route>
 
+          {/* --------------RECEPTIONIST ROUTES ------------------- */}
+          <Route element={<ProtectedRoute allowedRoles={["receptionist"]} />}>
+            <Route element={<DashboardLayout />}>
+              <Route path="/staff/dashboard" element={<AdminLayout />} />
+              <Route path="/staff/bookings" element={<Bookings />} />
+              <Route path="/staff/services" element={<Services />} />
+              <Route path="/staff/clients" element={<Clients />} />
+              <Route path="/staff/staff" element={<Staff />} />
+              <Route path="/staff/attendance" element={<Attendance />} />
+            </Route>
+          </Route>
+
           {/* ------------------- STAFF ROUTES ------------------- */}
           <Route element={<ProtectedRoute allowedRoles={["staff"]} />}>
             <Route element={<DashboardLayout />}>

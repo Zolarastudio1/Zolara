@@ -28,6 +28,7 @@ import MyAttendance from "./pages/Staff/MyAttendance";
 
 import ClientBookings from "./pages/Client/ClientBookings";
 import ViewServices from "./pages/Client/ViewServices";
+import SettingsPage from "./pages/Admin/Settings";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +57,7 @@ const App = () => (
                 path="/admin/attendance-reports"
                 element={<AttendanceReports />}
               />
+              <Route path="/admin/settings" element={<SettingsPage />} />
             </Route>
           </Route>
 

@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   Clock,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -80,6 +81,7 @@ const DashboardLayout = () => {
     { icon: FileText, label: "Reports", path: "reports" },
     { icon: Clock, label: "Attendance", path: "attendance" },
     { icon: FileText, label: "Attendance Reports", path: "attendance-reports" },
+    { icon: Settings, label: "Settings", path: "settings" },
   ];
 
   // ==========================================================
@@ -106,7 +108,7 @@ const DashboardLayout = () => {
         return baseNavItems
           .filter(
             (item) =>
-              !["Sales", "Reports", "Attendance Reports"].includes(item.label)
+              !["Sales", "Reports", "Attendance Reports", "Settings"].includes(item.label)
           )
           .map((item) => ({
             ...item,

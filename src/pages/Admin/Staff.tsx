@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner";
 import { z } from "zod";
 import PhoneInput from "@/lib/phoneInput";
+import { AvatarUpload } from "@/components/AvatarUpload";
 
 // Schema for validation
 const staffSchema = z.object({
@@ -40,12 +41,14 @@ const staffSchema = z.object({
     .or(z.literal("")),
   specialization: z.string().max(100, "Specialization too long").optional(),
   role: z.enum(["staff", "receptionist"]),
+  image: z.instanceof(File).optional(), // NEW: image field
 });
 
 const Staff = () => {
   const [staff, setStaff] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteStaffId, setDeleteStaffId] = useState<string | null>(null);
@@ -56,6 +59,7 @@ const Staff = () => {
     specialization: "",
     role: "staff" as "staff" | "receptionist",
     is_active: true,
+    image: null as File | string | null, // <-- new
   });
 
   useEffect(() => {
@@ -87,6 +91,7 @@ const Staff = () => {
       specialization: member.specialization || "",
       role: member.role || "staff",
       is_active: member.is_active ?? true,
+      image: member.image || null,
     });
     setDialogOpen(true);
   };
@@ -114,44 +119,56 @@ const Staff = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     try {
       const validated = staffSchema.parse(formData);
 
+      const staffData: any = {
+        full_name: validated.full_name,
+        phone: validated.phone,
+        ...(validated.email && { email: validated.email }),
+        ...(validated.specialization && {
+          specialization: validated.specialization,
+        }),
+        role: validated.role,
+        is_active: formData.is_active,
+      };
+
+      // Upload image if selected
+      if (validated.image) {
+        setUploading(true);
+        const fileExtension = validated.image.name.split(".").pop();
+        const uniqueId = editingMemberId || Date.now();
+        const fileName = `staff-${uniqueId}.${fileExtension}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("avatars")
+          .upload(fileName, validated.image, {
+            cacheControl: "3600",
+            upsert: true,
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from("avatars")
+          .getPublicUrl(fileName);
+
+        staffData.image = urlData.publicUrl;
+        setUploading(false);
+      }
+
       if (editingMemberId) {
-        // UPDATE existing staff
         const { error } = await supabase
           .from("staff")
-          .update({
-            full_name: validated.full_name,
-            phone: validated.phone,
-            email: validated.email || null,
-            specialization: validated.specialization || null,
-            is_active: formData.is_active,
-          })
+          .update(staffData)
           .eq("id", editingMemberId);
 
         if (error) throw error;
-
-        toast.success("Staff updated!");
+        toast.success("Staff updated successfully");
       } else {
-        // CREATE staff via Supabase first
-        const { data: newStaff, error } = await supabase
-          .from("staff")
-          .insert([
-            {
-              full_name: validated.full_name,
-              phone: validated.phone,
-              email: validated.email || null,
-              specialization: validated.specialization || null,
-              is_active: true,
-              role: validated.role || null,
-            },
-          ])
-          .select()
-          .single();
-
+        const { error } = await supabase.from("staff").insert([staffData]);
         if (error) throw error;
+        toast.success("Staff added successfully");
       }
 
       setDialogOpen(false);
@@ -163,12 +180,17 @@ const Staff = () => {
         specialization: "",
         role: "staff",
         is_active: true,
+        image: null,
       });
 
       fetchStaff();
     } catch (error: any) {
-      if (error instanceof z.ZodError) toast.error(error.errors[0].message);
-      else toast.error(error.message || "Failed to save staff");
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error(error.message || "Failed to save staff");
+      }
+      setUploading(false);
     }
   };
 
@@ -203,6 +225,10 @@ const Staff = () => {
                 {editingMemberId ? "Edit Member" : "Add New Member"}
               </DialogTitle>
             </DialogHeader>
+            <AvatarUpload
+              image={formData.image}
+              onChange={(file) => setFormData({ ...formData, image: file })}
+            />
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -266,7 +292,11 @@ const Staff = () => {
               </div>
 
               <Button type="submit" className="w-full">
-                {editingMemberId ? "Update Member" : "Add Member"}
+                {uploading
+                  ? "Loading"
+                  : !editingMemberId
+                  ? "Add Member"
+                  : "Update Member"}{" "}
               </Button>
             </form>
           </DialogContent>
@@ -305,19 +335,41 @@ const Staff = () => {
           >
             <CardHeader>
               <div className="flex justify-between items-start">
-                <CardTitle className="text-lg font-semibold">
-                  {member.full_name}
-                </CardTitle>
+                <div className="flex items-center gap-3">
+                  {/* Staff Avatar */}
+                  <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
+                    {member.image ? (
+                      <img
+                        src={member.image}
+                        alt={member.full_name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-green-500 text-white flex items-center justify-center font-bold text-lg shadow-md">
+                        {member.full_name
+                          .split(" ")
+                          .map((n: string) => n[0])
+                          .join("")}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <CardTitle className="text-lg font-semibold">
+                      {member.full_name}
+                    </CardTitle>
+                    {member.specialization && (
+                      <p className="text-sm text-gray-500 mt-1">
+                        {member.specialization}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
                 <Badge variant={member.is_active ? "default" : "secondary"}>
                   {member.is_active ? "Active" : "Inactive"}
                 </Badge>
               </div>
-              {member.specialization && (
-                <p className="text-sm text-gray-500 mt-1">
-                  {member.specialization}
-                </p>
-              )}
-              {/* <p className="text-sm mt-1 font-medium">Role: {member.user_metadata.role}</p> */}
             </CardHeader>
 
             <CardContent className="space-y-3">

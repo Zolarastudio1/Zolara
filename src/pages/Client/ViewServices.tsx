@@ -67,7 +67,7 @@ const ViewServices = () => {
         .select("*")
         .eq("is_active", true) // only fetch active services
         .order("order", { ascending: true }) // order by the 'order' field
-        .order("name", { ascending: true }); // secondary ordering by name
+        // .order("name", { ascending: true }); // secondary ordering by name
 
       if (error) throw error;
       setServices(data || []);

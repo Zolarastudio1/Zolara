@@ -14,9 +14,10 @@ import {
   endOfMonth,
   startOfWeek,
   endOfWeek,
+  subMonths,
 } from "date-fns";
 
-const AdminLayout = () => {
+const Dashboard = () => {
   const [stats, setStats] = useState({
     todayBookings: 0,
     todayRevenue: 0,
@@ -25,11 +26,9 @@ const AdminLayout = () => {
     totalClients: 0,
     activeStaff: 0,
     topService: "N/A",
-    cancelledBookings: 0,
-    pendingBookings: 0,
-    completedBookings: 0,
-    topStaff: "N/A",
+    monthChangePercentage: 0,
   });
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,84 +44,108 @@ const AdminLayout = () => {
       const startOfThisMonth = format(startOfMonth(today), "yyyy-MM-dd");
       const endOfThisMonth = format(endOfMonth(today), "yyyy-MM-dd");
 
-      // Fetch bookings this month
-      const { data: bookings } = await supabase
+      // Previous month
+      const previousMonthStart = format(
+        startOfMonth(subMonths(today, 1)),
+        "yyyy-MM-dd"
+      );
+      const previousMonthEnd = format(
+        endOfMonth(subMonths(today, 1)),
+        "yyyy-MM-dd"
+      );
+      // Today's bookings
+      const { data: todayBookings } = await supabase
         .from("bookings")
-        .select(
-          "id,status,staff(full_name),services(name,price),appointment_date"
-        )
-        .gte("appointment_date", startOfThisMonth)
-        .lte("appointment_date", endOfThisMonth);
+        .select("*", { count: "exact" })
+        .eq("appointment_date", startOfToday);
 
-      // Count bookings by status
-      const cancelledBookings =
-        bookings?.filter((b) => b.status === "cancelled")?.length || 0;
-      const pendingBookings =
-        bookings?.filter((b) => b.status === "scheduled")?.length || 0;
-      const completedBookings =
-        bookings?.filter((b) => b.status === "completed")?.length || 0;
+      // Today's revenue
+      const { data: todayPayments } = await supabase
+        .from("payments")
+        .select("amount")
+        .gte("payment_date", startOfToday);
 
-      // Top staff by completed bookings
-      const staffCounts: Record<string, number> = {};
-      bookings?.forEach((b) => {
-        if (b.status === "completed" && b.staff?.full_name) {
-          staffCounts[b.staff.full_name] =
-            (staffCounts[b.staff.full_name] || 0) + 1;
-        }
-      });
-      const topStaff =
-        Object.entries(staffCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ||
-        "N/A";
+      // Weekly revenue
+      const { data: weeklyPayments } = await supabase
+        .from("payments")
+        .select("amount")
+        .gte("payment_date", startOfThisWeek)
+        .lte("payment_date", endOfThisWeek);
 
       // Monthly revenue
       const { data: monthlyPayments } = await supabase
         .from("payments")
         .select("amount")
-        .eq("payment_status", "completed")
         .gte("payment_date", startOfThisMonth)
         .lte("payment_date", endOfThisMonth);
 
+      // Previous month revenue
+      const { data: previousMonthPayments } = await supabase
+        .from("payments")
+        .select("amount")
+        .gte("payment_date", previousMonthStart)
+        .lte("payment_date", previousMonthEnd);
+
       // Total clients
-      const { count: clientCount } = await supabase
+      const { data: clients, count: clientCount } = await supabase
         .from("clients")
         .select("*", { count: "exact" });
 
       // Active staff
-      const { count: staffCount } = await supabase
+      const { data: staff, count: staffCount } = await supabase
         .from("staff")
         .select("*", { count: "exact" })
         .eq("is_active", true);
 
-      // Top service this month
-      const serviceCounts = bookings?.reduce((acc: any, booking: any) => {
+      // Top service
+      const { data: services } = await supabase
+        .from("bookings")
+        .select("service_id, services(name)")
+        .gte("appointment_date", startOfThisMonth)
+        .lte("appointment_date", endOfThisMonth);
+
+      const serviceCounts = services?.reduce((acc: any, booking: any) => {
         const serviceName = booking.services?.name || "Unknown";
         acc[serviceName] = (acc[serviceName] || 0) + 1;
         return acc;
       }, {});
+
       const topService = serviceCounts
         ? Object.entries(serviceCounts).sort(
             (a: any, b: any) => b[1] - a[1]
           )[0]?.[0] || "N/A"
         : "N/A";
 
-      // Today's bookings & revenue
-      const todayBookings =
-        bookings?.filter((b) => b.appointment_date === startOfToday)?.length ||
-        0;
+      const todayRevenue =
+        todayPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+      const weeklyRevenue =
+        weeklyPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+      const monthlyRevenue =
+        monthlyPayments?.reduce((sum, p) => sum + p.amount, 0) || 0;
+      const totalClients = clientCount || 0;
+      const activeStaff = staffCount || 0;
+
+      const previousMonthRevenue =
+        previousMonthPayments?.reduce((sum, p) => sum + p.amount, 0) || 0;
+
+
+      // Percentage change calculation
+      let percentageChange = 0;
+      if (previousMonthRevenue > 0) {
+        percentageChange =
+          ((monthlyRevenue - previousMonthRevenue) / previousMonthRevenue) *
+          100;
+      }
 
       setStats({
-        todayBookings,
-        todayRevenue: 0, // can keep your previous todayRevenue calculation if needed
-        weeklyRevenue: 0, // keep previous weeklyRevenue calculation
-        monthlyRevenue:
-          monthlyPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0,
-        totalClients: clientCount || 0,
-        activeStaff: staffCount || 0,
+        todayBookings: todayBookings?.length || 0,
+        todayRevenue,
+        weeklyRevenue,
+        monthlyRevenue,
+        totalClients,
+        activeStaff,
         topService,
-        cancelledBookings,
-        pendingBookings,
-        completedBookings,
-        topStaff,
+        monthChangePercentage: Number(percentageChange.toFixed(1)),
       });
     } catch (error) {
       console.error("Error fetching stats:", error);
@@ -147,57 +170,49 @@ const AdminLayout = () => {
       title: "Today's Bookings",
       value: stats.todayBookings,
       icon: Calendar,
+      percent: "",
       color: "text-primary",
       bgColor: "bg-primary/10",
+    },
+    {
+      title: "Today's Revenue",
+      value: `GH₵${stats.todayRevenue.toLocaleString()}`,
+      icon: DollarSign,
+      percent: "",
+      color: "text-success",
+      bgColor: "bg-success/10",
+    },
+    {
+      title: "Weekly Revenue",
+      value: `GH₵${stats.weeklyRevenue.toLocaleString()}`,
+      icon: TrendingUp,
+      percent: "",
+      color: "text-info",
+      bgColor: "bg-info/10",
     },
     {
       title: "Monthly Revenue",
       value: `GH₵${stats.monthlyRevenue.toLocaleString()}`,
-      icon: DollarSign,
+      icon: TrendingUp,
+      percent: stats.monthChangePercentage,
       color: "text-accent",
       bgColor: "bg-accent/10",
-    },
-    {
-      title: "Cancelled Bookings",
-      value: stats.cancelledBookings,
-      icon: Scissors,
-      color: "text-red-500",
-      bgColor: "bg-red-100",
-    },
-    {
-      title: "Pending Bookings",
-      value: stats.pendingBookings,
-      icon: Calendar,
-      color: "text-yellow-500",
-      bgColor: "bg-yellow-100",
-    },
-    {
-      title: "Completed Bookings",
-      value: stats.completedBookings,
-      icon: TrendingUp,
-      color: "text-green-500",
-      bgColor: "bg-green-100",
-    },
-    {
-      title: "Active Staff",
-      value: stats.activeStaff,
-      icon: Users,
-      color: "text-secondary-foreground",
-      bgColor: "bg-secondary",
-    },
-    {
-      title: "Top Staff",
-      value: stats.topStaff,
-      icon: Users,
-      color: "text-primary",
-      bgColor: "bg-primary/10",
     },
     {
       title: "Total Clients",
       value: stats.totalClients,
       icon: Users,
+      percent: "",
       color: "text-primary",
       bgColor: "bg-primary/10",
+    },
+    {
+      title: "Active Staff",
+      value: stats.activeStaff,
+      icon: Users,
+      percent: "",
+      color: "text-secondary-foreground",
+      bgColor: "bg-secondary",
     },
   ];
 
@@ -214,17 +229,86 @@ const AdminLayout = () => {
         {statCards.map((stat, index) => {
           const Icon = stat.icon;
           return (
-            <Card key={index} className="hover:shadow-md transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {stat.title}
-                </CardTitle>
-                <div className={`${stat.bgColor} p-2 rounded-full`}>
-                  <Icon className={`w-4 h-4 ${stat.color}`} />
+            <Card
+              key={index}
+              className="transition-all hover:shadow-xl hover:scale-[1.02] bg-gradient-to-br from-white/70 to-white/40 dark:from-gray-900/60 dark:to-gray-800/40 backdrop-blur-xl border border-gray-200/40 dark:border-gray-700/40 rounded-2xl"
+            >
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                {/* Title */}
+                <div>
+                  <CardTitle className="text-sm font-semibold text-gray-600 dark:text-gray-300 tracking-wide">
+                    {stat.title}
+                  </CardTitle>
+                </div>
+
+                {/* Icon Bubble */}
+                <div
+                  className={`${stat.bgColor} p-3 rounded-xl shadow-sm flex items-center justify-center`}
+                >
+                  <Icon className={`w-5 h-5 ${stat.color}`} />
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
+
+              <CardContent className="pt-1 flex items-center justify-between">
+                {/* Main Value */}
+                <div className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+                  {stat.value}
+                </div>
+
+                {/* Percentage Change with Trend Icon */}
+                {stat.percent !== "" && stat.percent !== null && (
+                  <div className="flex items-center gap-2 text-lg font-bold">
+                    {/* Trend Icon */}
+                    {Number(stat.percent) > 0 ? (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-6 w-6 text-green-600"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 15l7-7 7 7"
+                        />
+                      </svg>
+                    ) : Number(stat.percent) < 0 ? (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-6 w-6 text-red-600"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    ) : (
+                      // Neutral dot
+                      <span className="inline-block w-3 h-3 bg-gray-400 rounded-full"></span>
+                    )}
+
+                    {/* Percentage Value */}
+                    <span
+                      className={`${
+                        Number(stat.percent) > 0
+                          ? "text-green-600"
+                          : Number(stat.percent) < 0
+                          ? "text-red-600"
+                          : "text-gray-500 dark:text-gray-400"
+                      }`}
+                    >
+                      {Number(stat.percent) > 0 && "+"}
+                      {Number(stat.percent)}%
+                    </span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
@@ -248,4 +332,4 @@ const AdminLayout = () => {
   );
 };
 
-export default AdminLayout;
+export default Dashboard;

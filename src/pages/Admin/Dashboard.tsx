@@ -1,14 +1,21 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Calendar, 
-  Users, 
-  DollarSign, 
+import {
+  Calendar,
+  Users,
+  DollarSign,
   TrendingUp,
-  Scissors
+  Scissors,
 } from "lucide-react";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  subMonths,
+} from "date-fns";
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -18,8 +25,10 @@ const Dashboard = () => {
     monthlyRevenue: 0,
     totalClients: 0,
     activeStaff: 0,
-    topService: "N/A"
+    topService: "N/A",
+    monthChangePercentage: 0,
   });
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,6 +44,15 @@ const Dashboard = () => {
       const startOfThisMonth = format(startOfMonth(today), "yyyy-MM-dd");
       const endOfThisMonth = format(endOfMonth(today), "yyyy-MM-dd");
 
+      // Previous month
+      const previousMonthStart = format(
+        startOfMonth(subMonths(today, 1)),
+        "yyyy-MM-dd"
+      );
+      const previousMonthEnd = format(
+        endOfMonth(subMonths(today, 1)),
+        "yyyy-MM-dd"
+      );
       // Today's bookings
       const { data: todayBookings } = await supabase
         .from("bookings")
@@ -61,6 +79,13 @@ const Dashboard = () => {
         .gte("payment_date", startOfThisMonth)
         .lte("payment_date", endOfThisMonth);
 
+      // Previous month revenue
+      const { data: previousMonthPayments } = await supabase
+        .from("payments")
+        .select("amount")
+        .gte("payment_date", previousMonthStart)
+        .lte("payment_date", previousMonthEnd);
+
       // Total clients
       const { data: clients, count: clientCount } = await supabase
         .from("clients")
@@ -85,18 +110,43 @@ const Dashboard = () => {
         return acc;
       }, {});
 
-      const topService = serviceCounts 
-        ? Object.entries(serviceCounts).sort((a: any, b: any) => b[1] - a[1])[0]?.[0] || "N/A"
+      const topService = serviceCounts
+        ? Object.entries(serviceCounts).sort(
+            (a: any, b: any) => b[1] - a[1]
+          )[0]?.[0] || "N/A"
         : "N/A";
+
+      const todayRevenue =
+        todayPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+      const weeklyRevenue =
+        weeklyPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+      const monthlyRevenue =
+        monthlyPayments?.reduce((sum, p) => sum + p.amount, 0) || 0;
+      const totalClients = clientCount || 0;
+      const activeStaff = staffCount || 0;
+
+      const previousMonthRevenue =
+        previousMonthPayments?.reduce((sum, p) => sum + p.amount, 0) || 0;
+
+        console.log(monthlyPayments)
+
+      // Percentage change calculation
+      let percentageChange = 0;
+      if (previousMonthRevenue > 0) {
+        percentageChange =
+          ((monthlyRevenue - previousMonthRevenue) / previousMonthRevenue) *
+          100;
+      }
 
       setStats({
         todayBookings: todayBookings?.length || 0,
-        todayRevenue: todayPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0,
-        weeklyRevenue: weeklyPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0,
-        monthlyRevenue: monthlyPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0,
-        totalClients: clientCount || 0,
-        activeStaff: staffCount || 0,
-        topService
+        todayRevenue,
+        weeklyRevenue,
+        monthlyRevenue,
+        totalClients,
+        activeStaff,
+        topService,
+        monthChangePercentage: Number(percentageChange.toFixed(1)),
       });
     } catch (error) {
       console.error("Error fetching stats:", error);
@@ -122,50 +172,57 @@ const Dashboard = () => {
       value: stats.todayBookings,
       icon: Calendar,
       color: "text-primary",
-      bgColor: "bg-primary/10"
+      bgColor: "bg-primary/10",
     },
     {
       title: "Today's Revenue",
       value: `GH₵${stats.todayRevenue.toLocaleString()}`,
       icon: DollarSign,
+      percent: "",
       color: "text-success",
-      bgColor: "bg-success/10"
+      bgColor: "bg-success/10",
     },
     {
       title: "Weekly Revenue",
       value: `GH₵${stats.weeklyRevenue.toLocaleString()}`,
       icon: TrendingUp,
+      percent: "",
       color: "text-info",
-      bgColor: "bg-info/10"
+      bgColor: "bg-info/10",
     },
     {
       title: "Monthly Revenue",
       value: `GH₵${stats.monthlyRevenue.toLocaleString()}`,
       icon: TrendingUp,
+      percent: stats.monthChangePercentage,
       color: "text-accent",
-      bgColor: "bg-accent/10"
+      bgColor: "bg-accent/10",
     },
     {
       title: "Total Clients",
       value: stats.totalClients,
       icon: Users,
+      percent: "",
       color: "text-primary",
-      bgColor: "bg-primary/10"
+      bgColor: "bg-primary/10",
     },
     {
       title: "Active Staff",
       value: stats.activeStaff,
       icon: Users,
+      percent: "",
       color: "text-secondary-foreground",
-      bgColor: "bg-secondary"
-    }
+      bgColor: "bg-secondary",
+    },
   ];
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome back! Here's your salon overview</p>
+        <p className="text-muted-foreground">
+          Welcome back! Here's your salon overview
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -177,12 +234,32 @@ const Dashboard = () => {
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   {stat.title}
                 </CardTitle>
+
                 <div className={`${stat.bgColor} p-2 rounded-full`}>
                   <Icon className={`w-4 h-4 ${stat.color}`} />
                 </div>
               </CardHeader>
+
               <CardContent>
                 <div className="text-2xl font-bold">{stat.value}</div>
+
+                {/* ▼ Percentage Change */}
+                {stat.percent !== undefined && stat.percent !== null ? (
+                  <p
+                    className={`text-sm font-medium mt-1 ${
+                      Number(stat.percent) > 0
+                        ? "text-green-600"
+                        : Number(stat.percent) < 0
+                        ? "text-red-600"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {Number(stat.percent) > 0 && "+"}
+                    {Number(stat.percent)}%
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground mt-1">—</p>
+                )}
               </CardContent>
             </Card>
           );
@@ -197,7 +274,9 @@ const Dashboard = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-semibold text-primary">{stats.topService}</p>
+          <p className="text-2xl font-semibold text-primary">
+            {stats.topService}
+          </p>
         </CardContent>
       </Card>
     </div>

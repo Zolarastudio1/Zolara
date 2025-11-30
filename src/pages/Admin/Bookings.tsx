@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import PaymentDialog from "@/components/PaymentDialog";
 import { Textarea } from "@/components/ui/textarea";
+import { CollapsibleSearchBar } from "@/components/SearchBar";
 
 const bookingSchema = z.object({
   client_id: z.string().uuid("Invalid client selection"),
@@ -55,6 +56,7 @@ const bookingSchema = z.object({
 
 const Bookings = () => {
   const [bookings, setBookings] = useState<any[]>([]);
+  const [filteredBookings, setFilteredBookings] = useState(bookings);
   const [requests, setRequests] = useState<any[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [isBookingModalOpen, setBookingModalOpen] = useState(false);
@@ -62,6 +64,13 @@ const Bookings = () => {
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [requestPage, setRequestPage] = useState(1);
+  const [totalBookings, setTotalBookings] = useState(0);
+  const [totalRequests, setTotalRequests] = useState(0);
+  const itemsPerPage = 20;
+  const totalBookingPages = Math.ceil(totalBookings / itemsPerPage);
+  const totalRequestPages = Math.ceil(totalRequests / itemsPerPage);
 
   const [clients, setClients] = useState<any[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
@@ -69,6 +78,9 @@ const Bookings = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
+  const start = (page - 1) * itemsPerPage;
+  const end = start + itemsPerPage - 1;
+
   const [formData, setFormData] = useState<any>({
     client_id: "",
     staff_id: "",
@@ -85,25 +97,68 @@ const Bookings = () => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    fetchBookings(page);
+  }, [page]);
+
+  useEffect(() => {
+    fetchBookingRequests(requestPage);
+  }, [requestPage]);
+
+  const fetchBookings = async (pageNumber = page) => {
+    try {
+      const start = (pageNumber - 1) * itemsPerPage;
+      const end = start + itemsPerPage - 1;
+
+      const { data, count, error } = await supabase
+        .from("bookings")
+        .select("*, clients(*), staff(*), services(*)", { count: "exact" })
+        .order("appointment_date", { ascending: false })
+        .range(start, end);
+
+      if (error) throw error;
+
+      setBookings(data || []);
+      setTotalBookings(count || 0);
+    } catch (error) {
+      console.error("Error fetching bookings:", error);
+      toast.error("Failed to load data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchBookingRequests = async (pageNumber = page) => {
+    try {
+      const start = (pageNumber - 1) * itemsPerPage;
+      const end = start + itemsPerPage - 1;
+
+      const { data, count, error } = await supabase
+        .from("booking_requests")
+        .select("*, clients(*), services(*)", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(start, end);
+
+      if (error) throw error;
+
+      setRequests(data || []);
+      setTotalRequests(count || 0);
+    } catch (error) {
+      console.error("Error fetching requests:", error);
+      toast.error("Failed to load data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchData = async () => {
     try {
-      const [bookingsRes, requestsRes, clientsRes, staffRes, servicesRes] =
-        await Promise.all([
-          supabase
-            .from("bookings")
-            .select("*, clients(*), staff(*), services(*)")
-            .order("appointment_date", { ascending: false }),
-          supabase //@ts-ignore
-            .from("booking_requests")
-            .select("*, clients(*), services(*)")
-            .order("created_at", { ascending: false }),
-          supabase.from("clients").select("*").order("full_name"),
-          supabase.from("staff").select("*").order("full_name"),
-          supabase.from("services").select("*").order("name"),
-        ]);
+      const [clientsRes, staffRes, servicesRes] = await Promise.all([
+        supabase.from("clients").select("*").order("full_name"),
+        supabase.from("staff").select("*").order("full_name"),
+        supabase.from("services").select("*").order("name"),
+      ]);
 
-      if (bookingsRes.data) setBookings(bookingsRes.data);
-      if (requestsRes.data) setRequests(requestsRes.data);
       if (clientsRes.data) setClients(clientsRes.data);
       if (staffRes.data) setStaff(staffRes.data);
       if (servicesRes.data) setServices(servicesRes.data);
@@ -495,8 +550,15 @@ const Bookings = () => {
 
       {/* Bookings List */}
       <div className="w-full px-4 space-y-10">
+        <div className="flex justify-end mb-4">
+          <CollapsibleSearchBar
+            data={bookings}
+            placeholder="Search bookings..."
+            onSearchResults={(results) => setFilteredBookings(results)}
+          />
+        </div>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {bookings.map((b) => (
+          {filteredBookings.map((b) => (
             <Card
               key={b.id}
               className="rounded-2xl border border-gray-200/60 shadow-sm hover:shadow-lg bg-white/70 backdrop-blur-sm transition-all"
@@ -615,6 +677,30 @@ const Bookings = () => {
             </Card>
           ))}
         </div>
+
+        {/* Pagination */}
+        <div className="flex justify-center items-center gap-2 mt-4">
+          <button
+            disabled={page === 1}
+            onClick={() => {
+              setPage((prev) => prev - 1);
+              fetchBookings(page - 1);
+            }}
+            className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50 hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+          >
+            Prev
+          </button>
+          <span className="px-3 py-2 text-sm text-gray-600 dark:text-gray-300">
+            Page {page} of {totalBookingPages}
+          </span>
+          <button
+            disabled={page === totalBookingPages}
+            onClick={() => setPage((p) => p + 1)}
+            className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50 hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+          >
+            Next
+          </button>
+        </div>
       </div>
 
       {/* Booking Requests Section */}
@@ -679,6 +765,27 @@ const Bookings = () => {
               No booking requests at the moment.
             </p>
           )}
+        </div>
+
+        {/* Pagination */}
+        <div className="flex justify-center items-center gap-2 mt-4">
+          <button
+            disabled={requestPage === 1}
+            onClick={() => setRequestPage((p) => p - 1)}
+            className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50 hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+          >
+            Prev
+          </button>
+          <span className="px-3 py-2 text-sm text-gray-600 dark:text-gray-300">
+            Page {requestPage} of {totalRequestPages}
+          </span>
+          <button
+            disabled={requestPage === totalRequestPages}
+            onClick={() => setRequestPage((p) => p + 1)}
+            className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50 hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+          >
+            Next
+          </button>
         </div>
       </div>
 

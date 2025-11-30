@@ -47,6 +47,16 @@ const clientSchema = z.object({
   image: z.union([z.instanceof(File), z.null()]).optional(),
 });
 
+// Small stat tile used in profile dialog
+const Stat = ({ label, value }: { label: string; value: () => string }) => {
+  return (
+    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+      <p className="text-sm text-gray-500">{label}</p>
+      <p className="text-lg font-semibold mt-1">{value()}</p>
+    </div>
+  );
+};
+
 const Clients = () => {
   const [clients, setClients] = useState<any[]>([]);
   const [filteredClients, setFilteredClients] = useState<any[]>([]);
@@ -73,6 +83,8 @@ const Clients = () => {
   const [page, setPage] = useState(1); // current page
   const [pageSize, setPageSize] = useState(20); // items per page
   const [totalClients, setTotalClients] = useState(0);
+  const [selectedClient, setSelectedClient] = useState<any | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
   const totalPages = Math.ceil(totalClients / pageSize);
 
   const [formData, setFormData] = useState<any>({
@@ -627,7 +639,11 @@ const Clients = () => {
             return (
               <Card
                 key={client.id}
-                className="hover:shadow-2xl transition-all transform hover:-translate-y-1 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-white/80 to-white/60 dark:from-gray-900/70 dark:to-gray-800/50 backdrop-blur-lg"
+                onClick={() => {
+                  setSelectedClient(client);
+                  setProfileOpen(true);
+                }}
+                className="cursor-pointer hover:shadow-2xl transition-all transform hover:-translate-y-1 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-white/80 to-white/60 dark:from-gray-900/70 dark:to-gray-800/50 backdrop-blur-lg"
               >
                 <CardHeader>
                   <div className="flex justify-between items-start">
@@ -698,12 +714,13 @@ const Clients = () => {
                   )}
 
                   {/* Action Buttons */}
-                  <div className="flex justify-end gap-2 pt-3">
+                    <div className="flex justify-end gap-2 pt-3">
                     <Button
                       size="sm"
                       variant="ghost"
                       className="rounded-xl flex items-center gap-1"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setFormData({
                           full_name: client.full_name,
                           phone: client.phone,
@@ -723,7 +740,8 @@ const Clients = () => {
                         size="sm"
                         variant="destructive"
                         className="rounded-xl flex items-center gap-1"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setDeleteClientId(client.id);
                           setDeleteDialogOpen(true);
                         }}
@@ -736,6 +754,114 @@ const Clients = () => {
               </Card>
             );
           })}
+
+                  {/* Profile Dialog */}
+                  <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+                    <DialogContent className="max-w-3xl">
+                      <DialogHeader>
+                        <DialogTitle>
+                          {selectedClient ? selectedClient.full_name : "Client Profile"}
+                        </DialogTitle>
+                      </DialogHeader>
+
+                      {selectedClient && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-4">
+                              <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center text-2xl font-semibold text-white bg-gradient-to-br from-green-500 to-teal-500">
+                                {selectedClient.image ? (
+                                  <img src={selectedClient.image} alt={selectedClient.full_name} className="w-full h-full object-cover" />
+                                ) : (
+                                  (selectedClient.full_name || "").split(" ").map((n: string) => n[0]).join("")
+                                )}
+                              </div>
+
+                              <div>
+                                <h3 className="text-xl font-semibold">{selectedClient.full_name}</h3>
+                                <p className="text-sm text-muted-foreground">{selectedClient.email}</p>
+                                <p className="text-sm text-muted-foreground">{selectedClient.phone}</p>
+                              </div>
+                            </div>
+
+                            <div>
+                              <h4 className="font-medium text-sm text-gray-600">Notes</h4>
+                              <p className="mt-2 text-sm text-gray-800">{selectedClient.notes || "No notes"}</p>
+                            </div>
+
+                            <div>
+                              <h4 className="font-medium text-sm text-gray-600">Contact & Address</h4>
+                              <p className="mt-1 text-sm">{selectedClient.address || "No address"}</p>
+                            </div>
+                          </div>
+
+                          {/* Middle: service history */}
+                          <div className="md:col-span-2">
+                            <h4 className="text-lg font-semibold mb-3">Service History</h4>
+
+                            <div className="space-y-3 max-h-72 overflow-auto">
+                              {(selectedClient.bookings || [])
+                                .slice()
+                                .sort((a: any, b: any) => new Date(b.appointment_date).getTime() - new Date(a.appointment_date).getTime())
+                                .map((b: any) => (
+                                  <div key={b.id} className="flex justify-between items-center p-3 rounded-lg border bg-white/50 dark:bg-gray-900/40">
+                                    <div>
+                                      <div className="text-sm font-medium">{b.services?.name || "Service"}</div>
+                                      <div className="text-xs text-muted-foreground">{b.staff?.full_name || b.staff?.name || "Unassigned"} • {b.appointment_date ? format(new Date(b.appointment_date), "PPP") : "Date N/A"}</div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="font-semibold">GH₵{Number(b.services?.price || 0).toFixed(2)}</div>
+                                      <div className="text-xs text-muted-foreground">{b.status || "-"}</div>
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+
+                            {/* Summary stats */}
+                            <div className="mt-4 grid grid-cols-2 gap-4">
+                              <Stat label="Total Spent" value={() => {
+                                const total = (selectedClient.bookings || []).reduce((sum: number, bk: any) => {
+                                  // count only completed bookings as spent
+                                  if (bk.status && bk.status !== "completed") return sum;
+                                  return sum + Number(bk.services?.price || 0);
+                                }, 0);
+                                return `GH₵${total.toFixed(2)}`;
+                              }} />
+
+                              <Stat label="Preferred Staff" value={() => {
+                                const counts: Record<string, { name: string; count: number }> = {};
+                                (selectedClient.bookings || []).forEach((bk: any) => {
+                                  const name = bk.staff?.full_name || bk.staff?.name || "Unassigned";
+                                  if (!name) return;
+                                  counts[name] = counts[name] || { name, count: 0 };
+                                  counts[name].count += 1;
+                                });
+                                const top = Object.values(counts).sort((a, b) => b.count - a.count)[0];
+                                return top ? `${top.name} (${top.count})` : "N/A";
+                              }} />
+
+                              <Stat label="Visits" value={() => `${(selectedClient.bookings || []).length}`} />
+
+                              <Stat label="Avg Frequency" value={() => {
+                                const dates = (selectedClient.bookings || [])
+                                  .map((bk: any) => bk.appointment_date)
+                                  .filter(Boolean)
+                                  .map((d: string) => new Date(d))
+                                  .sort((a: Date, b: Date) => a.getTime() - b.getTime());
+                                if (dates.length < 2) return "N/A";
+                                const diffs: number[] = [];
+                                for (let i = 1; i < dates.length; i++) {
+                                  const days = (dates[i].getTime() - dates[i - 1].getTime()) / (1000 * 60 * 60 * 24);
+                                  diffs.push(days);
+                                }
+                                const avg = diffs.reduce((s, v) => s + v, 0) / diffs.length;
+                                return `${Math.round(avg)} days`;
+                              }} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </DialogContent>
+                  </Dialog>
 
           {/* No-match placeholder when filters applied but nothing matches */}
           {filteredClients.length === 0 && clients.length > 0 && (

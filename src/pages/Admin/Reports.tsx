@@ -23,6 +23,8 @@ const Reports = () => {
   );
   const [filterType, setFilterType] = useState("all");
   const [reportData, setReportData] = useState<any>(null);
+  const [clients, setClients] = useState<any[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
   const formatDateTime = (date: string, time: string) => {
@@ -97,9 +99,9 @@ const Reports = () => {
           appointment_date,
           appointment_time,
           status,
-          services:service_id (name, category),
+          services:service_id (id, name, category),
           staff:staff_id (full_name),
-          clients:client_id (full_name)
+          clients:client_id (id, full_name)
         )
       `
         )
@@ -129,6 +131,44 @@ const Reports = () => {
         acc[name].revenue += Number(row.amount);
         return acc;
       }, {});
+
+      /* ===============================
+       MOST ACTIVE CLIENTS
+    ============================== */
+      const mostActiveClients = data?.reduce((acc: any, row: any) => {
+        const clientObj = row.bookings?.clients;
+        const clientId = clientObj?.id || clientObj?.full_name || "unknown";
+        const clientName = clientObj?.full_name || "Unknown";
+
+        if (!acc[clientId]) acc[clientId] = { id: clientId, name: clientName, count: 0, revenue: 0 };
+        acc[clientId].count += 1;
+        acc[clientId].revenue += Number(row.amount);
+        return acc;
+      }, {});
+
+      const mostActiveList = Object.values(mostActiveClients || {}).sort(
+        (a: any, b: any) => b.count - a.count
+      );
+
+      /* ===============================
+       SERVICE HISTORY (for selected client)
+    ============================== */
+      let serviceHistory: any = {};
+      if (filterType === "service_history" && selectedClientId) {
+        const rowsForClient = data?.filter((p: any) => {
+          const clientObj = p.bookings?.clients;
+          const cid = clientObj?.id || clientObj?.full_name;
+          return cid === selectedClientId;
+        }) || [];
+
+        serviceHistory = rowsForClient.reduce((acc: any, row: any) => {
+          const name = row.bookings?.services?.name || "Unknown";
+          if (!acc[name]) acc[name] = { count: 0, revenue: 0 };
+          acc[name].count += 1;
+          acc[name].revenue += Number(row.amount);
+          return acc;
+        }, {});
+      }
 
       /* ===============================
        STAFF BREAKDOWN
@@ -173,6 +213,8 @@ const Reports = () => {
         staffBreakdown,
         exportRows,
         rawData: data,
+        mostActiveList,
+        serviceHistory,
       });
     } catch (err) {
       console.error("Report Error:", err);
@@ -180,6 +222,23 @@ const Reports = () => {
       setLoading(false);
     }
   };
+
+  // Fetch clients for service history filter
+  useEffect(() => {
+    const fetchClients = async () => {
+      try {
+        const { data } = await supabase
+          .from("clients")
+          .select("id, full_name")
+          .order("full_name");
+        if (data) setClients(data);
+      } catch (err) {
+        console.error("Failed to fetch clients", err);
+      }
+    };
+
+    fetchClients();
+  }, []);
 
   /* Run on page mount */
   useEffect(() => {
@@ -251,9 +310,32 @@ const Reports = () => {
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="service">By Service</SelectItem>
                   <SelectItem value="staff">By Staff</SelectItem>
+                  <SelectItem value="most_active">Most Active Clients</SelectItem>
+                  <SelectItem value="service_history">Service History (Per Client)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {filterType === "service_history" && (
+              <div className="space-y-2 md:col-span-3">
+                <Label>Choose Client</Label>
+                <Select
+                  value={selectedClientId}
+                  onValueChange={(v) => setSelectedClientId(v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All clients</SelectItem>
+                    {clients.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <div className="flex gap-2">
             <Button onClick={generateReport} disabled={loading}>
@@ -353,6 +435,68 @@ const Reports = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Most active clients (when selected) */}
+          {filterType === "most_active" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Most Active Clients</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {(reportData.mostActiveList || []).map((c: any) => (
+                    <div
+                      key={c.id}
+                      className="flex justify-between items-center p-3 bg-muted rounded-lg"
+                    >
+                      <div>
+                        <p className="font-medium">{c.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {c.count} bookings
+                        </p>
+                      </div>
+                      <p className="font-bold text-primary">
+                        GH₵{Number(c.revenue).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Service history for selected client */}
+          {filterType === "service_history" && selectedClientId && (
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  Service History for {clients.find((c) => c.id === selectedClientId)?.full_name || "Client"}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {Object.entries(reportData.serviceHistory || {}).map(
+                    ([service, data]: [string, any]) => (
+                      <div
+                        key={service}
+                        className="flex justify-between items-center p-3 bg-muted rounded-lg"
+                      >
+                        <div>
+                          <p className="font-medium">{service}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {data.count} times
+                          </p>
+                        </div>
+                        <p className="font-bold text-primary">
+                          GH₵{data.revenue.toLocaleString()}
+                        </p>
+                      </div>
+                    )
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>

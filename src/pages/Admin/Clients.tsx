@@ -1,8 +1,18 @@
 import { useEffect, useState } from "react";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Mail, Phone, Trash, Pencil, Trash2 } from "lucide-react";
+import {
+  Plus,
+  Mail,
+  Phone,
+  Trash,
+  Pencil,
+  Trash2,
+  CalendarClock,
+  TrendingUp,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -39,7 +49,7 @@ const clientSchema = z.object({
 
 const Clients = () => {
   const [clients, setClients] = useState<any[]>([]);
-  const [filteredClients, setFilteredClients] = useState(clients);
+  const [filteredClients, setFilteredClients] = useState<any[]>([]);
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [deleteClientId, setDeleteClientId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -51,6 +61,15 @@ const Clients = () => {
   const [services, setServices] = useState([]);
   const [selectedService, setSelectedService] = useState("");
   const [showServiceList, setShowServiceList] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<"none" | "date" | "most_active" | "service_history" | "search">("none");
+  const [searchResults, setSearchResults] = useState<any[] | null>(null);
+  const [showFiltersMobile, setShowFiltersMobile] = useState(false);
+  const [startDate, setStartDate] = useState(
+    format(startOfMonth(new Date()), "yyyy-MM-dd")
+  );
+  const [endDate, setEndDate] = useState(
+    format(endOfMonth(new Date()), "yyyy-MM-dd")
+  );
   const [page, setPage] = useState(1); // current page
   const [pageSize, setPageSize] = useState(20); // items per page
   const [totalClients, setTotalClients] = useState(0);
@@ -105,15 +124,16 @@ const Clients = () => {
       const from = (pageNumber - 1) * pageSize;
       const to = from + pageSize - 1;
 
+      // Fetch clients with their bookings (and nested service meta) so we can filter locally
       const { data, count, error } = await supabase
         .from("clients")
-        .select("*", { count: "exact" }) // get total count for pagination
-        .order("full_name")
-        .range(from, to); // range for pagination
+        .select(`*, bookings(*, services(*))`, { count: "exact" })
+        // .order("full_name")
+        .range(from, to);
 
       if (error) throw error;
 
-      setClients(data || []);
+  setClients(data || []);
       setTotalClients(count || 0); // total clients in DB
     } catch (error) {
       console.error("Error fetching clients:", error);
@@ -140,31 +160,99 @@ const Clients = () => {
     }
   };
 
-  const handleFilterByDate = (startDate: string, endDate: string) => {
-    const filtered = clients.filter((c) => {
-      const clientDate = new Date(c.created_at);
-      return (
-        clientDate >= new Date(startDate) && clientDate <= new Date(endDate)
-      );
-    });
-    setFilteredClients(filtered);
+  const handleFilterByDate = () => {
+    setActiveFilter("date");
   };
 
   const handleMostActiveClient = () => {
-    const sorted = [...clients].sort(
-      (a, b) => (b.bookings?.length || 0) - (a.bookings?.length || 0)
-    );
-    setFilteredClients(sorted);
+    setActiveFilter("most_active");
   };
 
   const handleServiceHistory = (serviceName: string) => {
-    const filtered = clients.filter((c) =>
-      c.bookings?.some((b) => b.service?.name === serviceName)
-    );
-    setFilteredClients(filtered);
     setSelectedService(serviceName);
+    setActiveFilter("service_history");
     setShowServiceList(false);
   };
+
+  const clearFilters = () => {
+    setActiveFilter("none");
+    setSelectedService("");
+    setFilteredClients(clients);
+  };
+
+  // Helper: check if a booking date falls within start/end (full-day) bounds
+  const bookingInRange = (rawDate: any, s: Date, e: Date) => {
+    if (!rawDate) return false;
+    const ad = new Date(rawDate);
+    if (!isNaN(ad.getTime())) return ad >= s && ad <= e;
+    const parsed = new Date(`${rawDate}T00:00:00`);
+    if (!isNaN(parsed.getTime())) return parsed >= s && parsed <= e;
+    return false;
+  };
+
+  // Centralized filter application so filters compose
+  const applyFilters = () => {
+    const s = new Date(`${startDate}T00:00:00`);
+    const e = new Date(`${endDate}T23:59:59`);
+
+    // Clients that have at least one booking in range
+    const dateFiltered = clients.filter((c) =>
+      (c.bookings || []).some((b: any) => bookingInRange(b?.appointment_date, s, e))
+    );
+
+    // Debugging info to help trace why filters may not match
+    // (will appear in browser console)
+    console.debug("applyFilters", { activeFilter, startDate, endDate, clientsCount: clients.length, dateFilteredCount: dateFiltered.length });
+
+    if (activeFilter === "date") {
+      setFilteredClients(dateFiltered);
+      return;
+    }
+
+    if (activeFilter === "search") {
+      setFilteredClients(searchResults || []);
+      return;
+    }
+
+    if (activeFilter === "most_active") {
+      const withCounts = dateFiltered.map((c) => ({
+        client: c,
+        count: (c.bookings || []).filter((b: any) => bookingInRange(b?.appointment_date, s, e)).length,
+      }));
+
+      const sorted = withCounts.sort((a, b) => b.count - a.count).map((x) => x.client);
+      console.debug("most_active counts", withCounts.slice(0, 10));
+      setFilteredClients(sorted);
+      return;
+    }
+
+    if (activeFilter === "service_history") {
+      if (!selectedService) {
+        setFilteredClients(dateFiltered);
+        return;
+      }
+
+      const filtered = dateFiltered.filter((c) =>
+        (c.bookings || []).some((b: any) => {
+          const svc = b.services?.name || b.service?.name || "";
+          return svc === selectedService && bookingInRange(b?.appointment_date, s, e);
+        })
+      );
+
+      console.debug("service_history result count", filtered.length, { selectedService });
+
+      setFilteredClients(filtered);
+      return;
+    }
+
+    // none
+    setFilteredClients(clients);
+  };
+
+  useEffect(() => {
+    applyFilters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clients, startDate, endDate, activeFilter, selectedService, searchResults]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -272,7 +360,7 @@ const Clients = () => {
   if (loading) {
     return (
       <div className="flex justify-center p-8">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -382,157 +470,284 @@ const Clients = () => {
           </DialogContent>
         </Dialog>
       </div>
-      <div className="flex justify-end items-center mb-4 gap-2 flex-wrap">
-        {/* Search Bar */}
-        <CollapsibleSearchBar
-          data={clients}
-          placeholder="Search clients..."
-          onSearchResults={(results) => setFilteredClients(results)}
-        />
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+        {/* Left: Search */}
+        <div className="w-full sm:w-1/2">
+          <CollapsibleSearchBar
+            data={clients}
+            placeholder="Search clients..."
+            onSearchResults={(results) => {
+              // treat search as its own view
+              setSearchResults(results);
+              setActiveFilter("search");
+            }}
+          />
+        </div>
 
-        {/* Filter Buttons */}
-        <div className="flex gap-2 flex-wrap items-center">
-          <button
-            onClick={() => handleFilterByDate("2025-11-01", "2025-11-30")}
-            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+        {/* Right: Filters */}
+        <div className="w-full sm:w-auto flex items-center justify-end">
+          {/* Mobile: toggleable filters panel */}
+          <Button
+            className="sm:hidden"
+            variant={showFiltersMobile ? "default" : "outline"}
+            onClick={() => setShowFiltersMobile((s) => !s)}
           >
-            Filter by Date
-          </button>
+            Filters
+          </Button>
 
-          <button
-            onClick={handleMostActiveClient}
-            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-          >
-            Most Active
-          </button>
+          {/* Desktop filters (hidden on small screens) */}
+          <div className="hidden sm:flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 w-auto">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-800/60 text-sm"
+                aria-label="Start date"
+              />
+              <span>to</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-800/60 text-sm"
+                aria-label="End date"
+              />
+              <Button onClick={handleFilterByDate} variant={activeFilter === "date" ? "default" : "outline"} className="whitespace-nowrap">
+                <CalendarClock className="w-4 h-4 mr-2" />
+                Filter
+              </Button>
+              <Button onClick={clearFilters} variant={"ghost"} className="ml-2">
+                Clear
+              </Button>
+            </div>
 
-          {/* Service History Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setShowServiceList(!showServiceList)}
-              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-            >
-              {selectedService || "Service History"}
-            </button>
+            <Button onClick={handleMostActiveClient} variant={activeFilter === "most_active" ? "default" : "ghost"}>
+              <TrendingUp className="w-4 h-4 mr-2" /> Most Active
+            </Button>
 
-            {showServiceList && (
-              <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-md z-50">
-                {services.map((service) => (
-                  <button
-                    key={service}
-                    onClick={() => handleServiceHistory(service)}
-                    className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm rounded-t-md last:rounded-b-md transition"
-                  >
-                    {service}
-                  </button>
-                ))}
-              </div>
-            )}
+            {/* Service History Dropdown (desktop) */}
+            <div className="relative w-auto">
+              <Button
+                onClick={() => setShowServiceList(!showServiceList)}
+                variant={activeFilter === "service_history" ? "default" : "outline"}
+                className="w-auto"
+              >
+                {selectedService || "Service History"}
+              </Button>
+
+              {showServiceList && (
+                <div className="absolute right-0 mt-1 w-56 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-xl z-50">
+                  <div className="p-2 max-h-64 overflow-auto">
+                    {services.map((service: any) => (
+                      <button
+                        key={service.id}
+                        onClick={() => handleServiceHistory(service.name)}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm rounded-md transition"
+                      >
+                        {service.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* Mobile filters panel (shown when toggled) */}
+          {showFiltersMobile && (
+            <div className="sm:hidden mt-3 w-full p-3 space-y-3 border rounded-lg bg-white/70 dark:bg-gray-900/60">
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-800/60 text-sm"
+                    aria-label="Start date"
+                  />
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-800/60 text-sm"
+                    aria-label="End date"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <Button onClick={handleFilterByDate} variant={activeFilter === "date" ? "default" : "outline"} className="flex-1">
+                    <CalendarClock className="w-4 h-4 mr-2" />
+                    Filter
+                  </Button>
+                  <Button onClick={clearFilters} variant={"ghost"} className="flex-1">
+                    Clear
+                  </Button>
+                </div>
+
+                <Button onClick={handleMostActiveClient} variant={activeFilter === "most_active" ? "default" : "outline"} className="w-full">
+                  <TrendingUp className="w-4 h-4 mr-2" /> Most Active
+                </Button>
+
+                <div>
+                  <label className="block text-sm mb-1">Service History</label>
+                  <div className="flex flex-col gap-2">
+                    {services.map((service: any) => (
+                      <button
+                        key={service.id}
+                        onClick={() => handleServiceHistory(service.name)}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm rounded-md transition"
+                      >
+                        {service.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       <div className="space-y-6">
         {/* Client Grid */}
         <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {filteredClients.map((client) => (
-            <Card
-              key={client.id}
-              className="hover:shadow-xl transition-all transform hover:scale-[1.02] rounded-2xl border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-white/70 to-white/40 dark:from-gray-900/60 dark:to-gray-800/40 backdrop-blur-xl"
-            >
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
-                    {/* Avatar */}
-                    <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
-                      {client.image ? (
-                        <img
-                          src={client.image}
-                          alt={client.full_name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-full bg-green-500 text-white flex items-center justify-center font-bold text-lg shadow-md">
-                          {client.full_name
-                            .split(" ")
-                            .map((n: string) => n[0])
-                            .join("")}
-                        </div>
-                      )}
+          {filteredClients.map((client) => {
+            const s = new Date(`${startDate}T00:00:00`);
+            const e = new Date(`${endDate}T23:59:59`);
+            const bookingsInRange = (client.bookings || []).filter((b: any) => {
+              return bookingInRange(b?.appointment_date, s, e);
+            });
+            const bookingsCount = bookingsInRange.length || (client.bookings || []).length;
+            const lastBooking = (client.bookings || []).reduce((latest: any, b: any) => {
+              if (!b?.appointment_date) return latest;
+              if (!latest) return b.appointment_date;
+              return new Date(b.appointment_date) > new Date(latest) ? b.appointment_date : latest;
+            }, null as any);
+
+            return (
+              <Card
+                key={client.id}
+                className="hover:shadow-2xl transition-all transform hover:-translate-y-1 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-white/80 to-white/60 dark:from-gray-900/70 dark:to-gray-800/50 backdrop-blur-lg"
+              >
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                      {/* Avatar */}
+                      <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-100 flex-shrink-0 ring-1 ring-gray-100 dark:ring-gray-700 shadow">
+                        {client.image ? (
+                          <img
+                            src={client.image}
+                            alt={client.full_name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-green-500 to-teal-500 text-white flex items-center justify-center font-semibold text-lg shadow-md">
+                            {client.full_name
+                              .split(" ")
+                              .map((n: string) => n[0])
+                              .join("")}
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                          {client.full_name}
+                          <span className="ml-2 text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700">
+                            {bookingsCount} visits
+                          </span>
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {lastBooking
+                            ? `Last: ${format(
+                                new Date(lastBooking),
+                                "MMM dd, yyyy"
+                              )}`
+                            : "No appointments yet"}
+                        </p>
+                      </div>
                     </div>
 
-                    {/* Name */}
-                    <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {client.full_name}
-                    </CardTitle>
+                    {client.specialization && (
+                      <p className="text-sm text-gray-500 mt-1">
+                        {client.specialization}
+                      </p>
+                    )}
                   </div>
+                </CardHeader>
 
-                  {client.specialization && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      {client.specialization}
-                    </p>
-                  )}
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-3">
-                {/* Phone */}
-                <a
-                  href={`tel:${client.phone}`}
-                  className="flex items-center gap-2 text-sm text-gray-600 hover:text-green-600 hover:underline transition-colors"
-                >
-                  <Phone className="w-4 h-4" />
-                  <span>{client.phone}</span>
-                </a>
-
-                {/* Email */}
-                {client.email && (
+                <CardContent className="space-y-3">
+                  {/* Phone */}
                   <a
-                    href={`mailto:${client.email}`}
-                    className="flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600 hover:underline transition-colors"
+                    href={`tel:${client.phone}`}
+                    className="flex items-center gap-2 text-sm text-gray-600 hover:text-green-600 hover:underline transition-colors"
                   >
-                    <Mail className="w-4 h-4" />
-                    <span>{client.email}</span>
+                    <Phone className="w-4 h-4" />
+                    <span>{client.phone}</span>
                   </a>
-                )}
 
-                {/* Action Buttons */}
-                <div className="flex justify-end gap-2 pt-3">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="rounded-xl flex items-center gap-1"
-                    onClick={() => {
-                      setFormData({
-                        full_name: client.full_name,
-                        phone: client.phone,
-                        email: client.email || "",
-                        address: client.address || "",
-                        notes: client.notes || "",
-                        image: client.image || null,
-                      });
-                      setDialogOpen(true);
-                      setEditingClientId(client.id);
-                    }}
-                  >
-                    <Pencil className="w-4 h-4" /> Edit
-                  </Button>
-                  {userRole === "owner" && (
+                  {/* Email */}
+                  {client.email && (
+                    <a
+                      href={`mailto:${client.email}`}
+                      className="flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600 hover:underline transition-colors"
+                    >
+                      <Mail className="w-4 h-4" />
+                      <span>{client.email}</span>
+                    </a>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex justify-end gap-2 pt-3">
                     <Button
                       size="sm"
-                      variant="outline"
-                      className="rounded-xl text-red-500 border-red-300 flex items-center gap-1"
+                      variant="ghost"
+                      className="rounded-xl flex items-center gap-1"
                       onClick={() => {
-                        setDeleteClientId(client.id);
-                        setDeleteDialogOpen(true);
+                        setFormData({
+                          full_name: client.full_name,
+                          phone: client.phone,
+                          email: client.email || "",
+                          address: client.address || "",
+                          notes: client.notes || "",
+                          image: client.image || null,
+                        });
+                        setDialogOpen(true);
+                        setEditingClientId(client.id);
                       }}
                     >
-                      <Trash2 className="w-4 h-4" /> Delete
+                      <Pencil className="w-4 h-4" />
                     </Button>
-                  )}
-                </div>
+                    {userRole === "owner" && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="rounded-xl flex items-center gap-1"
+                        onClick={() => {
+                          setDeleteClientId(client.id);
+                          setDeleteDialogOpen(true);
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+
+          {/* No-match placeholder when filters applied but nothing matches */}
+          {filteredClients.length === 0 && clients.length > 0 && (
+            <Card className="col-span-full border-gray-200 dark:border-gray-700 rounded-2xl shadow-md bg-gradient-to-b from-white/80 to-white/60 dark:from-gray-800/80 dark:to-gray-900/60 backdrop-blur-md">
+              <CardContent className="text-center py-16">
+                <p className="text-gray-500 dark:text-gray-400 text-lg">
+                  No clients match the current filters. Try clearing filters or
+                  expanding the date range.
+                </p>
               </CardContent>
             </Card>
-          ))}
+          )}
 
           {/* No clients placeholder */}
           {clients.length === 0 && (

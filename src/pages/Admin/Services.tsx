@@ -24,6 +24,7 @@ const serviceSchema = z.object({
   price: z.number().positive().max(1000000),
   duration_minutes: z.number().int().positive().max(1440),
   description: z.string().max(500).optional().or(z.literal("")),
+  specialization: z.string().max(100, "Specialization too long").optional().or(z.literal("")),
   order: z.number().int().optional(),
 });
 
@@ -42,6 +43,7 @@ const Services = () => {
     price: "",
     duration_minutes: "",
     description: "",
+    specialization: "",
   });
 
   const [reorderServices, setReorderServices] = useState<any[]>([]);
@@ -76,6 +78,7 @@ const Services = () => {
         price: parseFloat(formData.price),
         duration_minutes: parseInt(formData.duration_minutes),
         description: formData.description,
+        specialization: formData.specialization,
       });
 
       if (editingServiceId) {
@@ -100,6 +103,7 @@ const Services = () => {
         price: "",
         duration_minutes: "",
         description: "",
+        specialization: "",
       });
       fetchServices();
     } catch (error: any) {
@@ -201,7 +205,7 @@ const Services = () => {
           {/* Add Service Button */}
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+                    <Button onClick={() => { setFormData({ name: "", category: "", price: "", duration_minutes: "", description: "", specialization: "" }); setEditingServiceId(null); }}>
                 <Plus className="w-4 h-4 mr-2" />
                 Add Service
               </Button>
@@ -233,6 +237,14 @@ const Services = () => {
                       setFormData({ ...formData, category: e.target.value })
                     }
                     required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Specialization</Label>
+                  <Input
+                    placeholder="e.g. Braiding, Natural Nails, Acrylics"
+                    value={formData.specialization}
+                    onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -307,106 +319,101 @@ const Services = () => {
 
       {Object.entries(groupedServices).map(
         ([category, categoryServices]: [string, any]) => (
-          <div key={category} className="space-y-4">
-            <h2 className="text-xl font-semibold">{category}</h2>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {categoryServices.map((service: any) => (
-                <Card
-                  key={service.id}
-                  className="hover:shadow-lg transition-shadow rounded-xl border border-gray-200 dark:border-gray-700"
-                >
-                  <CardHeader className="flex flex-col gap-2">
-                    <div className="flex justify-between items-start">
-                      <CardTitle className="text-lg font-semibold">
-                        {service.name}
-                      </CardTitle>
+          <Card key={category} className="mb-6 rounded-xl border border-gray-200">
+                  <CardHeader>
+                    <div className="flex justify-between items-center w-full">
+                      <h2 className="text-xl font-semibold">{category}</h2>
                       <div className="flex items-center gap-2">
-                        {/* Active / Inactive Toggle */}
-                        <div className="flex items-center gap-1">
-                          <Switch
-                            checked={service.is_active}
-                            onCheckedChange={async (checked) => {
-                              try {
-                                const { error } = await supabase
-                                  .from("services")
-                                  .update({ is_active: checked })
-                                  .eq("id", service.id);
-
-                                if (error) throw error;
-
-                                // Update local state immediately
-                                setServices((prev) =>
-                                  prev.map((s) =>
-                                    s.id === service.id
-                                      ? { ...s, is_active: checked }
-                                      : s
-                                  )
-                                );
-                              } catch (err: any) {
-                                console.error(err);
-                                toast.error("Failed to update service status");
-                              }
-                            }}
-                          />
-                          <span className="text-sm">
-                            {service.is_active ? "Active" : "Inactive"}
-                          </span>
-                        </div>
-
-                        {/* Edit Button */}
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => {
-                            setFormData({
-                              name: service.name,
-                              category: service.category,
-                              price: service.price.toString(),
-                              duration_minutes:
-                                service.duration_minutes.toString(),
-                              description: service.description || "",
-                            });
-                            setEditingServiceId(service.id);
+                            // open add dialog pre-filling category
+                            setFormData({ name: "", category, price: "", duration_minutes: "", description: "", specialization: "" });
+                            setEditingServiceId(null);
                             setDialogOpen(true);
                           }}
                         >
-                          Edit
-                        </Button>
-
-                        {/* Delete Button */}
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => {
-                            setDeleteServiceId(service.id);
-                            setDeleteDialogOpen(true);
-                          }}
-                        >
-                          <Trash className="w-4 h-4" />
+                          Add Item
                         </Button>
                       </div>
                     </div>
-
-                    <p className="text-2xl font-bold text-primary">
-                      GH₵{service.price.toLocaleString()}
-                    </p>
                   </CardHeader>
-
-                  <CardContent className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Clock className="w-4 h-4" />
-                      <span>{service.duration_minutes} minutes</span>
+            <CardContent className="space-y-3">
+              {(categoryServices || []).map((service: any) => (
+                <div key={service.id} className="p-3 rounded-lg border bg-white/50 dark:bg-gray-900/40 flex justify-between items-center">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <div className="text-sm font-semibold">{service.name}</div>
+                        <div className="text-xs text-muted-foreground">{service.specialization || ''}</div>
+                      </div>
                     </div>
-                    {service.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {service.description}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
+                    <div className="text-sm text-muted-foreground mt-1">{service.description}</div>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <div className="font-semibold">GH₵{Number(service.price || 0).toFixed(2)}</div>
+                      <div className="text-xs text-muted-foreground">{service.duration_minutes} min</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={service.is_active}
+                        onCheckedChange={async (checked) => {
+                          try {
+                            const { error } = await supabase
+                              .from("services")
+                              .update({ is_active: checked })
+                              .eq("id", service.id);
+
+                            if (error) throw error;
+
+                            setServices((prev) =>
+                              prev.map((s) =>
+                                s.id === service.id ? { ...s, is_active: checked } : s
+                              )
+                            );
+                          } catch (err: any) {
+                            console.error(err);
+                            toast.error("Failed to update service status");
+                          }
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setFormData({
+                            name: service.name,
+                            category: service.category,
+                            price: service.price.toString(),
+                            duration_minutes: service.duration_minutes.toString(),
+                            description: service.description || "",
+                            specialization: service.specialization || "",
+                          });
+                          setEditingServiceId(service.id);
+                          setDialogOpen(true);
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => {
+                          setDeleteServiceId(service.id);
+                          setDeleteDialogOpen(true);
+                        }}
+                      >
+                        <Trash className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               ))}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         )
       )}
 

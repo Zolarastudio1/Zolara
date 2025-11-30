@@ -3,7 +3,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 import { DollarSign, Calendar } from "lucide-react";
 import { CSVLink } from "react-csv"; // For CSV export
 
@@ -11,17 +20,71 @@ const SalesRevenue = () => {
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterMethod, setFilterMethod] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<"all" | "today" | "week" | "month" | "custom">("month");
+  const [customStart, setCustomStart] = useState<string>("");
+  const [customEnd, setCustomEnd] = useState<string>("");
+  const [monthlyNet, setMonthlyNet] = useState<number>(0);
+  const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchPayments();
+    fetchMonthlyNet();
   }, []);
+
+  useEffect(() => {
+    // refetch when dateRange changes
+    fetchPayments();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange, customStart, customEnd]);
+
+  // Fetch monthly net revenue same as dashboard
+  const fetchMonthlyNet = async () => {
+    try {
+      const today = new Date();
+      const start = format(startOfMonth(today), "yyyy-MM-dd");
+      const end = format(endOfMonth(today), "yyyy-MM-dd");
+      const { data, error } = await supabase
+        .from("payments")
+        .select("amount")
+        .gte("payment_date", start)
+        .lte("payment_date", end);
+      if (error) throw error;
+      const total = (data || []).reduce((s: number, p: any) => s + Number(p.amount), 0);
+      setMonthlyNet(total);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchPayments = async () => {
     try {
-      const { data, error } = await supabase
+      setLoading(true);
+      let query = supabase
         .from("payments")
         .select("*, bookings(*, clients(*), services(*))")
         .order("payment_date", { ascending: false });
+
+      // apply date filters
+      if (dateRange === "today") {
+        const today = format(new Date(), "yyyy-MM-dd");
+        query = query.gte("payment_date", today);
+      } else if (dateRange === "week") {
+        const today = new Date();
+        const start = format(startOfWeek(today), "yyyy-MM-dd");
+        const end = format(endOfWeek(today), "yyyy-MM-dd");
+        query = query.gte("payment_date", start).lte("payment_date", end);
+      } else if (dateRange === "month") {
+        const today = new Date();
+        const start = format(startOfMonth(today), "yyyy-MM-dd");
+        const end = format(endOfMonth(today), "yyyy-MM-dd");
+        query = query.gte("payment_date", start).lte("payment_date", end);
+      } else if (dateRange === "custom") {
+        if (customStart) query = query.gte("payment_date", customStart);
+        if (customEnd) query = query.lte("payment_date", customEnd);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -46,6 +109,28 @@ const SalesRevenue = () => {
     (p) => p.payment_status === "pending"
   );
 
+  const openPaymentDialog = (p: any) => {
+    setSelectedPayment(p);
+    setPaymentDialogOpen(true);
+  };
+
+  const updatePaymentStatus = async (id: string, status: string) => {
+    try {
+      const { error } = await supabase
+        .from("payments") //@ts-ignore
+        .update({ payment_status: status })
+        .eq("id", id);
+      if (error) throw error;
+      toast.success("Payment status updated");
+      fetchPayments();
+      fetchMonthlyNet();
+      setPaymentDialogOpen(false);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to update status");
+    }
+  };
+
   const getPaymentMethodColor = (method: string) => {
     const colors: any = {
       cash: "bg-success/10 text-success",
@@ -65,47 +150,53 @@ const SalesRevenue = () => {
     return colors[status] || "bg-muted text-muted-foreground";
   };
 
-  // const exportPDF = () => {
-  //   const doc = new jsPDF();
-  //   doc.text("Revenue Summary", 14, 20);
+  const exportPDF = () => {
+    try {
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text("Revenue Summary", 14, 20);
+      doc.setFontSize(10);
+      const rangeLabel =
+        dateRange === "custom"
+          ? `${customStart || "N/A"} - ${customEnd || "N/A"}`
+          : dateRange;
+      doc.text(`Date Range: ${rangeLabel}`, 14, 26);
 
-  //   const formatTable = (data: any[], title: string, yStart: number) => {
-  //     doc.text(title, 14, yStart - 5);
-  //     const tableData = data.map((p) => [
-  //       p.bookings?.clients?.full_name || "N/A",
-  //       p.bookings?.services?.name || "N/A",
-  //       p.payment_method,
-  //       `GH₵${Number(p.amount).toLocaleString()}`,
-  //       format(new Date(p.payment_date), "MMM dd, yyyy"),
-  //       p.notes || "",
-  //     ]);
-  //     (doc as any).autoTable({
-  //       startY: yStart,
-  //       head: [["Client", "Service", "Method", "Amount", "Date", "Notes"]],
-  //       body: tableData,
-  //       theme: "grid",
-  //       headStyles: { fillColor: [30, 144, 255] },
-  //     });
-  //     return (doc as any).lastAutoTable.finalY + 10;
-  //   };
+      const tableData = filteredPayments.map((p) => [
+        p.bookings?.clients?.full_name || "N/A",
+        p.bookings?.services?.name || "N/A",
+        p.payment_method,
+        `GH₵${Number(p.amount).toLocaleString()}`,
+        format(new Date(p.payment_date), "MMM dd, yyyy"),
+        p.payment_status,
+        p.notes || "",
+      ]);
 
-  //   let yPos = 25;
-  //   if (completedPayments.length > 0) {
-  //     yPos = formatTable(completedPayments, "Completed Payments", yPos);
-  //   }
-  //   if (pendingPayments.length > 0) {
-  //     formatTable(pendingPayments, "Pending Payments", yPos);
-  //   }
+      (doc as any).autoTable({
+        startY: 32,
+        head: [["Client", "Service", "Method", "Amount", "Date", "Status", "Notes"]],
+        body: tableData,
+        theme: "grid",
+        headStyles: { fillColor: [30, 144, 255] },
+        styles: { fontSize: 9 },
+        columnStyles: { 6: { cellWidth: 60 } },
+      });
 
-  //   doc.save("revenue_summary.pdf");
-  // };
+      const now = format(new Date(), "yyyyMMdd_HHmmss");
+      doc.save(`revenue_summary_${now}.pdf`);
+    } catch (err) {
+      console.error("PDF export failed", err);
+      toast.error("Failed to export PDF");
+    }
+  };
 
-  if (loading)
+  if (loading) {
     return (
       <div className="flex justify-center p-8">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
+  }
 
   return (
     <div className="space-y-6">
@@ -118,6 +209,30 @@ const SalesRevenue = () => {
 
       {/* Filter Buttons */}
       <div className="flex gap-2 flex-wrap">
+        {/* Date range filter */}
+        <div className="flex items-center gap-2">
+          {[
+            ["today", "Today"],
+            ["week", "This week"],
+            ["month", "This month"],
+            ["all", "All"],
+            ["custom", "Custom"],
+          ].map(([key, label]) => (
+            <Button
+              key={String(key)}
+              variant={dateRange === key ? "default" : "outline"}
+              onClick={() => setDateRange(key as any)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+        {dateRange === "custom" && (
+          <div className="flex items-center gap-2">
+            <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="px-3 py-2 rounded-md border" />
+            <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="px-3 py-2 rounded-md border" />
+          </div>
+        )}
         {/* All Payments Button */}
         <Button
           key="all"
@@ -151,6 +266,7 @@ const SalesRevenue = () => {
         >
           <Button variant="outline">Export CSV</Button>
         </CSVLink>
+        <Button variant="outline" onClick={exportPDF}>Export PDF</Button>
       </div>
 
       {/* Completed Revenue */}
@@ -168,6 +284,7 @@ const SalesRevenue = () => {
               .reduce((sum, p) => sum + Number(p.amount), 0)
               .toLocaleString()}
           </p>
+          <p className="text-sm text-muted-foreground mt-2">Net revenue this month: GH₵{monthlyNet.toLocaleString()}</p>
           <p className="text-sm text-muted-foreground">
             Total Transactions: {completedPayments.length}
           </p>
@@ -199,7 +316,7 @@ const SalesRevenue = () => {
       <div className="space-y-4 mt-4">
         {filteredPayments.length > 0 ? (
           filteredPayments.map((payment) => (
-            <Card key={payment.id}>
+            <Card key={payment.id} onClick={() => openPaymentDialog(payment)} className="cursor-pointer">
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div>
@@ -259,6 +376,55 @@ const SalesRevenue = () => {
           </Card>
         )}
       </div>
+      {/* Payment detail dialog */}
+      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Payment Details</DialogTitle>
+          </DialogHeader>
+          {selectedPayment && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold">Client</h3>
+                <p>{selectedPayment.bookings?.clients?.full_name}</p>
+                <p className="text-sm text-muted-foreground">{selectedPayment.bookings?.clients?.phone}</p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold">Service</h3>
+                <p>{selectedPayment.bookings?.services?.name}</p>
+                <p className="text-sm text-muted-foreground">Duration: {selectedPayment.bookings?.services?.duration_minutes || 'N/A'} min</p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold">Staff</h3>
+                <p>{selectedPayment.bookings?.staff?.full_name || 'Unassigned'}</p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold">Payment</h3>
+                <p>Method: {selectedPayment.payment_method}</p>
+                <p>Amount: GH₵{Number(selectedPayment.amount).toFixed(2)}</p>
+                <p>Status: {selectedPayment.payment_status}</p>
+              </div>
+
+              {selectedPayment.notes && (
+                <div>
+                  <h3 className="font-semibold">Internal Note</h3>
+                  <p className="text-sm text-muted-foreground">{selectedPayment.notes}</p>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2">
+                {selectedPayment.payment_status !== 'completed' && (
+                  <Button onClick={() => updatePaymentStatus(selectedPayment.id, 'completed')}>Mark Completed</Button>
+                )}
+                <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>Close</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

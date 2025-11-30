@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Mail, Phone, Pencil, Trash2 } from "lucide-react";
+import { format } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -40,6 +41,11 @@ const staffSchema = z.object({
     .optional()
     .or(z.literal("")),
   specialization: z.string().max(100, "Specialization too long").optional(),
+  emergency_contact: z
+    .string()
+    .regex(/^\+?[0-9]{7,15}$/, "Invalid emergency contact format")
+    .optional()
+    .or(z.literal("")),
   role: z.enum(["staff", "receptionist"]),
   image: z.union([z.instanceof(File), z.null()]).optional(),
 });
@@ -61,7 +67,23 @@ const Staff = () => {
     role: "staff" as "staff" | "receptionist",
     is_active: true,
     image: null as File | string | null,
+    emergency_contact: "",
   });
+  const [selectedStaff, setSelectedStaff] = useState<any | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [staffBookings, setStaffBookings] = useState<any[]>([]);
+  const [staffAttendance, setStaffAttendance] = useState<any[]>([]);
+  const [profileLoading, setProfileLoading] = useState(false);
+
+  const SPECIALIZATIONS = [
+    "Hair Stylist",
+    "Nail Technician",
+    "Therapist",
+    "Barber",
+    "Makeup Artist",
+    "Receptionist",
+    "Manager",
+  ];
 
   useEffect(() => {
     fetchStaff();
@@ -121,6 +143,7 @@ const Staff = () => {
       role: member.role || "staff",
       is_active: member.is_active ?? true,
       image: member.image || null,
+      emergency_contact: member.emergency_contact || "",
     });
     setDialogOpen(true);
   };
@@ -146,6 +169,36 @@ const Staff = () => {
     }
   };
 
+  // Fetch staff-related profile data (bookings and attendance)
+  const fetchStaffProfile = async (staffId: string) => {
+    setProfileLoading(true);
+    try {
+      const [bookingsRes, attendanceRes] = await Promise.all([
+        supabase
+          .from("bookings")
+          .select("*, clients(*), services(*)")
+          .eq("staff_id", staffId)
+          .order("appointment_date", { ascending: false }),
+        supabase
+          .from("attendance")
+          .select("*")
+          .eq("staff_id", staffId)
+          .order("check_in", { ascending: false }),
+      ]);
+
+      if ((bookingsRes as any).error) throw (bookingsRes as any).error;
+      if ((attendanceRes as any).error) throw (attendanceRes as any).error;
+
+      setStaffBookings((bookingsRes as any).data || []);
+      setStaffAttendance((attendanceRes as any).data || []);
+    } catch (err: any) {
+      console.error("Error fetching staff profile:", err);
+      toast.error("Failed to load staff profile data");
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -157,6 +210,9 @@ const Staff = () => {
         ...(validated.email && { email: validated.email }),
         ...(validated.specialization && {
           specialization: validated.specialization,
+        }),
+        ...(validated.emergency_contact && {
+          emergency_contact: validated.emergency_contact,
         }),
         role: validated.role,
         is_active: formData.is_active,
@@ -210,6 +266,7 @@ const Staff = () => {
         role: "staff",
         is_active: true,
         image: null,
+        emergency_contact: "",
       });
 
       fetchStaff();
@@ -293,11 +350,35 @@ const Staff = () => {
 
               <div className="space-y-2">
                 <Label>Specialization</Label>
-                <Input
-                  placeholder="Hair Stylist, Nail Technician, etc."
+                <Select
                   value={formData.specialization}
+                  onValueChange={(v) =>
+                    setFormData({ ...formData, specialization: v })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select specialization" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SPECIALIZATIONS.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Emergency Contact</Label>
+                <Input
+                  placeholder="+233XXXXXXXXX"
+                  value={formData.emergency_contact}
                   onChange={(e) =>
-                    setFormData({ ...formData, specialization: e.target.value })
+                    setFormData({
+                      ...formData,
+                      emergency_contact: e.target.value,
+                    })
                   }
                 />
               </div>
@@ -360,7 +441,12 @@ const Staff = () => {
         {staff.map((member) => (
           <Card
             key={member.id}
-            className="hover:shadow-xl transition-shadow rounded-2xl border border-gray-200"
+            onClick={() => {
+              setSelectedStaff(member);
+              setProfileOpen(true);
+              fetchStaffProfile(member.id);
+            }}
+            className="cursor-pointer hover:shadow-xl transition-shadow rounded-2xl border border-gray-200"
           >
             <CardHeader>
               <div className="flex justify-between items-start">
@@ -418,7 +504,10 @@ const Staff = () => {
                   size="sm"
                   variant="outline"
                   className="rounded-xl"
-                  onClick={() => handleEditMember(member)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditMember(member);
+                  }}
                 >
                   <Pencil className="w-4 h-4" />
                 </Button>
@@ -427,7 +516,8 @@ const Staff = () => {
                     size="sm"
                     variant="outline"
                     className="rounded-xl text-red-500 border-red-300"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setDeleteStaffId(member.id);
                       setDeleteDialogOpen(true);
                     }}
@@ -450,6 +540,201 @@ const Staff = () => {
           </Card>
         )}
       </div>
+
+      {/* Staff Profile Dialog */}
+      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedStaff ? selectedStaff.full_name : "Staff Profile"}
+            </DialogTitle>
+          </DialogHeader>
+
+          {profileLoading ? (
+            <div className="p-6">Loading...</div>
+          ) : selectedStaff ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-2">
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center text-2xl font-semibold text-white bg-gradient-to-br from-green-500 to-teal-500">
+                    {selectedStaff.image ? (
+                      <img
+                        src={selectedStaff.image}
+                        alt={selectedStaff.full_name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      (selectedStaff.full_name || "")
+                        .split(" ")
+                        .map((n: string) => n[0])
+                        .join("")
+                    )}
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-semibold">
+                      {selectedStaff.full_name}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedStaff.role}
+                    </p>
+                    <p className="text-sm">{selectedStaff.email}</p>
+                    <p className="text-sm">{selectedStaff.phone}</p>
+                    <p className="text-sm">
+                      Emergency: {selectedStaff.emergency_contact || "N/A"}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-sm text-gray-600">
+                    Specialization
+                  </h4>
+                  <p className="mt-1 text-sm">
+                    {selectedStaff.specialization || "N/A"}
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-sm text-gray-600">Notes</h4>
+                  <p className="mt-1 text-sm">
+                    {selectedStaff.notes || "No notes"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="md:col-span-2">
+                <h4 className="text-lg font-semibold mb-3">Booking History</h4>
+                <div className="space-y-3 max-h-56 overflow-auto">
+                  {staffBookings.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">
+                      No bookings
+                    </div>
+                  ) : (
+                    staffBookings.map((b: any) => (
+                      <div
+                        key={b.id}
+                        className="flex justify-between items-center p-3 rounded-lg border bg-white/50 dark:bg-gray-900/40"
+                      >
+                        <div>
+                          <div className="text-sm font-medium">
+                            {b.services?.name || "Service"}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {b.clients?.full_name || "Client"} •{" "}
+                            {b.appointment_date
+                              ? format(new Date(b.appointment_date), "PPP")
+                              : "Date N/A"}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-semibold">{b.status || "-"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            GH₵{Number(b.services?.price || 0).toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <p className="text-sm text-gray-500">Services Completed</p>
+                    <p className="text-lg font-semibold mt-1">
+                      {
+                        staffBookings.filter(
+                          (b: any) => b.status === "completed"
+                        ).length
+                      }
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <p className="text-sm text-gray-500">Total Earned</p>
+                    <p className="text-lg font-semibold mt-1">
+                      GH₵
+                      {staffBookings
+                        .filter((b: any) => b.status === "completed")
+                        .reduce(
+                          (s: number, b: any) =>
+                            s + Number(b.services?.price || 0),
+                          0
+                        )
+                        .toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <p className="text-sm text-gray-500">
+                      Monthly Hours (this month)
+                    </p>
+                    <p className="text-lg font-semibold mt-1">
+                      {(() => {
+                        const now = new Date();
+                        const m = now.getMonth();
+                        const y = now.getFullYear();
+                        const hours = staffAttendance.reduce(
+                          (sum: number, rec: any) => {
+                            if (!rec.check_in || !rec.check_out) return sum;
+                            const ci = new Date(rec.check_in);
+                            const co = new Date(rec.check_out);
+                            if (ci.getMonth() === m && ci.getFullYear() === y) {
+                              return (
+                                sum +
+                                (co.getTime() - ci.getTime()) / (1000 * 60 * 60)
+                              );
+                            }
+                            return sum;
+                          },
+                          0
+                        );
+                        return `${hours.toFixed(1)} h`;
+                      })()}
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <p className="text-sm text-gray-500">Attendance Records</p>
+                    <p className="text-lg font-semibold mt-1">
+                      {staffAttendance.length}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <h4 className="text-lg font-semibold mb-2">
+                    Performance Summary
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    Completed bookings:{" "}
+                    {
+                      staffBookings.filter((b: any) => b.status === "completed")
+                        .length
+                    }{" "}
+                    • Avg revenue per completed: GH₵
+                    {(
+                      staffBookings
+                        .filter((b: any) => b.status === "completed")
+                        .reduce(
+                          (s: number, b: any) =>
+                            s + Number(b.services?.price || 0),
+                          0
+                        ) /
+                      Math.max(
+                        1,
+                        staffBookings.filter(
+                          (b: any) => b.status === "completed"
+                        ).length
+                      )
+                    ).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

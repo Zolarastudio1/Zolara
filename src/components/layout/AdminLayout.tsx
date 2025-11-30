@@ -72,10 +72,11 @@ const Dashboard = () => {
         .gte("payment_date", startOfThisWeek)
         .lte("payment_date", endOfThisWeek);
 
-      // Monthly revenue
-      const { data: monthlyPayments } = await supabase
+      // Monthly revenue (only completed)
+      const { data: monthlyPayments, error } = await supabase
         .from("payments")
         .select("amount")
+        .eq("payment_status", "completed") // <-- filter only completed
         .gte("payment_date", startOfThisMonth)
         .lte("payment_date", endOfThisMonth);
 
@@ -127,7 +128,6 @@ const Dashboard = () => {
 
       const previousMonthRevenue =
         previousMonthPayments?.reduce((sum, p) => sum + p.amount, 0) || 0;
-
 
       // Percentage change calculation
       let percentageChange = 0;

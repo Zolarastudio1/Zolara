@@ -50,12 +50,12 @@ export function BusinessInfoSection({
 
           <div>
             <Label>Logo</Label>
-            <div className="flex items-center gap-4 mt-2">
+            <div className="flex items-center justify-center gap-4 mt-2">
               <AvatarUpload
                 image={logoFile || logoUrl || null}
                 onChange={onLogoFileChange}
               />
-              <div className="flex-1">
+              {/* <div className="flex-1">
                 <Label htmlFor="logo_url" className="text-xs text-muted-foreground">Or enter URL</Label>
                 <Input
                   id="logo_url"
@@ -63,7 +63,7 @@ export function BusinessInfoSection({
                   onChange={(e) => onLogoUrlChange(e.target.value)}
                   placeholder="https://example.com/logo.png"
                 />
-              </div>
+              </div> */}
             </div>
           </div>
         </div>

@@ -177,14 +177,12 @@ const ClientBookings = () => {
       });
     }
 
-    // @ts-ignore
     const { error } = await supabase.from("booking_requests").insert([
       {
         client_id: user.id,
         service_id: selectedService,
-        preferred_date: preferredDate,
-        preferred_time: preferredTime,
-        payment_method: paymentMethod,
+        appointment_date: preferredDate,
+        appointment_time: preferredTime,
         notes,
         status: "pending",
       },

@@ -1,10 +1,21 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { BusinessInfoSection } from "@/components/settings/BusinessInfoSection";
+import { OperatingHoursSection } from "@/components/settings/OperatingHoursSection";
+import { DraggableListSection } from "@/components/settings/DraggableListSection";
+import { PaymentMethodsSection } from "@/components/settings/PaymentMethodsSection";
+import { PermissionLevelsSection } from "@/components/settings/PermissionLevelsSection";
+import { DataManagementSection } from "@/components/settings/DataManagementSection";
+import { BackupRestoreSection } from "@/components/settings/BackupRestoreSection";
+import { Loader2 } from "lucide-react";
+
+interface PaymentMethod {
+  id: string;
+  name: string;
+  enabled: boolean;
+}
 
 interface Settings {
   id?: string;
@@ -15,22 +26,44 @@ interface Settings {
   currency: string;
   staff_roles: string[];
   service_categories: string[];
+  use_24_hour_format: boolean;
+  business_phone: string;
+  business_email: string;
+  business_address: string;
+  payment_methods: PaymentMethod[];
+  paystack_enabled: boolean;
   created_at?: string;
   updated_at?: string;
 }
 
-export default function Settings() {
-  const [settings, setSettings] = useState<Settings>({
-    business_name: "",
-    logo_url: "",
-    open_time: "09:00",
-    close_time: "17:00",
-    currency: "GH₵",
-    staff_roles: ["Hairdresser", "Barber", "Receptionist"],
-    service_categories: ["Hair", "Nails", "Massage"],
-  });
+const defaultPaymentMethods: PaymentMethod[] = [
+  { id: "cash", name: "Cash", enabled: true },
+  { id: "momo", name: "Mobile Money (MoMo)", enabled: true },
+  { id: "card", name: "Card", enabled: true },
+  { id: "bank_transfer", name: "Bank Transfer", enabled: true },
+];
 
+const defaultSettings: Settings = {
+  business_name: "",
+  logo_url: "",
+  open_time: "09:00",
+  close_time: "17:00",
+  currency: "GH₵",
+  staff_roles: ["Hairdresser", "Barber", "Receptionist"],
+  service_categories: ["Hair", "Nails", "Massage"],
+  use_24_hour_format: false,
+  business_phone: "",
+  business_email: "",
+  business_address: "",
+  payment_methods: defaultPaymentMethods,
+  paystack_enabled: true,
+};
+
+export default function Settings() {
+  const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -39,15 +72,19 @@ export default function Settings() {
   const fetchSettings = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("settings")
         .select("*")
         .single();
 
-      if (error && error.code !== "PGRST116") throw error; // no row yet
+      if (error && error.code !== "PGRST116") throw error;
 
       if (data) {
-        setSettings(data);
+        setSettings({
+          ...defaultSettings,
+          ...data,
+          payment_methods: data.payment_methods || defaultPaymentMethods,
+        });
       }
     } catch (err: any) {
       console.error(err);
@@ -57,186 +94,166 @@ export default function Settings() {
     }
   };
 
-  const updateSettings = async () => {
-    setLoading(true);
+  const uploadLogo = async (): Promise<string | null> => {
+    if (!logoFile) return settings.logo_url || null;
+
     try {
+      const fileExt = logoFile.name.split(".").pop();
+      const fileName = `logo_${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(fileName, logoFile, { cacheControl: "3600", upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(fileName);
+
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error("Logo upload failed:", error);
+      toast.error("Failed to upload logo");
+      return settings.logo_url || null;
+    }
+  };
+
+  const updateSettings = async () => {
+    setSaving(true);
+    try {
+      const logoUrl = await uploadLogo();
+
+      const settingsData = {
+        business_name: settings.business_name,
+        logo_url: logoUrl,
+        open_time: settings.open_time,
+        close_time: settings.close_time,
+        currency: settings.currency,
+        staff_roles: settings.staff_roles,
+        service_categories: settings.service_categories,
+        use_24_hour_format: settings.use_24_hour_format,
+        business_phone: settings.business_phone,
+        business_email: settings.business_email,
+        business_address: settings.business_address,
+        payment_methods: settings.payment_methods,
+        paystack_enabled: settings.paystack_enabled,
+      };
+
       if (settings.id) {
-        // Update existing
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("settings")
-          .update({
-            business_name: settings.business_name,
-            logo_url: settings.logo_url,
-            open_time: settings.open_time,
-            close_time: settings.close_time,
-            currency: settings.currency,
-            staff_roles: settings.staff_roles,
-            service_categories: settings.service_categories,
-          })
+          .update(settingsData)
           .eq("id", settings.id);
 
         if (error) throw error;
         toast.success("Settings updated successfully!");
       } else {
-        // Insert new
-        const { error } = await supabase.from("settings").insert([settings]);
+        const { error } = await (supabase as any).from("settings").insert([settingsData]);
         if (error) throw error;
         toast.success("Settings saved successfully!");
       }
-      fetchSettings(); // refresh
+
+      setLogoFile(null);
+      fetchSettings();
     } catch (err: any) {
       console.error(err);
       toast.error("Failed to save settings");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const addRole = () => {
+  const handlePaymentMethodToggle = (id: string, enabled: boolean) => {
     setSettings({
       ...settings,
-      staff_roles: [...settings.staff_roles, ""],
+      payment_methods: settings.payment_methods.map((m) =>
+        m.id === id ? { ...m, enabled } : m
+      ),
     });
   };
 
-  const addCategory = () => {
+  const handleRestore = (restoredSettings: any) => {
     setSettings({
-      ...settings,
-      service_categories: [...settings.service_categories, ""],
+      ...defaultSettings,
+      ...restoredSettings,
+      payment_methods: restoredSettings.payment_methods || defaultPaymentMethods,
     });
   };
 
-  const updateRole = (index: number, value: string) => {
-    const roles = [...settings.staff_roles];
-    roles[index] = value;
-    setSettings({ ...settings, staff_roles: roles });
-  };
-
-  const updateCategory = (index: number, value: string) => {
-    const categories = [...settings.service_categories];
-    categories[index] = value;
-    setSettings({ ...settings, service_categories: categories });
-  };
-
-  const removeRole = (index: number) => {
-    const roles = [...settings.staff_roles];
-    roles.splice(index, 1);
-    setSettings({ ...settings, staff_roles: roles });
-  };
-
-  const removeCategory = (index: number) => {
-    const categories = [...settings.service_categories];
-    categories.splice(index, 1);
-    setSettings({ ...settings, service_categories: categories });
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background p-8">
+    <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-6">
-        <h1 className="text-3xl font-bold">Settings</h1>
-        <Card className="p-6 space-y-4">
-          <div>
-            <Label htmlFor="business_name">Business Name</Label>
-            <Input
-              id="business_name"
-              value={settings.business_name}
-              onChange={(e) =>
-                setSettings({ ...settings, business_name: e.target.value })
-              }
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="logo_url">Logo URL</Label>
-            <Input
-              id="logo_url"
-              value={settings.logo_url}
-              onChange={(e) =>
-                setSettings({ ...settings, logo_url: e.target.value })
-              }
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="open_time">Open Time</Label>
-              <Input
-                id="open_time"
-                type="time"
-                value={settings.open_time}
-                onChange={(e) =>
-                  setSettings({ ...settings, open_time: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="close_time">Close Time</Label>
-              <Input
-                id="close_time"
-                type="time"
-                value={settings.close_time}
-                onChange={(e) =>
-                  setSettings({ ...settings, close_time: e.target.value })
-                }
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="currency">Default Currency</Label>
-            <Input
-              id="currency"
-              value={settings.currency}
-              onChange={(e) =>
-                setSettings({ ...settings, currency: e.target.value })
-              }
-            />
-          </div>
-
-          <div>
-            <Label>Staff Roles</Label>
-            {settings.staff_roles.map((role, i) => (
-              <div key={i} className="flex gap-2 mb-2">
-                <Input
-                  value={role}
-                  onChange={(e) => updateRole(i, e.target.value)}
-                />
-                <Button
-                  variant="destructive"
-                  onClick={() => removeRole(i)}
-                  size="sm"
-                >
-                  Remove
-                </Button>
-              </div>
-            ))}
-            <Button onClick={addRole}>Add Role</Button>
-          </div>
-
-          <div>
-            <Label>Service Categories</Label>
-            {settings.service_categories.map((cat, i) => (
-              <div key={i} className="flex gap-2 mb-2">
-                <Input
-                  value={cat}
-                  onChange={(e) => updateCategory(i, e.target.value)}
-                />
-                <Button
-                  variant="destructive"
-                  onClick={() => removeCategory(i)}
-                  size="sm"
-                >
-                  Remove
-                </Button>
-              </div>
-            ))}
-            <Button onClick={addCategory}>Add Category</Button>
-          </div>
-
-          <Button onClick={updateSettings} disabled={loading}>
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">Settings</h1>
+          <Button onClick={updateSettings} disabled={saving}>
+            {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             Save Settings
           </Button>
-        </Card>
+        </div>
+
+        <BusinessInfoSection
+          businessName={settings.business_name}
+          logoUrl={settings.logo_url}
+          logoFile={logoFile}
+          phone={settings.business_phone}
+          email={settings.business_email}
+          address={settings.business_address}
+          onBusinessNameChange={(v) => setSettings({ ...settings, business_name: v })}
+          onLogoUrlChange={(v) => setSettings({ ...settings, logo_url: v })}
+          onLogoFileChange={setLogoFile}
+          onPhoneChange={(v) => setSettings({ ...settings, business_phone: v })}
+          onEmailChange={(v) => setSettings({ ...settings, business_email: v })}
+          onAddressChange={(v) => setSettings({ ...settings, business_address: v })}
+        />
+
+        <OperatingHoursSection
+          openTime={settings.open_time}
+          closeTime={settings.close_time}
+          currency={settings.currency}
+          use24HourFormat={settings.use_24_hour_format}
+          onOpenTimeChange={(v) => setSettings({ ...settings, open_time: v })}
+          onCloseTimeChange={(v) => setSettings({ ...settings, close_time: v })}
+          onCurrencyChange={(v) => setSettings({ ...settings, currency: v })}
+          onFormatChange={(v) => setSettings({ ...settings, use_24_hour_format: v })}
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <DraggableListSection
+            title="Staff Roles"
+            items={settings.staff_roles}
+            onItemsChange={(items) => setSettings({ ...settings, staff_roles: items })}
+            addButtonText="Add Role"
+          />
+
+          <DraggableListSection
+            title="Service Categories"
+            items={settings.service_categories}
+            onItemsChange={(items) => setSettings({ ...settings, service_categories: items })}
+            addButtonText="Add Category"
+          />
+        </div>
+
+        <PermissionLevelsSection />
+
+        <PaymentMethodsSection
+          paymentMethods={settings.payment_methods}
+          paystackEnabled={settings.paystack_enabled}
+          onPaymentMethodToggle={handlePaymentMethodToggle}
+          onPaystackToggle={(v) => setSettings({ ...settings, paystack_enabled: v })}
+        />
+
+        <DataManagementSection />
+
+        <BackupRestoreSection settings={settings} onRestore={handleRestore} />
       </div>
     </div>
   );

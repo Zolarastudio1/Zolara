@@ -63,8 +63,7 @@ export default function PaymentDialog({
   // SAVE OR UPDATE PAYMENT ACCOUNT INFO
   // -----------------------------------
   const handleSavePaymentInfo = async () => {
-    // @ts-ignore
-    const { data, error } = await supabase.from("payment_settings").upsert({
+    const { data, error } = await (supabase as any).from("payment_settings").upsert({
       id: paymentInfo.id || 1, // force single row
       bank_name: paymentInfo.bank_name,
       account_name: paymentInfo.account_name,

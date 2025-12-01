@@ -155,9 +155,8 @@ export default function AttendanceReports() {
       // Use check-in for date if available, otherwise check-out
       const dateSource = new Date(checkIn);
 
-      
       if (!dateSource) return;
-      
+
       const date = checkIn.toDateString();
       const check_in_time = checkIn ? format(checkIn, "hh:mm a") : "—";
       const check_out_time = checkOut ? format(checkOut, "hh:mm a") : "—";
@@ -399,9 +398,33 @@ export default function AttendanceReports() {
         <Card className="p-6 bg-muted/30">
           <h3 className="font-semibold mb-2">Report Details:</h3>
           <ul className="text-sm text-muted-foreground space-y-1">
-            <li>• Expected shift: 9:00 AM - 5:00 PM</li>
-            <li>• Late check-in: More than 15 minutes after 9:00 AM</li>
-            <li>• Early checkout: More than 15 minutes before 5:00 PM</li>
+            <li>
+              • Expected shift:{" "}
+              {`${EXPECTED_START_HOUR.toString().padStart(
+                2,
+                "0"
+              )}:${EXPECTED_START_MINUTES.toString().padStart(
+                2,
+                "0"
+              )} - ${EXPECTED_END_HOUR.toString().padStart(
+                2,
+                "0"
+              )}:${EXPECTED_END_MINUTES.toString().padStart(2, "0")}`}
+            </li>
+            <li>
+              • Late check-in: More than 15 minutes after{" "}
+              {`${EXPECTED_START_HOUR.toString().padStart(
+                2,
+                "0"
+              )}:${EXPECTED_START_MINUTES.toString().padStart(2, "0")}`}
+            </li>
+            <li>
+              • Early checkout: More than 15 minutes before{" "}
+              {`${EXPECTED_END_HOUR.toString().padStart(
+                2,
+                "0"
+              )}:${EXPECTED_END_MINUTES.toString().padStart(2, "0")}`}
+            </li>
             <li>• Only completed shifts (with check-out) are included</li>
           </ul>
         </Card>

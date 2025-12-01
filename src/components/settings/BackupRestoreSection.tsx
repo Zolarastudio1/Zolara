@@ -9,7 +9,10 @@ interface BackupRestoreProps {
   onRestore: (settings: any) => void;
 }
 
-export function BackupRestoreSection({ settings, onRestore }: BackupRestoreProps) {
+export function BackupRestoreSection({
+  settings,
+  onRestore,
+}: BackupRestoreProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const exportSettings = () => {
@@ -26,7 +29,9 @@ export function BackupRestoreSection({ settings, onRestore }: BackupRestoreProps
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `settings_backup_${new Date().toISOString().split("T")[0]}.json`;
+      a.download = `settings_backup_${
+        new Date().toISOString().split("T")[0]
+      }.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -72,29 +77,29 @@ export function BackupRestoreSection({ settings, onRestore }: BackupRestoreProps
     <Card className="p-6 space-y-4">
       <h2 className="text-xl font-semibold">Backup & Restore</h2>
       <p className="text-sm text-muted-foreground">
-        Save your settings configuration to a JSON file or restore from a previous backup.
+        Save your settings configuration to a JSON file or restore from a
+        previous backup.
       </p>
 
       <div className="flex items-center gap-3 p-3 rounded-md bg-amber-500/10 border border-amber-200 text-amber-700">
         <AlertTriangle className="w-5 h-5 flex-shrink-0" />
         <p className="text-sm">
-          Restoring settings will overwrite your current configuration. Make sure
-          to save a backup first.
+          Restoring settings will overwrite your current configuration. Make
+          sure to save a backup first.
         </p>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row gap-3">
         <Button onClick={exportSettings} variant="outline">
           <Download className="w-4 h-4 mr-2" />
           Download Backup
         </Button>
-        <Button
-          variant="outline"
-          onClick={() => fileInputRef.current?.click()}
-        >
+
+        <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
           <Upload className="w-4 h-4 mr-2" />
           Restore from Backup
         </Button>
+
         <input
           ref={fileInputRef}
           type="file"

@@ -14,14 +14,14 @@ const permissionLevels = [
   {
     role: "receptionist",
     label: "Receptionist",
-    description: "Can manage bookings, clients, attendance, and view reports",
+    description: "Can manage bookings, services, clients, attendance, view general dashboard",
     icon: UserCog,
     color: "bg-blue-500/10 text-blue-600 border-blue-200",
   },
   {
     role: "staff",
     label: "Staff",
-    description: "Can view assigned bookings and manage own attendance",
+    description: "Can view assigned bookings and only check out own attendance",
     icon: User,
     color: "bg-green-500/10 text-green-600 border-green-200",
   },

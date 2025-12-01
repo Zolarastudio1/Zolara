@@ -36,12 +36,12 @@ interface Settings {
   updated_at?: string;
 }
 
-const defaultPaymentMethods: PaymentMethod[] = [
-  { id: "cash", name: "Cash", enabled: true },
-  { id: "momo", name: "Mobile Money (MoMo)", enabled: true },
-  { id: "card", name: "Card", enabled: true },
-  { id: "bank_transfer", name: "Bank Transfer", enabled: true },
-];
+// const defaultPaymentMethods: PaymentMethod[] = [
+//   { id: "cash", name: "Cash", enabled: true },
+//   { id: "momo", name: "Mobile Money (MoMo)", enabled: true },
+//   { id: "card", name: "Card", enabled: true },
+//   { id: "bank_transfer", name: "Bank Transfer", enabled: true },
+// ];
 
 const defaultSettings: Settings = {
   business_name: "",
@@ -55,7 +55,7 @@ const defaultSettings: Settings = {
   business_phone: "",
   business_email: "",
   business_address: "",
-  payment_methods: defaultPaymentMethods,
+  payment_methods: [],
   paystack_enabled: true,
 };
 
@@ -83,7 +83,7 @@ export default function Settings() {
         setSettings({
           ...defaultSettings,
           ...data,
-          payment_methods: data.payment_methods || defaultPaymentMethods,
+          payment_methods: data.payment_methods,
         });
       }
     } catch (err: any) {
@@ -177,7 +177,7 @@ export default function Settings() {
     setSettings({
       ...defaultSettings,
       ...restoredSettings,
-      payment_methods: restoredSettings.payment_methods || defaultPaymentMethods,
+      payment_methods: restoredSettings.payment_methods,
     });
   };
 

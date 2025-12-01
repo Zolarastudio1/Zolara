@@ -66,10 +66,10 @@ export function DataManagementSection() {
             Export your data to Excel for backup or analysis
           </p>
         </div>
-        <Button onClick={exportAll} variant="default">
+        {/* <Button onClick={exportAll} variant="default">
           <Download className="w-4 h-4 mr-2" />
           Export All
-        </Button>
+        </Button> */}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

@@ -256,7 +256,7 @@ const Auth = () => {
         email: validated.email,
         password: validated.password,
         options: {
-          data: { full_name: validated.fullName, role: roleToAssign },
+          data: { full_name: validated.fullName, phone: validated.phone, role: roleToAssign },
           emailRedirectTo: `${window.location.origin}/dashboard`,
         },
       });
@@ -382,18 +382,16 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-secondary/30 via-background to-accent/20 p-4">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="text-center space-y-2">
-          <div className="mx-auto w-12 h-12 bg-primary rounded-full flex items-center justify-center mb-2">
+          <div className="mx-auto w-12 h-12 bg-primary rounded-full flex items-center justify-center mb-2 overflow-hidden">
             <img
-              src={
-                settings.logo_url !== null
-                  ? settings.logo_url
-                  : "/assets/zolara-logo.jpg"
-              }
+              src={settings.logo_url ?? "/assets/zolara-logo.jpg"}
               className="w-full h-full object-cover"
+              alt="Logo"
             />
           </div>
+
           <CardTitle className="text-2xl font-bold">
-             {/* @ts-ignore */}
+            {/* @ts-ignore */}
             {settings?.business_name || "Zolara"}
           </CardTitle>
           <CardDescription>

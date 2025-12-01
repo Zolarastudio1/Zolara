@@ -74,6 +74,7 @@ const Staff = () => {
   const [staffBookings, setStaffBookings] = useState<any[]>([]);
   const [staffAttendance, setStaffAttendance] = useState<any[]>([]);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [staffRatings, setStaffRatings] = useState<Record<string, number | null>>({});
 
   const SPECIALIZATIONS = [
     "Hair Stylist",
@@ -125,6 +126,36 @@ const Staff = () => {
         .order("full_name");
       if (error) throw error;
       setStaff(data || []);
+      // Fetch ratings for staff members (if any) and compute averages
+      try {
+        const ids = (data || []).map((s: any) => s.id).filter(Boolean);
+        if (ids.length > 0) {
+          const { data: ratingsData, error: ratingsErr } = await supabase
+            .from("bookings")
+            .select("staff_id, rating")
+            .in("staff_id", ids)
+            .not("rating", "is", null);
+          if (!ratingsErr && ratingsData) {
+            const map: Record<string, { sum: number; count: number }> = {};
+            for (const r of ratingsData) {
+              const sid = r.staff_id || "";
+              const val = Number(r.rating);
+              if (!isNaN(val)) {
+                if (!map[sid]) map[sid] = { sum: 0, count: 0 };
+                map[sid].sum += val;
+                map[sid].count += 1;
+              }
+            }
+            const avgMap: Record<string, number | null> = {};
+            Object.entries(map).forEach(([k, v]) => {
+              avgMap[k] = v.count ? v.sum / v.count : null;
+            });
+            setStaffRatings(avgMap);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch staff ratings", err);
+      }
     } catch (error) {
       console.error("Error fetching staff:", error);
       toast.error("Failed to load staff");
@@ -327,6 +358,11 @@ const Staff = () => {
                   }
                   required
                 />
+                {selectedStaff && staffRatings[selectedStaff.id] !== undefined && (
+                  <p className="text-sm mt-1">
+                    Avg rating: {staffRatings[selectedStaff.id] !== null ? Number(staffRatings[selectedStaff.id]).toFixed(2) : "N/A"}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -476,6 +512,11 @@ const Staff = () => {
                     {member.specialization && (
                       <p className="text-sm text-gray-500 mt-1">
                         {member.specialization}
+                      </p>
+                    )}
+                    {staffRatings[member.id] !== undefined && (
+                      <p className="text-sm text-gray-500 mt-1">
+                        Avg rating: {staffRatings[member.id] !== null ? Number(staffRatings[member.id]).toFixed(2) : "N/A"}
                       </p>
                     )}
                   </div>

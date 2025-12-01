@@ -71,7 +71,9 @@ const Clients = () => {
   const [services, setServices] = useState([]);
   const [selectedService, setSelectedService] = useState("");
   const [showServiceList, setShowServiceList] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<"none" | "date" | "most_active" | "service_history" | "search">("none");
+  const [activeFilter, setActiveFilter] = useState<
+    "none" | "date" | "most_active" | "service_history" | "search"
+  >("none");
   const [searchResults, setSearchResults] = useState<any[] | null>(null);
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
   const [startDate, setStartDate] = useState(
@@ -97,10 +99,17 @@ const Clients = () => {
   });
 
   useEffect(() => {
-    fetchClients();
     fetchUserRole();
     fetchServices();
   }, []);
+
+  useEffect(() => {
+    fetchClients(page);
+  }, [page]);
+
+  useEffect(() => {
+    setFilteredClients(clients);
+  }, [clients]);
 
   /** Fetch Logged-in User Role */
   const fetchUserRole = async () => {
@@ -140,12 +149,12 @@ const Clients = () => {
       const { data, count, error } = await supabase
         .from("clients")
         .select(`*, bookings(*, services(*))`, { count: "exact" })
-        // .order("full_name")
+        .order("full_name")
         .range(from, to);
 
       if (error) throw error;
 
-  setClients(data || []);
+      setClients(data || []);
       setTotalClients(count || 0); // total clients in DB
     } catch (error) {
       console.error("Error fetching clients:", error);
@@ -172,6 +181,23 @@ const Clients = () => {
     }
   };
 
+  const fetchClientActivity = async () => {
+    const { data, error } = await supabase.from("bookings").select("client_id");
+
+    if (error) {
+      console.error("Activity fetch error:", error);
+      return {};
+    }
+
+    const counts: Record<string, number> = {};
+
+    data.forEach((b: any) => {
+      counts[b.client_id] = (counts[b.client_id] || 0) + 1;
+    });
+
+    return counts;
+  };
+
   const handleFilterByDate = () => {
     setActiveFilter("date");
   };
@@ -195,76 +221,84 @@ const Clients = () => {
   // Helper: check if a booking date falls within start/end (full-day) bounds
   const bookingInRange = (rawDate: any, s: Date, e: Date) => {
     if (!rawDate) return false;
-    const ad = new Date(rawDate);
-    if (!isNaN(ad.getTime())) return ad >= s && ad <= e;
+
+    const d = new Date(rawDate);
+    if (!isNaN(d.getTime())) return d >= s && d <= e;
+
     const parsed = new Date(`${rawDate}T00:00:00`);
     if (!isNaN(parsed.getTime())) return parsed >= s && parsed <= e;
+
     return false;
   };
 
   // Centralized filter application so filters compose
-  const applyFilters = () => {
-    const s = new Date(`${startDate}T00:00:00`);
-    const e = new Date(`${endDate}T23:59:59`);
+ const applyFilters = async () => {
+  let result = [...clients];
 
-    // Clients that have at least one booking in range
-    const dateFiltered = clients.filter((c) =>
-      (c.bookings || []).some((b: any) => bookingInRange(b?.appointment_date, s, e))
+  const s = new Date(`${startDate}T00:00:00`);
+  const e = new Date(`${endDate}T23:59:59`);
+
+  // DATE FILTER (if selected)
+  if (activeFilter === "date") {
+    result = clients.filter((client) =>
+      (client.bookings || []).some((b: any) =>
+        bookingInRange(b?.appointment_date, s, e)
+      )
     );
+  }
 
-    // Debugging info to help trace why filters may not match
-    // (will appear in browser console)
-    console.debug("applyFilters", { activeFilter, startDate, endDate, clientsCount: clients.length, dateFilteredCount: dateFiltered.length });
+  // MOST ACTIVE CLIENTS
+  if (activeFilter === "most_active") {
+    const activity = await fetchClientActivity(); // { client_id: count }
 
-    if (activeFilter === "date") {
-      setFilteredClients(dateFiltered);
-      return;
-    }
+    result = [...clients].sort((a, b) => {
+      const aCount = activity[a.id] || 0;
+      const bCount = activity[b.id] || 0;
+      return bCount - aCount; // highest first
+    });
 
-    if (activeFilter === "search") {
-      setFilteredClients(searchResults || []);
-      return;
-    }
+    setFilteredClients(result);
+    return;
+  }
 
-    if (activeFilter === "most_active") {
-      const withCounts = dateFiltered.map((c) => ({
-        client: c,
-        count: (c.bookings || []).filter((b: any) => bookingInRange(b?.appointment_date, s, e)).length,
-      }));
+  // SERVICE HISTORY FILTER
+  if (activeFilter === "service_history" && selectedService) {
+    result = clients.filter((client) =>
+      (client.bookings || []).some(
+        (b: any) => b?.services?.name === selectedService
+      )
+    );
+  }
 
-      const sorted = withCounts.sort((a, b) => b.count - a.count).map((x) => x.client);
-      console.debug("most_active counts", withCounts.slice(0, 10));
-      setFilteredClients(sorted);
-      return;
-    }
+  // SEARCH FILTER
+  if (activeFilter === "search") {
+    // searchResults already has the correct clients
+    setFilteredClients(searchResults || []);
+    return;
+  }
 
-    if (activeFilter === "service_history") {
-      if (!selectedService) {
-        setFilteredClients(dateFiltered);
-        return;
-      }
-
-      const filtered = dateFiltered.filter((c) =>
-        (c.bookings || []).some((b: any) => {
-          const svc = b.services?.name || b.service?.name || "";
-          return svc === selectedService && bookingInRange(b?.appointment_date, s, e);
-        })
-      );
-
-      console.debug("service_history result count", filtered.length, { selectedService });
-
-      setFilteredClients(filtered);
-      return;
-    }
-
-    // none
+  // NO FILTER
+  if (activeFilter === "none") {
     setFilteredClients(clients);
-  };
+    return;
+  }
+
+  // Final assignment
+  setFilteredClients(result);
+};
+
 
   useEffect(() => {
     applyFilters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clients, startDate, endDate, activeFilter, selectedService, searchResults]);
+  }, [
+    clients,
+    startDate,
+    endDate,
+    activeFilter,
+    selectedService,
+    searchResults,
+  ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -525,7 +559,11 @@ const Clients = () => {
                 className="px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-800/60 text-sm"
                 aria-label="End date"
               />
-              <Button onClick={handleFilterByDate} variant={activeFilter === "date" ? "default" : "outline"} className="whitespace-nowrap">
+              <Button
+                onClick={handleFilterByDate}
+                variant={activeFilter === "date" ? "default" : "outline"}
+                className="whitespace-nowrap"
+              >
                 <CalendarClock className="w-4 h-4 mr-2" />
                 Filter
               </Button>
@@ -534,7 +572,10 @@ const Clients = () => {
               </Button>
             </div>
 
-            <Button onClick={handleMostActiveClient} variant={activeFilter === "most_active" ? "default" : "ghost"}>
+            <Button
+              onClick={handleMostActiveClient}
+              variant={activeFilter === "most_active" ? "default" : "ghost"}
+            >
               <TrendingUp className="w-4 h-4 mr-2" /> Most Active
             </Button>
 
@@ -542,7 +583,9 @@ const Clients = () => {
             <div className="relative w-auto">
               <Button
                 onClick={() => setShowServiceList(!showServiceList)}
-                variant={activeFilter === "service_history" ? "default" : "outline"}
+                variant={
+                  activeFilter === "service_history" ? "default" : "outline"
+                }
                 className="w-auto"
               >
                 {selectedService || "Service History"}
@@ -588,16 +631,30 @@ const Clients = () => {
                 </div>
 
                 <div className="flex gap-2">
-                  <Button onClick={handleFilterByDate} variant={activeFilter === "date" ? "default" : "outline"} className="flex-1">
+                  <Button
+                    onClick={handleFilterByDate}
+                    variant={activeFilter === "date" ? "default" : "outline"}
+                    className="flex-1"
+                  >
                     <CalendarClock className="w-4 h-4 mr-2" />
                     Filter
                   </Button>
-                  <Button onClick={clearFilters} variant={"ghost"} className="flex-1">
+                  <Button
+                    onClick={clearFilters}
+                    variant={"ghost"}
+                    className="flex-1"
+                  >
                     Clear
                   </Button>
                 </div>
 
-                <Button onClick={handleMostActiveClient} variant={activeFilter === "most_active" ? "default" : "outline"} className="w-full">
+                <Button
+                  onClick={handleMostActiveClient}
+                  variant={
+                    activeFilter === "most_active" ? "default" : "outline"
+                  }
+                  className="w-full"
+                >
                   <TrendingUp className="w-4 h-4 mr-2" /> Most Active
                 </Button>
 
@@ -629,12 +686,18 @@ const Clients = () => {
             const bookingsInRange = (client.bookings || []).filter((b: any) => {
               return bookingInRange(b?.appointment_date, s, e);
             });
-            const bookingsCount = bookingsInRange.length || (client.bookings || []).length;
-            const lastBooking = (client.bookings || []).reduce((latest: any, b: any) => {
-              if (!b?.appointment_date) return latest;
-              if (!latest) return b.appointment_date;
-              return new Date(b.appointment_date) > new Date(latest) ? b.appointment_date : latest;
-            }, null as any);
+            const bookingsCount =
+              bookingsInRange.length || (client.bookings || []).length;
+            const lastBooking = (client.bookings || []).reduce(
+              (latest: any, b: any) => {
+                if (!b?.appointment_date) return latest;
+                if (!latest) return b.appointment_date;
+                return new Date(b.appointment_date) > new Date(latest)
+                  ? b.appointment_date
+                  : latest;
+              },
+              null as any
+            );
 
             return (
               <Card
@@ -714,7 +777,7 @@ const Clients = () => {
                   )}
 
                   {/* Action Buttons */}
-                    <div className="flex justify-end gap-2 pt-3">
+                  <div className="flex justify-end gap-2 pt-3">
                     <Button
                       size="sm"
                       variant="ghost"
@@ -755,113 +818,188 @@ const Clients = () => {
             );
           })}
 
-                  {/* Profile Dialog */}
-                  <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
-                    <DialogContent className="max-w-3xl">
-                      <DialogHeader>
-                        <DialogTitle>
-                          {selectedClient ? selectedClient.full_name : "Client Profile"}
-                        </DialogTitle>
-                      </DialogHeader>
+          {/* Profile Dialog */}
+          <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>
+                  {selectedClient ? selectedClient.full_name : "Client Profile"}
+                </DialogTitle>
+              </DialogHeader>
 
-                      {selectedClient && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                          <div className="space-y-4">
-                            <div className="flex items-center gap-4">
-                              <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center text-2xl font-semibold text-white bg-gradient-to-br from-green-500 to-teal-500">
-                                {selectedClient.image ? (
-                                  <img src={selectedClient.image} alt={selectedClient.full_name} className="w-full h-full object-cover" />
-                                ) : (
-                                  (selectedClient.full_name || "").split(" ").map((n: string) => n[0]).join("")
-                                )}
+              {selectedClient && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center text-2xl font-semibold text-white bg-gradient-to-br from-green-500 to-teal-500">
+                        {selectedClient.image ? (
+                          <img
+                            src={selectedClient.image}
+                            alt={selectedClient.full_name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          (selectedClient.full_name || "")
+                            .split(" ")
+                            .map((n: string) => n[0])
+                            .join("")
+                        )}
+                      </div>
+
+                      <div>
+                        <h3 className="text-xl font-semibold">
+                          {selectedClient.full_name}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {selectedClient.email}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {selectedClient.phone}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-medium text-sm text-gray-600">
+                        Notes
+                      </h4>
+                      <p className="mt-2 text-sm text-gray-800">
+                        {selectedClient.notes || "No notes"}
+                      </p>
+                    </div>
+
+                    <div>
+                      <h4 className="font-medium text-sm text-gray-600">
+                        Contact & Address
+                      </h4>
+                      <p className="mt-1 text-sm">
+                        {selectedClient.address || "No address"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Middle: service history */}
+                  <div className="md:col-span-2">
+                    <h4 className="text-lg font-semibold mb-3">
+                      Service History
+                    </h4>
+
+                    <div className="space-y-3 max-h-72 overflow-auto">
+                      {(selectedClient.bookings || [])
+                        .slice()
+                        .sort(
+                          (a: any, b: any) =>
+                            new Date(b.appointment_date).getTime() -
+                            new Date(a.appointment_date).getTime()
+                        )
+                        .map((b: any) => (
+                          <div
+                            key={b.id}
+                            className="flex justify-between items-center p-3 rounded-lg border bg-white/50 dark:bg-gray-900/40"
+                          >
+                            <div>
+                              <div className="text-sm font-medium">
+                                {b.services?.name || "Service"}
                               </div>
-
-                              <div>
-                                <h3 className="text-xl font-semibold">{selectedClient.full_name}</h3>
-                                <p className="text-sm text-muted-foreground">{selectedClient.email}</p>
-                                <p className="text-sm text-muted-foreground">{selectedClient.phone}</p>
+                              <div className="text-xs text-muted-foreground">
+                                {b.staff?.full_name ||
+                                  b.staff?.name ||
+                                  "Unassigned"}{" "}
+                                •{" "}
+                                {b.appointment_date
+                                  ? format(new Date(b.appointment_date), "PPP")
+                                  : "Date N/A"}
                               </div>
                             </div>
-
-                            <div>
-                              <h4 className="font-medium text-sm text-gray-600">Notes</h4>
-                              <p className="mt-2 text-sm text-gray-800">{selectedClient.notes || "No notes"}</p>
-                            </div>
-
-                            <div>
-                              <h4 className="font-medium text-sm text-gray-600">Contact & Address</h4>
-                              <p className="mt-1 text-sm">{selectedClient.address || "No address"}</p>
+                            <div className="text-right">
+                              <div className="font-semibold">
+                                GH₵{Number(b.services?.price || 0).toFixed(2)}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {b.status || "-"}
+                              </div>
                             </div>
                           </div>
+                        ))}
+                    </div>
 
-                          {/* Middle: service history */}
-                          <div className="md:col-span-2">
-                            <h4 className="text-lg font-semibold mb-3">Service History</h4>
+                    {/* Summary stats */}
+                    <div className="mt-4 grid grid-cols-2 gap-4">
+                      <Stat
+                        label="Total Spent"
+                        value={() => {
+                          const total = (selectedClient.bookings || []).reduce(
+                            (sum: number, bk: any) => {
+                              // count only completed bookings as spent
+                              if (bk.status && bk.status !== "completed")
+                                return sum;
+                              return sum + Number(bk.services?.price || 0);
+                            },
+                            0
+                          );
+                          return `GH₵${total.toFixed(2)}`;
+                        }}
+                      />
 
-                            <div className="space-y-3 max-h-72 overflow-auto">
-                              {(selectedClient.bookings || [])
-                                .slice()
-                                .sort((a: any, b: any) => new Date(b.appointment_date).getTime() - new Date(a.appointment_date).getTime())
-                                .map((b: any) => (
-                                  <div key={b.id} className="flex justify-between items-center p-3 rounded-lg border bg-white/50 dark:bg-gray-900/40">
-                                    <div>
-                                      <div className="text-sm font-medium">{b.services?.name || "Service"}</div>
-                                      <div className="text-xs text-muted-foreground">{b.staff?.full_name || b.staff?.name || "Unassigned"} • {b.appointment_date ? format(new Date(b.appointment_date), "PPP") : "Date N/A"}</div>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className="font-semibold">GH₵{Number(b.services?.price || 0).toFixed(2)}</div>
-                                      <div className="text-xs text-muted-foreground">{b.status || "-"}</div>
-                                    </div>
-                                  </div>
-                                ))}
-                            </div>
+                      <Stat
+                        label="Preferred Staff"
+                        value={() => {
+                          const counts: Record<
+                            string,
+                            { name: string; count: number }
+                          > = {};
+                          (selectedClient.bookings || []).forEach((bk: any) => {
+                            const name =
+                              bk.staff?.full_name ||
+                              bk.staff?.name ||
+                              "Unassigned";
+                            if (!name) return;
+                            counts[name] = counts[name] || { name, count: 0 };
+                            counts[name].count += 1;
+                          });
+                          const top = Object.values(counts).sort(
+                            (a, b) => b.count - a.count
+                          )[0];
+                          return top ? `${top.name} (${top.count})` : "N/A";
+                        }}
+                      />
 
-                            {/* Summary stats */}
-                            <div className="mt-4 grid grid-cols-2 gap-4">
-                              <Stat label="Total Spent" value={() => {
-                                const total = (selectedClient.bookings || []).reduce((sum: number, bk: any) => {
-                                  // count only completed bookings as spent
-                                  if (bk.status && bk.status !== "completed") return sum;
-                                  return sum + Number(bk.services?.price || 0);
-                                }, 0);
-                                return `GH₵${total.toFixed(2)}`;
-                              }} />
+                      <Stat
+                        label="Visits"
+                        value={() =>
+                          `${(selectedClient.bookings || []).length}`
+                        }
+                      />
 
-                              <Stat label="Preferred Staff" value={() => {
-                                const counts: Record<string, { name: string; count: number }> = {};
-                                (selectedClient.bookings || []).forEach((bk: any) => {
-                                  const name = bk.staff?.full_name || bk.staff?.name || "Unassigned";
-                                  if (!name) return;
-                                  counts[name] = counts[name] || { name, count: 0 };
-                                  counts[name].count += 1;
-                                });
-                                const top = Object.values(counts).sort((a, b) => b.count - a.count)[0];
-                                return top ? `${top.name} (${top.count})` : "N/A";
-                              }} />
-
-                              <Stat label="Visits" value={() => `${(selectedClient.bookings || []).length}`} />
-
-                              <Stat label="Avg Frequency" value={() => {
-                                const dates = (selectedClient.bookings || [])
-                                  .map((bk: any) => bk.appointment_date)
-                                  .filter(Boolean)
-                                  .map((d: string) => new Date(d))
-                                  .sort((a: Date, b: Date) => a.getTime() - b.getTime());
-                                if (dates.length < 2) return "N/A";
-                                const diffs: number[] = [];
-                                for (let i = 1; i < dates.length; i++) {
-                                  const days = (dates[i].getTime() - dates[i - 1].getTime()) / (1000 * 60 * 60 * 24);
-                                  diffs.push(days);
-                                }
-                                const avg = diffs.reduce((s, v) => s + v, 0) / diffs.length;
-                                return `${Math.round(avg)} days`;
-                              }} />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </DialogContent>
-                  </Dialog>
+                      <Stat
+                        label="Avg Frequency"
+                        value={() => {
+                          const dates = (selectedClient.bookings || [])
+                            .map((bk: any) => bk.appointment_date)
+                            .filter(Boolean)
+                            .map((d: string) => new Date(d))
+                            .sort(
+                              (a: Date, b: Date) => a.getTime() - b.getTime()
+                            );
+                          if (dates.length < 2) return "N/A";
+                          const diffs: number[] = [];
+                          for (let i = 1; i < dates.length; i++) {
+                            const days =
+                              (dates[i].getTime() - dates[i - 1].getTime()) /
+                              (1000 * 60 * 60 * 24);
+                            diffs.push(days);
+                          }
+                          const avg =
+                            diffs.reduce((s, v) => s + v, 0) / diffs.length;
+                          return `${Math.round(avg)} days`;
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
 
           {/* No-match placeholder when filters applied but nothing matches */}
           {filteredClients.length === 0 && clients.length > 0 && (

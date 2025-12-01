@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Scissors, Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 import RoleSelect from "@/components/ui/role-select";
+import { useSettings } from "@/context/SettingsContext";
 
 // Validation schemas
 const loginSchema = z.object({
@@ -40,6 +41,8 @@ const signupSchema = z.object({
 
 const Auth = () => {
   const navigate = useNavigate();
+  const { settings } = useSettings();
+
   const [loading, setLoading] = useState(false);
 
   const [loginEmail, setLoginEmail] = useState("");
@@ -325,7 +328,14 @@ const Auth = () => {
         <Card className="w-full max-w-md shadow-lg">
           <CardHeader className="text-center space-y-2">
             <div className="mx-auto w-12 h-12 bg-primary rounded-full flex items-center justify-center mb-2">
-              <Scissors className="w-6 h-6 text-primary-foreground" />
+              <img
+                src={
+                  settings.logo_url !== null
+                    ? settings.logo_url
+                    : "/assets/zolara-logo.jpg"
+                }
+                className="w-full h-full object-cover"
+              />
             </div>
             <CardTitle className="text-2xl font-bold">
               Set New Password
@@ -373,10 +383,18 @@ const Auth = () => {
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="text-center space-y-2">
           <div className="mx-auto w-12 h-12 bg-primary rounded-full flex items-center justify-center mb-2">
-            <Scissors className="w-6 h-6 text-primary-foreground" />
+            <img
+              src={
+                settings.logo_url !== null
+                  ? settings.logo_url
+                  : "/assets/zolara-logo.jpg"
+              }
+              className="w-full h-full object-cover"
+            />
           </div>
           <CardTitle className="text-2xl font-bold">
-            Zolara Beauty Salon
+             {/* @ts-ignore */}
+            {settings?.business_name || "Zolara"}
           </CardTitle>
           <CardDescription>
             {/* Manage your salon operations efficiently */}

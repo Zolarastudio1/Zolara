@@ -24,7 +24,11 @@ const serviceSchema = z.object({
   price: z.number().positive().max(1000000),
   duration_minutes: z.number().int().positive().max(1440),
   description: z.string().max(500).optional().or(z.literal("")),
-  specialization: z.string().max(100, "Specialization too long").optional().or(z.literal("")),
+  specialization: z
+    .string()
+    .max(100, "Specialization too long")
+    .optional()
+    .or(z.literal("")),
   order: z.number().int().optional(),
 });
 
@@ -205,7 +209,19 @@ const Services = () => {
           {/* Add Service Button */}
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-                    <Button onClick={() => { setFormData({ name: "", category: "", price: "", duration_minutes: "", description: "", specialization: "" }); setEditingServiceId(null); }}>
+              <Button
+                onClick={() => {
+                  setFormData({
+                    name: "",
+                    category: "",
+                    price: "",
+                    duration_minutes: "",
+                    description: "",
+                    specialization: "",
+                  });
+                  setEditingServiceId(null);
+                }}
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Service
               </Button>
@@ -244,7 +260,12 @@ const Services = () => {
                   <Input
                     placeholder="e.g. Braiding, Natural Nails, Acrylics"
                     value={formData.specialization}
-                    onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        specialization: e.target.value,
+                      })
+                    }
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -319,45 +340,72 @@ const Services = () => {
 
       {Object.entries(groupedServices).map(
         ([category, categoryServices]: [string, any]) => (
-          <Card key={category} className="mb-6 rounded-xl border border-gray-200">
-                  <CardHeader>
-                    <div className="flex justify-between items-center w-full">
-                      <h2 className="text-xl font-semibold">{category}</h2>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            // open add dialog pre-filling category
-                            setFormData({ name: "", category, price: "", duration_minutes: "", description: "", specialization: "" });
-                            setEditingServiceId(null);
-                            setDialogOpen(true);
-                          }}
-                        >
-                          Add Item
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
+          <Card
+            key={category}
+            className="mb-6 rounded-xl border border-gray-200"
+          >
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center w-full gap-2 sm:gap-0">
+                <h2 className="text-xl font-semibold break-words">
+                  {category}
+                </h2>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setFormData({
+                      name: "",
+                      category,
+                      price: "",
+                      duration_minutes: "",
+                      description: "",
+                      specialization: "",
+                    });
+                    setEditingServiceId(null);
+                    setDialogOpen(true);
+                  }}
+                >
+                  Add Item
+                </Button>
+              </div>
+            </CardHeader>
+
             <CardContent className="space-y-3">
               {(categoryServices || []).map((service: any) => (
-                <div key={service.id} className="p-3 rounded-lg border bg-white/50 dark:bg-gray-900/40 flex justify-between items-center">
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <div className="text-sm font-semibold">{service.name}</div>
-                        <div className="text-xs text-muted-foreground">{service.specialization || ''}</div>
-                      </div>
+                <div
+                  key={service.id}
+                  className="p-3 rounded-lg border bg-white/50 dark:bg-gray-900/40 flex flex-col gap-3"
+                >
+                  {/* Service Info */}
+                  <div className="flex flex-col gap-1">
+                    <div className="text-sm font-semibold break-words">
+                      {service.name}
                     </div>
-                    <div className="text-sm text-muted-foreground mt-1">{service.description}</div>
+                    {service.specialization && (
+                      <div className="text-xs text-muted-foreground break-words">
+                        {service.specialization}
+                      </div>
+                    )}
+                    {service.description && (
+                      <div className="text-sm text-muted-foreground break-words">
+                        {service.description}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <div className="font-semibold">GH₵{Number(service.price || 0).toFixed(2)}</div>
-                      <div className="text-xs text-muted-foreground">{service.duration_minutes} min</div>
+                  {/* Price + Duration */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="flex flex-row items-center gap-4">
+                      <div className="text-sm font-semibold min-w-[80px]">
+                        GH₵{Number(service.price || 0).toFixed(2)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {service.duration_minutes} min
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
+
+                    {/* Action Buttons: Single row on mobile */}
+                    <div className="flex flex-row flex-wrap items-center gap-2">
                       <Switch
                         checked={service.is_active}
                         onCheckedChange={async (checked) => {
@@ -366,12 +414,13 @@ const Services = () => {
                               .from("services")
                               .update({ is_active: checked })
                               .eq("id", service.id);
-
                             if (error) throw error;
 
                             setServices((prev) =>
                               prev.map((s) =>
-                                s.id === service.id ? { ...s, is_active: checked } : s
+                                s.id === service.id
+                                  ? { ...s, is_active: checked }
+                                  : s
                               )
                             );
                           } catch (err: any) {
@@ -388,7 +437,8 @@ const Services = () => {
                             name: service.name,
                             category: service.category,
                             price: service.price.toString(),
-                            duration_minutes: service.duration_minutes.toString(),
+                            duration_minutes:
+                              service.duration_minutes.toString(),
                             description: service.description || "",
                             specialization: service.specialization || "",
                           });

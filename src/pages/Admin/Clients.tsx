@@ -247,7 +247,7 @@ const Clients = () => {
     );
   }
 
-  // 2. MOST ACTIVE FILTER
+  // MOST ACTIVE FILTER
   if (activeFilter === "most_active") {
     const activity = await fetchClientActivity();
 
@@ -261,7 +261,7 @@ const Clients = () => {
     return;
   }
 
-  // 3. SERVICE HISTORY FILTER
+  // SERVICE HISTORY FILTER
   if (activeFilter === "service_history" && selectedService) {
     result = clients.filter((client) =>
       (client.bookings || []).some(
@@ -270,7 +270,7 @@ const Clients = () => {
     );
   }
 
-  // 4. SEARCH FILTER
+  // SEARCH FILTER
   if (activeFilter === "search") {
     result = searchResults || [];
   }

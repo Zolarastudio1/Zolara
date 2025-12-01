@@ -14,17 +14,39 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+// interface AttendanceRecord {
+//   id: string;
+//   staff_id: string;
+//   check_in: string;
+//   check_out: string | null;
+//   status: string;
+//   created_at: string;
+//   staff?: {
+//     full_name: string;
+//     email: string;
+//   };
+// }
+
+// interface StaffReport {
+//   staff_id: string;
+//   staff_name: string;
+//   total_hours: number;
+//   late_check_ins: number;
+//   early_checkouts: number;
+//   total_days: number;
+// }
+
+// const EXPECTED_START_HOUR = 9; // 9 AM
+// const EXPECTED_END_HOUR = 17; // 5 PM
+// const LATE_THRESHOLD_MINUTES = 15;
+// const EARLY_THRESHOLD_MINUTES = 15;
+
 interface AttendanceRecord {
-  id: string;
   staff_id: string;
+  staff?: { full_name: string };
   check_in: string;
-  check_out: string | null;
-  status: string;
-  created_at: string;
-  staff?: {
-    full_name: string;
-    email: string;
-  };
+  check_out: string;
+  notes?: string;
 }
 
 interface StaffReport {
@@ -34,12 +56,24 @@ interface StaffReport {
   late_check_ins: number;
   early_checkouts: number;
   total_days: number;
+  records: StaffRecordRow[];
 }
 
-const EXPECTED_START_HOUR = 9; // 9 AM
-const EXPECTED_END_HOUR = 17; // 5 PM
-const LATE_THRESHOLD_MINUTES = 15;
-const EARLY_THRESHOLD_MINUTES = 15;
+interface StaffRecordRow {
+  date: string;
+  check_in_time: string;
+  check_out_time: string;
+  total_hours: string;
+  late_check_in: string;
+  early_checkout: string;
+  notes: string;
+}
+
+// Constants for expected working hours
+const EXPECTED_START_HOUR = 8;
+const EXPECTED_START_MINUTES = 30; // 8:30 AM
+const EXPECTED_END_HOUR = 20;
+const EXPECTED_END_MINUTES = 30; // 8:30 PM
 
 export default function AttendanceReports() {
   const [attendanceRecords, setAttendanceRecords] = useState<
@@ -102,11 +136,48 @@ export default function AttendanceReports() {
     const staffMap = new Map<string, StaffReport>();
 
     records.forEach((record) => {
-      if (!record.staff_id || !record.check_out) return;
+      if (!record.staff_id) return;
 
       const staffId = record.staff_id;
       const staffName = record.staff?.full_name || "Unknown";
+      const notes = record.notes || "";
 
+      let checkIn: Date | null = null;
+      let checkOut: Date | null = null;
+
+      try {
+        if (record.check_in) checkIn = parseISO(record.check_in);
+        if (record.check_out) checkOut = parseISO(record.check_out);
+      } catch {
+        // Invalid date, ignore parsing
+      }
+
+      // Use check-in for date if available, otherwise check-out
+      const dateSource = new Date(checkIn);
+
+      
+      if (!dateSource) return;
+      
+      const date = checkIn.toDateString();
+      const check_in_time = checkIn ? format(checkIn, "hh:mm a") : "—";
+      const check_out_time = checkOut ? format(checkOut, "hh:mm a") : "—";
+
+      // Total hours
+      const minutesWorked =
+        checkIn && checkOut ? differenceInMinutes(checkOut, checkIn) : 0;
+      const total_hours = (minutesWorked / 60).toFixed(2);
+
+      // Late check-in (>8:30 AM)
+      const expectedStart = new Date(dateSource);
+      expectedStart.setHours(EXPECTED_START_HOUR, EXPECTED_START_MINUTES, 0, 0);
+      const late_check_in = checkIn && checkIn > expectedStart ? "Yes" : "No";
+
+      // Early checkout (<8:30 PM)
+      const expectedEnd = new Date(dateSource);
+      expectedEnd.setHours(EXPECTED_END_HOUR, EXPECTED_END_MINUTES, 0, 0);
+      const early_checkout = checkOut && checkOut < expectedEnd ? "Yes" : "No";
+
+      // Initialize staff report
       if (!staffMap.has(staffId)) {
         staffMap.set(staffId, {
           staff_id: staffId,
@@ -115,36 +186,26 @@ export default function AttendanceReports() {
           late_check_ins: 0,
           early_checkouts: 0,
           total_days: 0,
+          records: [],
         });
       }
 
       const report = staffMap.get(staffId)!;
 
-      // Calculate hours worked
-      const checkIn = parseISO(record.check_in);
-      const checkOut = parseISO(record.check_out);
-      const minutesWorked = differenceInMinutes(checkOut, checkIn);
       report.total_hours += minutesWorked / 60;
       report.total_days += 1;
+      if (late_check_in === "Yes") report.late_check_ins += 1;
+      if (early_checkout === "Yes") report.early_checkouts += 1;
 
-      // Check for late check-in (after 9:15 AM)
-      const expectedStart = new Date(checkIn);
-      expectedStart.setHours(EXPECTED_START_HOUR, LATE_THRESHOLD_MINUTES, 0, 0);
-      if (checkIn > expectedStart) {
-        report.late_check_ins += 1;
-      }
-
-      // Check for early checkout (before 4:45 PM)
-      const expectedEnd = new Date(checkOut);
-      expectedEnd.setHours(
-        EXPECTED_END_HOUR - 1,
-        60 - EARLY_THRESHOLD_MINUTES,
-        0,
-        0
-      );
-      if (checkOut < expectedEnd) {
-        report.early_checkouts += 1;
-      }
+      report.records.push({
+        date,
+        check_in_time,
+        check_out_time,
+        total_hours,
+        late_check_in,
+        early_checkout,
+        notes,
+      });
     });
 
     setReports(Array.from(staffMap.values()));
@@ -156,23 +217,31 @@ export default function AttendanceReports() {
       return;
     }
 
+    // CSV headers
     const headers = [
+      "Date",
       "Staff Name",
-      "Total Days Worked",
+      "Check-in Time",
+      "Check-out Time",
       "Total Hours",
-      "Late Check-ins",
-      "Early Checkouts",
-      "Average Hours/Day",
+      "Late Check-in?",
+      "Early Checkout?",
+      "Notes",
     ];
 
-    const rows = reports.map((report) => [
-      report.staff_name,
-      report.total_days.toString(),
-      report.total_hours.toFixed(2),
-      report.late_check_ins.toString(),
-      report.early_checkouts.toString(),
-      (report.total_hours / report.total_days).toFixed(2),
-    ]);
+    // Flatten per-record rows for all staff
+    const rows = reports.flatMap((report) =>
+      report.records.map((r) => [
+        r.date,
+        report.staff_name,
+        r.check_in_time,
+        r.check_out_time,
+        r.total_hours,
+        r.late_check_in,
+        r.early_checkout,
+        r.notes || "",
+      ])
+    );
 
     const csvContent = [
       headers.join(","),
@@ -185,7 +254,7 @@ export default function AttendanceReports() {
     link.setAttribute("href", url);
     link.setAttribute(
       "download",
-      `attendance-report-${startDate}-to-${endDate}.csv`
+      `attendance-report-${format(new Date(), "yyyy-MM-dd_HH-mm-ss")}.csv`
     );
     link.style.visibility = "hidden";
     document.body.appendChild(link);

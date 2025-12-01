@@ -232,13 +232,13 @@ const Clients = () => {
   };
 
   // Centralized filter application so filters compose
- const applyFilters = async () => {
+  const applyFilters = async () => {
   let result = [...clients];
 
   const s = new Date(`${startDate}T00:00:00`);
   const e = new Date(`${endDate}T23:59:59`);
 
-  // DATE FILTER (if selected)
+  // 1. DATE RANGE FILTER
   if (activeFilter === "date") {
     result = clients.filter((client) =>
       (client.bookings || []).some((b: any) =>
@@ -247,21 +247,21 @@ const Clients = () => {
     );
   }
 
-  // MOST ACTIVE CLIENTS
+  // 2. MOST ACTIVE FILTER
   if (activeFilter === "most_active") {
-    const activity = await fetchClientActivity(); // { client_id: count }
+    const activity = await fetchClientActivity();
 
     result = [...clients].sort((a, b) => {
       const aCount = activity[a.id] || 0;
       const bCount = activity[b.id] || 0;
-      return bCount - aCount; // highest first
+      return bCount - aCount;
     });
 
     setFilteredClients(result);
     return;
   }
 
-  // SERVICE HISTORY FILTER
+  // 3. SERVICE HISTORY FILTER
   if (activeFilter === "service_history" && selectedService) {
     result = clients.filter((client) =>
       (client.bookings || []).some(
@@ -270,20 +270,11 @@ const Clients = () => {
     );
   }
 
-  // SEARCH FILTER
+  // 4. SEARCH FILTER
   if (activeFilter === "search") {
-    // searchResults already has the correct clients
-    setFilteredClients(searchResults || []);
-    return;
+    result = searchResults || [];
   }
 
-  // NO FILTER
-  if (activeFilter === "none") {
-    setFilteredClients(clients);
-    return;
-  }
-
-  // Final assignment
   setFilteredClients(result);
 };
 
@@ -733,7 +724,7 @@ const Clients = () => {
                         <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                           {client.full_name}
                           <span className="ml-2 text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700">
-                            {bookingsCount} visits
+                            {bookingsCount == 0 ? "No" : bookingsCount} bookings
                           </span>
                         </CardTitle>
                         <p className="text-sm text-muted-foreground mt-1">

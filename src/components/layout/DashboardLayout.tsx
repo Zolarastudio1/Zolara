@@ -19,10 +19,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useSettings } from "@/context/SettingsContext";
 
 const DashboardLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { settings } = useSettings();
 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,7 +110,9 @@ const DashboardLayout = () => {
         return baseNavItems
           .filter(
             (item) =>
-              !["Sales", "Reports", "Attendance Reports", "Settings"].includes(item.label)
+              !["Sales", "Reports", "Attendance Reports", "Settings"].includes(
+                item.label
+              )
           )
           .map((item) => ({
             ...item,
@@ -179,7 +183,11 @@ const DashboardLayout = () => {
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full overflow-hidden">
                 <img
-                  src="/assets/zolara-logo.jpg"
+                  src={
+                    settings.logo_url !== null
+                      ? settings.logo_url
+                      : "/assets/zolara-logo.jpg"
+                  }
                   className="w-full h-full object-cover"
                 />
               </div>

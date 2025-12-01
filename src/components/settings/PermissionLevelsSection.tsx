@@ -21,7 +21,7 @@ const permissionLevels = [
   {
     role: "staff",
     label: "Staff",
-    description: "Can view assigned bookings and only check out own attendance",
+    description: "Can view services, assigned bookings and only check out own attendance",
     icon: User,
     color: "bg-green-500/10 text-green-600 border-green-200",
   },

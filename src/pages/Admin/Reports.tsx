@@ -115,10 +115,10 @@ const Reports = () => {
 
       // apply payment method/status filters only when the corresponding filter type is selected
       if (filterType === "payment_method" && selectedPaymentMethod && selectedPaymentMethod !== "all") {
-        query = query.eq("payment_method", selectedPaymentMethod);
+        query = query.eq("payment_method", selectedPaymentMethod as "cash" | "momo" | "card" | "bank_transfer");
       }
       if (filterType === "payment_status" && selectedPaymentStatus && selectedPaymentStatus !== "all") {
-        query = query.eq("payment_status", selectedPaymentStatus);
+        query = query.eq("payment_status", selectedPaymentStatus as "pending" | "completed" | "refunded");
       }
 
       const { data, error } = await query;

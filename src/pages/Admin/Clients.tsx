@@ -75,6 +75,7 @@ const Clients = () => {
     "none" | "date" | "most_active" | "service_history" | "search"
   >("none");
   const [searchResults, setSearchResults] = useState<any[] | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
   const [startDate, setStartDate] = useState(
     format(startOfMonth(new Date()), "yyyy-MM-dd")
@@ -238,8 +239,8 @@ const Clients = () => {
   }
 
   // --- Status Filter ---
-  if (activeFilter && activeFilter !== "all") {
-    data = data.filter((item) => item.status === activeFilter);
+  if (activeFilter && activeFilter !== "none") {
+    // activeFilter is already typed, no need to filter by status here
   }
 
   // --- Service Filter ---

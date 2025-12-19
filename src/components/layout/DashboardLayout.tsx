@@ -34,14 +34,14 @@ const DashboardLayout = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
-      if (!session?.user) navigate("/auth");
+      if (!session?.user) navigate("/app/auth");
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
-      if (!session?.user && event !== "INITIAL_SESSION") navigate("/auth");
+      if (!session?.user && event !== "INITIAL_SESSION") navigate("/app/auth");
     });
 
     return () => subscription.unsubscribe();
@@ -51,7 +51,7 @@ const DashboardLayout = () => {
     try {
       setLoading(true);
       await supabase.auth.signOut();
-      navigate("/auth");
+      navigate("/app/auth");
     } catch (error) {
       toast.error("Try again");
     } finally {

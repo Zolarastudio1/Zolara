@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Scissors, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Sparkles } from "lucide-react";
 import { z } from "zod";
 import RoleSelect from "@/components/ui/role-select";
 import { useSettings } from "@/context/SettingsContext";
@@ -82,7 +82,7 @@ const Auth = () => {
       const { error } = await supabase.auth.resetPasswordForEmail(
         validatedEmail,
         {
-          redirectTo: `${window.location.origin}/auth`,
+          redirectTo: `${window.location.origin}/app/auth`,
         }
       );
 
@@ -122,7 +122,7 @@ const Auth = () => {
       setIsResettingPassword(false);
       setNewPassword("");
       setConfirmPassword("");
-      navigate("/auth");
+      navigate("/app/auth");
     } catch (error: any) {
       toast.error(error.message || "Failed to update password");
     } finally {
@@ -146,7 +146,7 @@ const Auth = () => {
         password: validated.password,
       });
 
-      const metaDataRole = data.user.user_metadata.role;
+      const metaDataRole = data.user?.user_metadata?.role;
 
       if (error) throw error;
       if (!data.user) throw new Error("User not found");
@@ -239,7 +239,7 @@ const Auth = () => {
               full_name: validated.fullName,
               phone: validated.phone,
               is_active: true,
-            })
+            } as any)
             .eq("email", validated.email);
 
           if (updateError) throw updateError;
@@ -257,7 +257,7 @@ const Auth = () => {
         password: validated.password,
         options: {
           data: { full_name: validated.fullName, phone: validated.phone, role: roleToAssign },
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          emailRedirectTo: `${window.location.origin}/app/dashboard`,
         },
       });
 
@@ -309,14 +309,14 @@ const Auth = () => {
   const redirectToDashboard = (role: string) => {
     switch (role) {
       case "owner":
-        navigate("/admin/dashboard");
+        navigate("/app/admin/dashboard");
         break;
       case "receptionist":
       case "staff":
-        navigate("/staff/dashboard");
+        navigate("/app/staff/dashboard");
         break;
       default:
-        navigate("/dashboard");
+        navigate("/app/dashboard");
         break;
     }
   };
@@ -324,28 +324,35 @@ const Auth = () => {
   // If in password reset mode, show reset form
   if (isResettingPassword) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-secondary/30 via-background to-accent/20 p-4">
-        <Card className="w-full max-w-md shadow-lg">
+      <div 
+        className="min-h-screen flex items-center justify-center p-4 relative"
+        style={{
+          backgroundImage: "url('https://images.unsplash.com/photo-1560066984-138dadb4c035?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      >
+        {/* Blur overlay */}
+        <div className="absolute inset-0 backdrop-blur-md bg-black/40" />
+        
+        <Card className="w-full max-w-md shadow-2xl relative z-10 bg-white/10 backdrop-blur-xl border-white/20">
           <CardHeader className="text-center space-y-2">
-            <div className="mx-auto w-12 h-12 bg-primary rounded-full flex items-center justify-center mb-2">
+            <div className="mx-auto w-16 h-16 bg-white/20 backdrop-blur rounded-full flex items-center justify-center mb-2 overflow-hidden border-2 border-champagne">
               <img
-                src={
-                  settings.logo_url !== null
-                    ? settings.logo_url
-                    : "/assets/zolara-logo.jpg"
-                }
+                src={settings.logo_url ?? "/assets/zolara-logo.jpg"}
                 className="w-full h-full object-cover"
+                alt="Zolara Logo"
               />
             </div>
-            <CardTitle className="text-2xl font-bold">
+            <CardTitle className="text-2xl font-bold text-white">
               Set New Password
             </CardTitle>
-            <CardDescription>Enter your new password below</CardDescription>
+            <CardDescription className="text-white/70">Enter your new password below</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleUpdatePassword} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="new-password">New Password</Label>
+                <Label htmlFor="new-password" className="text-white/90">New Password</Label>
                 <Input
                   id="new-password"
                   type="password"
@@ -354,10 +361,11 @@ const Auth = () => {
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
                   minLength={6}
+                  className="bg-white/10 border-white/30 text-white placeholder:text-white/50"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <Label htmlFor="confirm-password" className="text-white/90">Confirm Password</Label>
                 <Input
                   id="confirm-password"
                   type="password"
@@ -366,177 +374,241 @@ const Auth = () => {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   minLength={6}
+                  className="bg-white/10 border-white/30 text-white placeholder:text-white/50"
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button 
+                type="submit" 
+                className="w-full bg-champagne hover:bg-champagne-dark text-white font-semibold" 
+                disabled={loading}
+              >
                 {loading ? "Updating..." : "Update Password"}
               </Button>
             </form>
           </CardContent>
         </Card>
+        
+        {/* Footer */}
+        <div className="absolute bottom-4 left-0 right-0 text-center z-10">
+          <p className="text-white/60 text-sm">Powered by Zolara Management System</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-secondary/30 via-background to-accent/20 p-4">
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="text-center space-y-2">
-          <div className="mx-auto w-12 h-12 bg-primary rounded-full flex items-center justify-center mb-2 overflow-hidden">
+    <div 
+      className="min-h-screen flex relative"
+      style={{
+        backgroundImage: "url('https://images.unsplash.com/photo-1560066984-138dadb4c035?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
+    >
+      {/* Blur overlay */}
+      <div className="absolute inset-0 backdrop-blur-md bg-black/40" />
+      
+      {/* Left Side - Welcome Message */}
+      <div className="hidden lg:flex lg:w-1/2 relative z-10 flex-col justify-center items-center p-12 text-white">
+        <div className="max-w-md text-center space-y-6">
+          <div className="mx-auto w-24 h-24 bg-white/20 backdrop-blur rounded-full flex items-center justify-center overflow-hidden border-2 border-champagne shadow-xl">
             <img
               src={settings.logo_url ?? "/assets/zolara-logo.jpg"}
               className="w-full h-full object-cover"
-              alt="Logo"
+              alt="Zolara Logo"
             />
           </div>
-
-          <CardTitle className="text-2xl font-bold">
+          <h1 className="text-4xl font-bold tracking-tight">
             {/* @ts-ignore */}
-            {settings?.business_name || "Zolara"}
-          </CardTitle>
-          <CardDescription>
-            {/* Manage your salon operations efficiently */}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
-            </TabsList>
+            Welcome to {settings?.business_name || "Zolara Beauty Studio"}
+          </h1>
+          <p className="text-xl text-white/80 italic flex items-center justify-center gap-2">
+            <Sparkles className="w-5 h-5 text-champagne" />
+            Where Beauty Meets Excellence
+            <Sparkles className="w-5 h-5 text-champagne" />
+          </p>
+          <div className="pt-6 space-y-3">
+            <p className="text-white/70">
+              Book appointments, manage your beauty journey, and experience premium salon services.
+            </p>
+          </div>
+        </div>
+      </div>
 
-            {/* Login Form */}
-            <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="login-email">Email</Label>
-                  <Input
-                    id="login-email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2 relative">
-                  <Label htmlFor="signup-password">Password</Label>
-                  <Input
-                    id="login-password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    required
-                    className="pr-10" // space for the eye icon
-                  />
-                  <button
-                    type="button"
-                    className="absolute top-[38px] right-3 text-gray-400 hover:text-gray-600"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    tabIndex={-1} // avoid focus when tabbing
+      {/* Right Side - Login Form */}
+      <div className="w-full lg:w-1/2 relative z-10 flex items-center justify-center p-6">
+        <Card className="w-full max-w-md shadow-2xl bg-white/10 backdrop-blur-xl border-white/20 rounded-2xl">
+          <CardHeader className="text-center space-y-2">
+            {/* Mobile Logo */}
+            <div className="lg:hidden mx-auto w-16 h-16 bg-white/20 backdrop-blur rounded-full flex items-center justify-center mb-2 overflow-hidden border-2 border-champagne">
+              <img
+                src={settings.logo_url ?? "/assets/zolara-logo.jpg"}
+                className="w-full h-full object-cover"
+                alt="Zolara Logo"
+              />
+            </div>
+
+            <CardTitle className="text-2xl font-bold text-white">
+              {/* @ts-ignore */}
+              {settings?.business_name || "Zolara Beauty Studio"}
+            </CardTitle>
+            <CardDescription className="text-white/70 lg:hidden flex items-center justify-center gap-1">
+              <Sparkles className="w-4 h-4 text-champagne" />
+              Where Beauty Meets Excellence
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="login" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 bg-white/10 border border-white/20">
+                <TabsTrigger value="login" className="data-[state=active]:bg-champagne data-[state=active]:text-white text-white/70">Login</TabsTrigger>
+                <TabsTrigger value="signup" className="data-[state=active]:bg-champagne data-[state=active]:text-white text-white/70">Sign Up</TabsTrigger>
+              </TabsList>
+
+              {/* Login Form */}
+              <TabsContent value="login">
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="login-email" className="text-white/90">Email</Label>
+                    <Input
+                      id="login-email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      required
+                      className="bg-white/10 border-white/30 text-white placeholder:text-white/50 focus:border-champagne"
+                    />
+                  </div>
+                  <div className="space-y-2 relative">
+                    <Label htmlFor="login-password" className="text-white/90">Password</Label>
+                    <Input
+                      id="login-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      required
+                      className="pr-10 bg-white/10 border-white/30 text-white placeholder:text-white/50 focus:border-champagne"
+                    />
+                    <button
+                      type="button"
+                      className="absolute top-[38px] right-3 text-white/50 hover:text-white/80"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-champagne hover:bg-champagne-dark text-white font-semibold shadow-lg" 
+                    disabled={loading}
                   >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
+                    {loading ? "Logging in..." : "Login"}
+                  </Button>
 
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Logging in..." : "Login"}
-                </Button>
+                  <div className="text-center mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowResetDialog(true)}
+                      className="text-sm text-champagne hover:text-white transition-colors"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                </form>
+              </TabsContent>
 
-                <div className="text-center mt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowResetDialog(true)}
-                    className="text-sm text-primary hover:underline"
+              {/* Signup Form */}
+              <TabsContent value="signup">
+                <form onSubmit={handleSignup} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-name" className="text-white/90">Full Name</Label>
+                    <Input
+                      id="signup-name"
+                      type="text"
+                      placeholder="John Doe"
+                      value={signupFullName}
+                      onChange={(e) => setSignupFullName(e.target.value)}
+                      required
+                      className="bg-white/10 border-white/30 text-white placeholder:text-white/50 focus:border-champagne"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-email" className="text-white/90">Email</Label>
+                    <Input
+                      id="signup-email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={signupEmail}
+                      onChange={(e) => setSignupEmail(e.target.value)}
+                      required
+                      className="bg-white/10 border-white/30 text-white placeholder:text-white/50 focus:border-champagne"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-phone" className="text-white/90">Phone</Label>
+                    <Input
+                      id="signup-phone"
+                      type="tel"
+                      placeholder="+233 30 1234567"
+                      value={signupPhone}
+                      onChange={(e) => setSignupPhone(e.target.value)}
+                      required
+                      className="bg-white/10 border-white/30 text-white placeholder:text-white/50 focus:border-champagne"
+                    />
+                  </div>
+                  <div className="space-y-2 relative">
+                    <Label htmlFor="signup-password" className="text-white/90">Password</Label>
+                    <Input
+                      id="signup-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={signupPassword}
+                      onChange={(e) => setSignupPassword(e.target.value)}
+                      required
+                      className="pr-10 bg-white/10 border-white/30 text-white placeholder:text-white/50 focus:border-champagne"
+                    />
+                    <button
+                      type="button"
+                      className="absolute top-[38px] right-3 text-white/50 hover:text-white/80"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+
+                  {/* Optional: Role Selection */}
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-role" className="text-white/90">Role</Label>
+                    <RoleSelect
+                      value={signupRole}
+                      onChange={(val) => setSignupRole(val as any)}
+                    />
+                  </div>
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-champagne hover:bg-champagne-dark text-white font-semibold shadow-lg" 
+                    disabled={loading}
                   >
-                    Forgot password?
-                  </button>
-                </div>
-              </form>
-            </TabsContent>
-
-            {/* Signup Form */}
-            <TabsContent value="signup">
-              <form onSubmit={handleSignup} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="signup-name">Full Name</Label>
-                  <Input
-                    id="signup-name"
-                    type="text"
-                    placeholder="John Doe"
-                    value={signupFullName}
-                    onChange={(e) => setSignupFullName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
-                  <Input
-                    id="signup-email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={signupEmail}
-                    onChange={(e) => setSignupEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-phone">phone</Label>
-                  <Input
-                    id="signup-phone"
-                    type="phone"
-                    placeholder="+233 30 1234567"
-                    value={signupPhone}
-                    onChange={(e) => setSignupPhone(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2 relative">
-                  <Label htmlFor="signup-password">Password</Label>
-                  <Input
-                    id="login-password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={signupPassword}
-                    onChange={(e) => setSignupPassword(e.target.value)}
-                    required
-                    className="pr-10" // space for the eye icon
-                  />
-                  <button
-                    type="button"
-                    className="absolute top-[38px] right-3 text-gray-400 hover:text-gray-600"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    tabIndex={-1} // avoid focus when tabbing
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-
-                {/* Optional: Role Selection */}
-                <div className="space-y-2">
-                  <Label htmlFor="signup-role">Role</Label>
-                  <RoleSelect
-                    value={signupRole}
-                    onChange={(val) => setSignupRole(val as any)}
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Creating account..." : "Create Account"}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+                    {loading ? "Creating account..." : "Create Account"}
+                  </Button>
+                </form>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Password Reset Dialog */}
       {showResetDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <Card className="w-full max-w-md">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <Card className="w-full max-w-md bg-white/10 backdrop-blur-xl border-white/20 rounded-2xl">
             <CardHeader>
-              <CardTitle>Reset Password</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-white">Reset Password</CardTitle>
+              <CardDescription className="text-white/70">
                 Enter your email address and we'll send you a link to reset your
                 password.
               </CardDescription>
@@ -544,7 +616,7 @@ const Auth = () => {
             <CardContent>
               <form onSubmit={handlePasswordReset} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="reset-email">Email</Label>
+                  <Label htmlFor="reset-email" className="text-white/90">Email</Label>
                   <Input
                     id="reset-email"
                     type="email"
@@ -552,13 +624,14 @@ const Auth = () => {
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
                     required
+                    className="bg-white/10 border-white/30 text-white placeholder:text-white/50"
                   />
                 </div>
                 <div className="flex gap-2">
                   <Button
                     type="button"
                     variant="outline"
-                    className="flex-1"
+                    className="flex-1 border-white/30 text-white hover:bg-white/10"
                     onClick={() => {
                       setShowResetDialog(false);
                       setResetEmail("");
@@ -566,7 +639,11 @@ const Auth = () => {
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" className="flex-1" disabled={loading}>
+                  <Button 
+                    type="submit" 
+                    className="flex-1 bg-champagne hover:bg-champagne-dark text-white" 
+                    disabled={loading}
+                  >
                     {loading ? "Sending..." : "Send Reset Link"}
                   </Button>
                 </div>
@@ -575,6 +652,11 @@ const Auth = () => {
           </Card>
         </div>
       )}
+      
+      {/* Footer */}
+      <div className="absolute bottom-4 left-0 right-0 text-center z-10">
+        <p className="text-white/60 text-sm">Powered by Zolara Management System</p>
+      </div>
     </div>
   );
 };

@@ -60,6 +60,11 @@ export default {
         success: "hsl(var(--success))",
         warning: "hsl(var(--warning))",
         info: "hsl(var(--info))",
+        champagne: {
+          DEFAULT: "hsl(var(--champagne))",
+          foreground: "hsl(var(--champagne-foreground))",
+          dark: "hsl(var(--champagne-dark))",
+        },
         chart: {
           "1": "hsl(var(--chart-1))",
           "2": "hsl(var(--chart-2))",

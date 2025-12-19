@@ -52,11 +52,12 @@ const LandingPage = () => {
           </div>
           <div className="hidden md:flex items-center gap-6">
             <a href="#services" className="text-white/80 hover:text-champagne transition-colors">Services</a>
+            <a href="#gallery" className="text-white/80 hover:text-champagne transition-colors">Gallery</a>
             <a href="#about" className="text-white/80 hover:text-champagne transition-colors">About</a>
             <a href="#testimonials" className="text-white/80 hover:text-champagne transition-colors">Reviews</a>
             <a href="#contact" className="text-white/80 hover:text-champagne transition-colors">Contact</a>
           </div>
-          <Link to="/app/auth">
+          <Link to="/book">
             <Button className="bg-champagne hover:bg-champagne-dark text-white">
               Book Now
             </Button>
@@ -95,7 +96,7 @@ const LandingPage = () => {
             Experience premium beauty services in a luxurious setting. Our expert stylists are dedicated to bringing out your natural beauty.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/app/auth">
+            <Link to="/book">
               <Button size="lg" className="bg-champagne hover:bg-champagne-dark text-white text-lg px-8 py-6 shadow-xl">
                 Book an Appointment
                 <ChevronRight className="ml-2" />
@@ -133,9 +134,9 @@ const LandingPage = () => {
             ))}
           </div>
           <div className="text-center mt-10">
-            <Link to="/app/auth">
+            <Link to="/book">
               <Button className="bg-champagne hover:bg-champagne-dark text-white">
-                View All Services
+                Book an Appointment
                 <ChevronRight className="ml-2" />
               </Button>
             </Link>
@@ -190,6 +191,39 @@ const LandingPage = () => {
                 <p className="text-sm">Years Experience</p>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Gallery Section */}
+      <section id="gallery" className="py-20 bg-black">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold text-white mb-4">Our Gallery</h2>
+            <p className="text-white/70 max-w-2xl mx-auto">
+              Take a peek inside our beautiful salon and see our work.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {[
+              "https://images.unsplash.com/photo-1560066984-138dadb4c035?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
+              "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
+              "https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
+              "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
+              "https://images.unsplash.com/photo-1562322140-8baeababf5df?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
+              "https://images.unsplash.com/photo-1457972729786-0411a3b2b626?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
+              "https://images.unsplash.com/photo-1470259078422-826894b933aa?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
+              "https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
+            ].map((src, index) => (
+              <div key={index} className="group relative overflow-hidden rounded-xl aspect-square">
+                <img 
+                  src={src}
+                  alt={`Gallery image ${index + 1}`}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300" />
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -269,7 +303,7 @@ const LandingPage = () => {
             </Card>
           </div>
           <div className="text-center mt-10">
-            <Link to="/app/auth">
+            <Link to="/book">
               <Button size="lg" className="bg-champagne hover:bg-champagne-dark text-white text-lg px-8">
                 Book Your Appointment
                 <ChevronRight className="ml-2" />
@@ -303,9 +337,11 @@ const LandingPage = () => {
               <h4 className="font-semibold mb-4 text-champagne">Quick Links</h4>
               <ul className="space-y-2 text-sm text-white/70">
                 <li><a href="#services" className="hover:text-champagne transition-colors">Services</a></li>
+                <li><a href="#gallery" className="hover:text-champagne transition-colors">Gallery</a></li>
                 <li><a href="#about" className="hover:text-champagne transition-colors">About Us</a></li>
                 <li><a href="#testimonials" className="hover:text-champagne transition-colors">Reviews</a></li>
                 <li><a href="#contact" className="hover:text-champagne transition-colors">Contact</a></li>
+                <li><Link to="/book" className="hover:text-champagne transition-colors">Book Appointment</Link></li>
               </ul>
             </div>
             <div>
@@ -332,7 +368,13 @@ const LandingPage = () => {
             <p className="text-white/50 text-sm">
               © {new Date().getFullYear()} {(settings as any)?.business_name || "Zolara Beauty Studio"}. All rights reserved.
             </p>
-            <p className="text-white/50 text-sm">Powered by Zolara Management System</p>
+            <div className="flex items-center gap-4">
+              <Link to="/app/auth" className="text-champagne/80 hover:text-champagne text-sm transition-colors font-medium">
+                Staff Login
+              </Link>
+              <span className="text-white/30">|</span>
+              <p className="text-white/50 text-sm">Powered by Zolara Management System</p>
+            </div>
           </div>
         </div>
       </footer>

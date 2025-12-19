@@ -40,7 +40,7 @@ const LandingPage = () => {
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-champagne">
               <img 
-                src={settings.logo_url ?? "/assets/zolara-logo.jpg"} 
+                src={settings?.logo_url || "https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg"} 
                 alt="Zolara Logo" 
                 className="w-full h-full object-cover"
               />
@@ -77,7 +77,7 @@ const LandingPage = () => {
         <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
           <div className="mx-auto w-28 h-28 rounded-full overflow-hidden border-4 border-champagne mb-8 shadow-2xl">
             <img 
-              src={settings.logo_url ?? "/assets/zolara-logo.jpg"} 
+              src={settings?.logo_url || "https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg"} 
               alt="Zolara Logo" 
               className="w-full h-full object-cover"
             />
@@ -102,7 +102,7 @@ const LandingPage = () => {
               </Button>
             </Link>
             <a href="#services">
-              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10 text-lg px-8 py-6">
+              <Button size="lg" variant="outline" className="border-white text-gray hover:bg-white/10 text-lg px-8 py-6">
                 View Services
               </Button>
             </a>
@@ -287,7 +287,7 @@ const LandingPage = () => {
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-champagne">
                   <img 
-                    src={settings.logo_url ?? "/assets/zolara-logo.jpg"} 
+                    src={settings?.logo_url || "https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg"} 
                     alt="Zolara Logo" 
                     className="w-full h-full object-cover"
                   />

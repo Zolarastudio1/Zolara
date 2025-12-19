@@ -484,7 +484,7 @@ const Bookings = () => {
                   </Select>
                 </div>
 
-                <div>
+                {/* <div>
                   <Label>Payment Status</Label>
                   <Select
                     value={formData.payment_status || ""}
@@ -501,7 +501,7 @@ const Bookings = () => {
                       <SelectItem value="partial">Partial</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
+                </div> */}
               </div>
 
               {/* Notes */}

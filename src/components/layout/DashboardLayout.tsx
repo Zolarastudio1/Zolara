@@ -97,7 +97,7 @@ const DashboardLayout = () => {
       case "owner":
         return baseNavItems.map((item) => ({
           ...item,
-          path: `/admin/${item.path}`,
+          path: `/app/admin/${item.path}`,
         }));
 
       // ------------------------------------------------------
@@ -116,7 +116,7 @@ const DashboardLayout = () => {
           )
           .map((item) => ({
             ...item,
-            path: `/staff/${item.path}`,
+            path: `/app/staff/${item.path}`,
           }));
 
       // ------------------------------------------------------
@@ -138,7 +138,7 @@ const DashboardLayout = () => {
           )
           .map((item) => ({
             ...item,
-            path: `/staff/${item.path}`,
+            path: `/app/staff/${item.path}`,
           }));
 
       // ------------------------------------------------------
@@ -151,7 +151,7 @@ const DashboardLayout = () => {
           )
           .map((item) => ({
             ...item,
-            path: `/${item.path}`,
+            path: `/app/${item.path}`,
           }));
     }
   };

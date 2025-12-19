@@ -126,8 +126,36 @@ const Staff = () => {
         .order("full_name");
       if (error) throw error;
       setStaff(data || []);
-      // Rating column doesn't exist on bookings table, skip fetching ratings
-      setStaffRatings({});
+      // Fetch ratings for staff members (if any) and compute averages
+      try {
+        const ids = (data || []).map((s: any) => s.id).filter(Boolean);
+        if (ids.length > 0) {
+          const { data: ratingsData, error: ratingsErr } = await supabase
+            .from("bookings")
+            .select("staff_id, rating")
+            .in("staff_id", ids)
+            .not("rating", "is", null);
+          if (!ratingsErr && ratingsData) {
+            const map: Record<string, { sum: number; count: number }> = {};
+            for (const r of ratingsData) {
+              const sid = r.staff_id || "";
+              const val = Number(r.rating);
+              if (!isNaN(val)) {
+                if (!map[sid]) map[sid] = { sum: 0, count: 0 };
+                map[sid].sum += val;
+                map[sid].count += 1;
+              }
+            }
+            const avgMap: Record<string, number | null> = {};
+            Object.entries(map).forEach(([k, v]) => {
+              avgMap[k] = v.count ? v.sum / v.count : null;
+            });
+            setStaffRatings(avgMap);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch staff ratings", err);
+      }
     } catch (error) {
       console.error("Error fetching staff:", error);
       toast.error("Failed to load staff");

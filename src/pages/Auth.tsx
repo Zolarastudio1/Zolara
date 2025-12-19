@@ -256,7 +256,11 @@ const Auth = () => {
         email: validated.email,
         password: validated.password,
         options: {
-          data: { full_name: validated.fullName, phone: validated.phone, role: roleToAssign },
+          data: {
+            full_name: validated.fullName,
+            phone: validated.phone,
+            role: roleToAssign,
+          },
           emailRedirectTo: `${window.location.origin}/app/dashboard`,
         },
       });
@@ -324,17 +328,18 @@ const Auth = () => {
   // If in password reset mode, show reset form
   if (isResettingPassword) {
     return (
-      <div 
+      <div
         className="min-h-screen flex items-center justify-center p-4 relative"
         style={{
-          backgroundImage: "url('https://images.unsplash.com/photo-1560066984-138dadb4c035?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80')",
+          backgroundImage:
+            "url('https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg')",
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
       >
         {/* Blur overlay */}
         <div className="absolute inset-0 backdrop-blur-md bg-black/40" />
-        
+
         <Card className="w-full max-w-md shadow-2xl relative z-10 bg-white/10 backdrop-blur-xl border-white/20">
           <CardHeader className="text-center space-y-2">
             <div className="mx-auto w-16 h-16 bg-white/20 backdrop-blur rounded-full flex items-center justify-center mb-2 overflow-hidden border-2 border-champagne">
@@ -347,12 +352,16 @@ const Auth = () => {
             <CardTitle className="text-2xl font-bold text-white">
               Set New Password
             </CardTitle>
-            <CardDescription className="text-white/70">Enter your new password below</CardDescription>
+            <CardDescription className="text-white/70">
+              Enter your new password below
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleUpdatePassword} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="new-password" className="text-white/90">New Password</Label>
+                <Label htmlFor="new-password" className="text-white/90">
+                  New Password
+                </Label>
                 <Input
                   id="new-password"
                   type="password"
@@ -365,7 +374,9 @@ const Auth = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirm-password" className="text-white/90">Confirm Password</Label>
+                <Label htmlFor="confirm-password" className="text-white/90">
+                  Confirm Password
+                </Label>
                 <Input
                   id="confirm-password"
                   type="password"
@@ -377,9 +388,9 @@ const Auth = () => {
                   className="bg-white/10 border-white/30 text-white placeholder:text-white/50"
                 />
               </div>
-              <Button 
-                type="submit" 
-                className="w-full bg-champagne hover:bg-champagne-dark text-white font-semibold" 
+              <Button
+                type="submit"
+                className="w-full bg-champagne hover:bg-champagne-dark text-white font-semibold"
                 disabled={loading}
               >
                 {loading ? "Updating..." : "Update Password"}
@@ -387,33 +398,36 @@ const Auth = () => {
             </form>
           </CardContent>
         </Card>
-        
+
         {/* Footer */}
         <div className="absolute bottom-4 left-0 right-0 text-center z-10">
-          <p className="text-white/60 text-sm">Powered by Zolara Management System</p>
+          <p className="text-white/60 text-sm">
+            Powered by Zolara Management System
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div 
+    <div
       className="min-h-screen flex relative"
       style={{
-        backgroundImage: "url('https://images.unsplash.com/photo-1560066984-138dadb4c035?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80')",
+        backgroundImage:
+          "url('https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg')",
         backgroundSize: "cover",
         backgroundPosition: "center",
       }}
     >
       {/* Blur overlay */}
       <div className="absolute inset-0 backdrop-blur-md bg-black/40" />
-      
+
       {/* Left Side - Welcome Message */}
       <div className="hidden lg:flex lg:w-1/2 relative z-10 flex-col justify-center items-center p-12 text-white">
         <div className="max-w-md text-center space-y-6">
           <div className="mx-auto w-24 h-24 bg-white/20 backdrop-blur rounded-full flex items-center justify-center overflow-hidden border-2 border-champagne shadow-xl">
             <img
-              src={settings.logo_url ?? "/assets/zolara-logo.jpg"}
+              src={settings.logo_url || "https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg"}
               className="w-full h-full object-cover"
               alt="Zolara Logo"
             />
@@ -429,7 +443,8 @@ const Auth = () => {
           </p>
           <div className="pt-6 space-y-3">
             <p className="text-white/70">
-              Book appointments, manage your beauty journey, and experience premium salon services.
+              Book appointments, manage your beauty journey, and experience
+              premium salon services.
             </p>
           </div>
         </div>
@@ -460,15 +475,27 @@ const Auth = () => {
           <CardContent>
             <Tabs defaultValue="login" className="w-full">
               <TabsList className="grid w-full grid-cols-2 bg-white/10 border border-white/20">
-                <TabsTrigger value="login" className="data-[state=active]:bg-champagne data-[state=active]:text-white text-white/70">Login</TabsTrigger>
-                <TabsTrigger value="signup" className="data-[state=active]:bg-champagne data-[state=active]:text-white text-white/70">Sign Up</TabsTrigger>
+                <TabsTrigger
+                  value="login"
+                  className="data-[state=active]:bg-champagne data-[state=active]:text-white text-white/70"
+                >
+                  Login
+                </TabsTrigger>
+                <TabsTrigger
+                  value="signup"
+                  className="data-[state=active]:bg-champagne data-[state=active]:text-white text-white/70"
+                >
+                  Sign Up
+                </TabsTrigger>
               </TabsList>
 
               {/* Login Form */}
               <TabsContent value="login">
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="login-email" className="text-white/90">Email</Label>
+                    <Label htmlFor="login-email" className="text-white/90">
+                      Email
+                    </Label>
                     <Input
                       id="login-email"
                       type="email"
@@ -480,7 +507,9 @@ const Auth = () => {
                     />
                   </div>
                   <div className="space-y-2 relative">
-                    <Label htmlFor="login-password" className="text-white/90">Password</Label>
+                    <Label htmlFor="login-password" className="text-white/90">
+                      Password
+                    </Label>
                     <Input
                       id="login-password"
                       type={showPassword ? "text" : "password"}
@@ -500,9 +529,9 @@ const Auth = () => {
                     </button>
                   </div>
 
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-champagne hover:bg-champagne-dark text-white font-semibold shadow-lg" 
+                  <Button
+                    type="submit"
+                    className="w-full bg-champagne hover:bg-champagne-dark text-white font-semibold shadow-lg"
                     disabled={loading}
                   >
                     {loading ? "Logging in..." : "Login"}
@@ -524,7 +553,9 @@ const Auth = () => {
               <TabsContent value="signup">
                 <form onSubmit={handleSignup} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signup-name" className="text-white/90">Full Name</Label>
+                    <Label htmlFor="signup-name" className="text-white/90">
+                      Full Name
+                    </Label>
                     <Input
                       id="signup-name"
                       type="text"
@@ -536,7 +567,9 @@ const Auth = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-email" className="text-white/90">Email</Label>
+                    <Label htmlFor="signup-email" className="text-white/90">
+                      Email
+                    </Label>
                     <Input
                       id="signup-email"
                       type="email"
@@ -548,7 +581,9 @@ const Auth = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-phone" className="text-white/90">Phone</Label>
+                    <Label htmlFor="signup-phone" className="text-white/90">
+                      Phone
+                    </Label>
                     <Input
                       id="signup-phone"
                       type="tel"
@@ -560,7 +595,9 @@ const Auth = () => {
                     />
                   </div>
                   <div className="space-y-2 relative">
-                    <Label htmlFor="signup-password" className="text-white/90">Password</Label>
+                    <Label htmlFor="signup-password" className="text-white/90">
+                      Password
+                    </Label>
                     <Input
                       id="signup-password"
                       type={showPassword ? "text" : "password"}
@@ -582,15 +619,17 @@ const Auth = () => {
 
                   {/* Optional: Role Selection */}
                   <div className="space-y-2">
-                    <Label htmlFor="signup-role" className="text-white/90">Role</Label>
+                    <Label htmlFor="signup-role" className="text-white/90">
+                      Role
+                    </Label>
                     <RoleSelect
                       value={signupRole}
                       onChange={(val) => setSignupRole(val as any)}
                     />
                   </div>
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-champagne hover:bg-champagne-dark text-white font-semibold shadow-lg" 
+                  <Button
+                    type="submit"
+                    className="w-full bg-champagne hover:bg-champagne-dark text-white font-semibold shadow-lg"
                     disabled={loading}
                   >
                     {loading ? "Creating account..." : "Create Account"}
@@ -616,7 +655,9 @@ const Auth = () => {
             <CardContent>
               <form onSubmit={handlePasswordReset} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="reset-email" className="text-white/90">Email</Label>
+                  <Label htmlFor="reset-email" className="text-white/90">
+                    Email
+                  </Label>
                   <Input
                     id="reset-email"
                     type="email"
@@ -639,9 +680,9 @@ const Auth = () => {
                   >
                     Cancel
                   </Button>
-                  <Button 
-                    type="submit" 
-                    className="flex-1 bg-champagne hover:bg-champagne-dark text-white" 
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-champagne hover:bg-champagne-dark text-white"
                     disabled={loading}
                   >
                     {loading ? "Sending..." : "Send Reset Link"}
@@ -652,10 +693,12 @@ const Auth = () => {
           </Card>
         </div>
       )}
-      
+
       {/* Footer */}
       <div className="absolute bottom-4 left-0 right-0 text-center z-10">
-        <p className="text-white/60 text-sm">Powered by Zolara Management System</p>
+        <p className="text-white/60 text-sm">
+          Powered by Zolara Management System
+        </p>
       </div>
     </div>
   );

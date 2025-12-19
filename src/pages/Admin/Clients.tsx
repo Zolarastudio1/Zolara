@@ -99,17 +99,10 @@ const Clients = () => {
   });
 
   useEffect(() => {
+    fetchClients();
     fetchUserRole();
     fetchServices();
   }, []);
-
-  useEffect(() => {
-    fetchClients(page);
-  }, [page]);
-
-  useEffect(() => {
-    setFilteredClients(clients);
-  }, [clients]);
 
   /** Fetch Logged-in User Role */
   const fetchUserRole = async () => {
@@ -182,7 +175,9 @@ const Clients = () => {
   };
 
   const fetchClientActivity = async () => {
-    const { data, error } = await supabase.from("bookings").select("client_id");
+    const { data, error } = await supabase
+      .from("bookings")
+      .select("client_id");
 
     if (error) {
       console.error("Activity fetch error:", error);
@@ -221,75 +216,56 @@ const Clients = () => {
   // Helper: check if a booking date falls within start/end (full-day) bounds
   const bookingInRange = (rawDate: any, s: Date, e: Date) => {
     if (!rawDate) return false;
-
-    const d = new Date(rawDate);
-    if (!isNaN(d.getTime())) return d >= s && d <= e;
-
+    const ad = new Date(rawDate);
+    if (!isNaN(ad.getTime())) return ad >= s && ad <= e;
     const parsed = new Date(`${rawDate}T00:00:00`);
     if (!isNaN(parsed.getTime())) return parsed >= s && parsed <= e;
-
     return false;
   };
 
   // Centralized filter application so filters compose
-  const applyFilters = async () => {
-  let result = [...clients];
+  const runFilters = () => {
+  let data = [...clients];
 
-  const s = new Date(`${startDate}T00:00:00`);
-  const e = new Date(`${endDate}T23:59:59`);
-
-  // 1. DATE RANGE FILTER
-  if (activeFilter === "date") {
-    result = clients.filter((client) =>
-      (client.bookings || []).some((b: any) =>
-        bookingInRange(b?.appointment_date, s, e)
-      )
-    );
-  }
-
-  // MOST ACTIVE FILTER
-  if (activeFilter === "most_active") {
-    const activity = await fetchClientActivity();
-
-    result = [...clients].sort((a, b) => {
-      const aCount = activity[a.id] || 0;
-      const bCount = activity[b.id] || 0;
-      return bCount - aCount;
+  // --- Date Filter ---
+  if (startDate || endDate) {
+    data = data.filter((item) => {
+      const created = new Date(item.created_at);
+      if (startDate && created < new Date(startDate)) return false;
+      if (endDate && created > new Date(endDate)) return false;
+      return true;
     });
-
-    setFilteredClients(result);
-    return;
   }
 
-  // SERVICE HISTORY FILTER
-  if (activeFilter === "service_history" && selectedService) {
-    result = clients.filter((client) =>
-      (client.bookings || []).some(
-        (b: any) => b?.services?.name === selectedService
-      )
+  // --- Status Filter ---
+  if (activeFilter && activeFilter !== "all") {
+    data = data.filter((item) => item.status === activeFilter);
+  }
+
+  // --- Service Filter ---
+  if (selectedService && selectedService !== "all") {
+    data = data.filter((item) => item.service === selectedService);
+  }
+
+  // --- Search Filter ---
+  if (searchTerm.trim() !== "") {
+    const term = searchTerm.toLowerCase();
+    data = data.filter(
+      (item) =>
+        item.full_name?.toLowerCase().includes(term) ||
+        item.phone?.toLowerCase().includes(term) ||
+        item.email?.toLowerCase().includes(term)
     );
   }
 
-  // SEARCH FILTER
-  if (activeFilter === "search") {
-    result = searchResults || [];
-  }
-
-  setFilteredClients(result);
+  setFilteredClients(data);
 };
 
 
   useEffect(() => {
-    applyFilters();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    clients,
-    startDate,
-    endDate,
-    activeFilter,
-    selectedService,
-    searchResults,
-  ]);
+    runFilters();
+}, [clients, startDate, endDate, activeFilter, selectedService, searchTerm]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -514,7 +490,6 @@ const Clients = () => {
             data={clients}
             placeholder="Search clients..."
             onSearchResults={(results) => {
-              // treat search as its own view
               setSearchResults(results);
               setActiveFilter("search");
             }}
@@ -724,7 +699,7 @@ const Clients = () => {
                         <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                           {client.full_name}
                           <span className="ml-2 text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700">
-                            {bookingsCount == 0 ? "No" : bookingsCount} bookings
+                            {bookingsCount} visits
                           </span>
                         </CardTitle>
                         <p className="text-sm text-muted-foreground mt-1">

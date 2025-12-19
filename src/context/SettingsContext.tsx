@@ -74,7 +74,7 @@ export const SettingsProvider = ({ children }: Props) => {
       }
     } catch (err: any) {
       console.error("Failed to load settings:", err);
-      toast.error("Failed to load settings");
+      // toast.error("Failed to load settings");
     } finally {
       setLoading(false);
     }

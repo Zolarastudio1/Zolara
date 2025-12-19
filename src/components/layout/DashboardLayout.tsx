@@ -110,13 +110,13 @@ const DashboardLayout = () => {
         return baseNavItems
           .filter(
             (item) =>
-              !["Sales", "Reports", "Attendance Reports", "Settings"].includes(
+              !["Sales", "Reports", "Attendance Reports", "Settings", "Staff"].includes(
                 item.label
               )
           )
           .map((item) => ({
             ...item,
-            path: `/app/staff/${item.path}`,
+            path: `/app/receptionist/${item.path}`,
           }));
 
       // ------------------------------------------------------
@@ -144,15 +144,18 @@ const DashboardLayout = () => {
       // ------------------------------------------------------
       // CLIENT
       // ------------------------------------------------------
-      default:
+      case "client":
         return baseNavItems
           .filter((item) =>
             ["Dashboard", "Bookings", "Services"].includes(item.label)
           )
           .map((item) => ({
             ...item,
-            path: `/app/${item.path}`,
+            path: `/app/client/${item.path}`,
           }));
+      
+      default:
+        return [];
     }
   };
 

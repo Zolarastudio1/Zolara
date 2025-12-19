@@ -316,11 +316,16 @@ const Auth = () => {
         navigate("/app/admin/dashboard");
         break;
       case "receptionist":
+        navigate("/app/receptionist/dashboard");
+        break;
       case "staff":
         navigate("/app/staff/dashboard");
         break;
+      case "client":
+        navigate("/app/client/dashboard");
+        break;
       default:
-        navigate("/app/dashboard");
+        navigate("/app/client/dashboard");
         break;
     }
   };

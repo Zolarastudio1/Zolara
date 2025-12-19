@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import Auth from "./pages/Auth";
 import LandingPage from "./pages/LandingPage";
+import PublicBooking from "./pages/PublicBooking";
 
 import DashboardLayout from "./components/layout/DashboardLayout";
 import AdminLayout from "./components/layout/AdminLayout";
@@ -40,13 +41,19 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          {/* =================== PUBLIC ROUTES =================== */}
           {/* Public Landing Page */}
           <Route path="/" element={<LandingPage />} />
           
-          {/* Auth Page */}
+          {/* Public Booking Page (no login required) */}
+          <Route path="/book" element={<PublicBooking />} />
+          
+          {/* Staff Login Page */}
           <Route path="/app/auth" element={<Auth />} />
 
-          {/* ------------------- ADMIN ROUTES ------------------- */}
+          {/* =================== MANAGEMENT SYSTEM ROUTES =================== */}
+          
+          {/* OWNER (Manager) - Full Access */}
           <Route element={<ProtectedRoute allowedRoles={["owner"]} />}>
             <Route element={<DashboardLayout />}>
               <Route path="/app/admin/dashboard" element={<AdminLayout />} />
@@ -62,19 +69,18 @@ const App = () => (
             </Route>
           </Route>
 
-          {/* --------------RECEPTIONIST ROUTES ------------------- */}
+          {/* RECEPTIONIST - Limited Access (daily operations) */}
           <Route element={<ProtectedRoute allowedRoles={["receptionist"]} />}>
             <Route element={<DashboardLayout />}>
-              <Route path="/app/staff/dashboard" element={<AdminLayout />} />
-              <Route path="/app/staff/bookings" element={<Bookings />} />
-              <Route path="/app/staff/services" element={<Services />} />
-              <Route path="/app/staff/clients" element={<Clients />} />
-              <Route path="/app/staff/staff" element={<Staff />} />
-              <Route path="/app/staff/attendance" element={<Attendance />} />
+              <Route path="/app/receptionist/dashboard" element={<AdminLayout />} />
+              <Route path="/app/receptionist/bookings" element={<Bookings />} />
+              <Route path="/app/receptionist/clients" element={<Clients />} />
+              <Route path="/app/receptionist/attendance" element={<Attendance />} />
+              <Route path="/app/receptionist/services" element={<ViewServices />} />
             </Route>
           </Route>
 
-          {/* ------------------- STAFF ROUTES ------------------- */}
+          {/* STAFF - Minimal Access (their own tasks) */}
           <Route element={<ProtectedRoute allowedRoles={["staff"]} />}>
             <Route element={<DashboardLayout />}>
               <Route path="/app/staff/dashboard" element={<StaffLayout />} />
@@ -84,20 +90,26 @@ const App = () => (
             </Route>
           </Route>
 
-          {/* ------------------- CLIENT ROUTES ------------------- */}
+          {/* CLIENT - Customer portal */}
           <Route element={<ProtectedRoute allowedRoles={["client"]} />}>
             <Route element={<DashboardLayout />}>
-              <Route path="/app/dashboard" element={<ClientLayout />} />
-              <Route path="/app/bookings" element={<ClientBookings />} />
-              <Route path="/app/services" element={<ViewServices />} />
+              <Route path="/app/client/dashboard" element={<ClientLayout />} />
+              <Route path="/app/client/bookings" element={<ClientBookings />} />
+              <Route path="/app/client/services" element={<ViewServices />} />
             </Route>
           </Route>
 
-          {/* Legacy redirects */}
+          {/* =================== LEGACY REDIRECTS =================== */}
           <Route path="/auth" element={<Navigate to="/app/auth" />} />
           <Route path="/admin/*" element={<Navigate to="/app/admin/dashboard" />} />
           <Route path="/staff/*" element={<Navigate to="/app/staff/dashboard" />} />
-          <Route path="/dashboard" element={<Navigate to="/app/dashboard" />} />
+          <Route path="/dashboard" element={<Navigate to="/app/client/dashboard" />} />
+          <Route path="/app/dashboard" element={<Navigate to="/app/client/dashboard" />} />
+          <Route path="/app/bookings" element={<Navigate to="/app/client/bookings" />} />
+          <Route path="/app/services" element={<Navigate to="/app/client/services" />} />
+          <Route path="/app/staff/staff" element={<Navigate to="/app/admin/staff" />} />
+          <Route path="/manage" element={<Navigate to="/app/auth" />} />
+          <Route path="/manage/*" element={<Navigate to="/app/auth" />} />
 
           {/* 404 */}
           <Route path="*" element={<NotFound />} />

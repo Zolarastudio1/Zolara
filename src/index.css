@@ -24,6 +24,15 @@
     --accent: 46 85% 55%; /* gold for highlights */
     --accent-foreground: 0 0% 100%;
 
+    /* ---- CHAMPAGNE GOLD ---- */
+    --champagne: 38 45% 68%; /* #C9A96E champagne gold */
+    --champagne-foreground: 0 0% 100%;
+    --champagne-dark: 38 50% 45%; /* darker hover state */
+
+    /* ---- MUTED ---- */
+    --muted: 34 30% 90%;
+    --muted-foreground: 0 0% 40%;
+
     /* ---- STATUS COLORS ---- */
     --success: 160 84% 39%;
     --warning: 38 92% 50%;
@@ -75,6 +84,15 @@
 
     --accent: 46 85% 55%;
     --accent-foreground: 0 0% 100%;
+
+    /* ---- CHAMPAGNE GOLD ---- */
+    --champagne: 38 45% 68%;
+    --champagne-foreground: 0 0% 100%;
+    --champagne-dark: 38 50% 45%;
+
+    /* ---- MUTED ---- */
+    --muted: 0 0% 20%;
+    --muted-foreground: 0 0% 70%;
 
     --border: 46 85% 25%;
     --input: 46 85% 25%;

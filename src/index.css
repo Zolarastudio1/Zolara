@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,84 +7,23 @@
 @layer base {
   :root {
     /* ---- CORE COLORS ---- */
-    --background: 34 92% 96%; /* milk color (#FEF4EB) */
-    --foreground: 0 0% 0%; /* black text */
+    --background: 40 33% 98%; /* warm cream white */
+    --foreground: 220 20% 15%; /* deep charcoal */
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 0%;
+    --card-foreground: 220 20% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 0%;
+    --popover-foreground: 220 20% 15%;
 
-    /* ---- BRAND COLORS ---- */
-    --primary: 46 85% 55%; /* gold */
-    --primary-foreground: 0 0% 100%; /* white text on gold */
-
-    --secondary: 34 92% 96%; /* milk tone for secondary bg */
-    --secondary-foreground: 0 0% 0%;
-
-    --accent: 46 85% 55%; /* gold for highlights */
-    --accent-foreground: 0 0% 100%;
-
-    /* ---- CHAMPAGNE GOLD ---- */
-    --champagne: 38 45% 68%; /* #C9A96E champagne gold */
-    --champagne-foreground: 0 0% 100%;
-    --champagne-dark: 38 50% 45%; /* darker hover state */
-
-    /* ---- MUTED ---- */
-    --muted: 34 30% 90%;
-    --muted-foreground: 0 0% 40%;
-
-    /* ---- STATUS COLORS ---- */
-    --success: 160 84% 39%;
-    --warning: 38 92% 50%;
-    --info: 199 89% 48%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-
-    /* ---- BORDER & INPUTS ---- */
-    --border: 34 30% 85%;
-    --input: 34 30% 85%;
-    --ring: 46 85% 55%;
-
-    /* ---- SIDEBAR ---- */
-    --sidebar-background: 0 0% 0%; /* black */
-    --sidebar-foreground: 0 0% 100%; /* white text */
-    --sidebar-primary: 46 85% 55%; /* gold */
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 46 85% 45%; /* darker gold hover */
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 46 85% 30%;
-    --sidebar-ring: 46 85% 55%;
-
-    /* ---- CHART COLORS ---- */
-    --chart-1: 46 85% 55%;
-    --chart-2: 34 92% 96%;
-    --chart-3: 0 0% 0%;
-    --chart-4: 38 92% 50%;
-    --chart-5: 280 80% 60%;
-
-    --radius: 0.75rem;
-  }
-
-  /* ---- DARK MODE ---- */
-  .dark {
-    --background: 0 0% 0%; /* black background */
-    --foreground: 34 92% 96%; /* milk text */
-
-    --card: 0 0% 10%;
-    --card-foreground: 34 92% 96%;
-
-    --popover: 0 0% 10%;
-    --popover-foreground: 34 92% 96%;
-
-    --primary: 46 85% 55%; /* gold */
+    /* ---- BRAND COLORS (Elegant Gold) ---- */
+    --primary: 38 70% 50%; /* rich gold */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 34 92% 96%;
-    --secondary-foreground: 0 0% 0%;
+    --secondary: 220 15% 96%; /* soft gray */
+    --secondary-foreground: 220 20% 15%;
 
-    --accent: 46 85% 55%;
+    --accent: 38 80% 55%; /* warm gold accent */
     --accent-foreground: 0 0% 100%;
 
     /* ---- CHAMPAGNE GOLD ---- */
@@ -91,27 +32,107 @@
     --champagne-dark: 38 50% 45%;
 
     /* ---- MUTED ---- */
-    --muted: 0 0% 20%;
-    --muted-foreground: 0 0% 70%;
+    --muted: 220 15% 94%;
+    --muted-foreground: 220 10% 45%;
 
-    --border: 46 85% 25%;
-    --input: 46 85% 25%;
-    --ring: 46 85% 55%;
+    /* ---- STATUS COLORS (Refined Palette) ---- */
+    --success: 152 60% 42%;
+    --success-light: 152 60% 95%;
+    --warning: 38 92% 50%;
+    --warning-light: 38 92% 95%;
+    --info: 210 80% 52%;
+    --info-light: 210 80% 95%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --destructive-light: 0 72% 95%;
 
-    --sidebar-background: 0 0% 0%; /* black */
-    --sidebar-foreground: 34 92% 96%; /* milk/white text */
-    --sidebar-primary: 46 85% 55%; /* gold */
+    /* ---- GRADIENT COLORS ---- */
+    --gradient-gold-start: 45 80% 60%;
+    --gradient-gold-end: 32 80% 45%;
+    --gradient-purple-start: 270 70% 60%;
+    --gradient-purple-end: 280 75% 45%;
+    --gradient-blue-start: 210 85% 55%;
+    --gradient-blue-end: 220 80% 45%;
+    --gradient-green-start: 152 60% 50%;
+    --gradient-green-end: 160 65% 38%;
+
+    /* ---- BORDER & INPUTS ---- */
+    --border: 220 15% 90%;
+    --input: 220 15% 90%;
+    --ring: 38 70% 50%;
+
+    /* ---- SIDEBAR (Dark Elegant) ---- */
+    --sidebar-background: 220 20% 8%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 38 70% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 46 85% 45%;
+    --sidebar-accent: 38 65% 45%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 46 85% 25%;
-    --sidebar-ring: 46 85% 55%;
+    --sidebar-border: 220 15% 18%;
+    --sidebar-ring: 38 70% 50%;
 
-    --chart-1: 46 85% 55%;
-    --chart-2: 34 92% 96%;
-    --chart-3: 0 0% 100%;
-    --chart-4: 38 92% 50%;
-    --chart-5: 280 80% 60%;
+    /* ---- CHART COLORS (Harmonious Palette) ---- */
+    --chart-1: 38 70% 55%;
+    --chart-2: 210 80% 55%;
+    --chart-3: 152 60% 45%;
+    --chart-4: 280 70% 55%;
+    --chart-5: 0 70% 55%;
+    --chart-6: 180 60% 45%;
+
+    --radius: 0.75rem;
+  }
+
+  /* ---- DARK MODE ---- */
+  .dark {
+    --background: 220 20% 8%;
+    --foreground: 40 33% 96%;
+
+    --card: 220 20% 12%;
+    --card-foreground: 40 33% 96%;
+
+    --popover: 220 20% 12%;
+    --popover-foreground: 40 33% 96%;
+
+    --primary: 38 70% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 15% 18%;
+    --secondary-foreground: 40 33% 96%;
+
+    --accent: 38 80% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --champagne: 38 45% 68%;
+    --champagne-foreground: 0 0% 100%;
+    --champagne-dark: 38 50% 45%;
+
+    --muted: 220 15% 18%;
+    --muted-foreground: 220 10% 60%;
+
+    --success-light: 152 60% 15%;
+    --warning-light: 38 92% 15%;
+    --info-light: 210 80% 15%;
+    --destructive-light: 0 72% 15%;
+
+    --border: 220 15% 22%;
+    --input: 220 15% 22%;
+    --ring: 38 70% 55%;
+
+    --sidebar-background: 220 20% 5%;
+    --sidebar-foreground: 40 33% 96%;
+    --sidebar-primary: 38 70% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 38 65% 45%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 220 15% 15%;
+    --sidebar-ring: 38 70% 55%;
+
+    --chart-1: 38 70% 55%;
+    --chart-2: 210 80% 55%;
+    --chart-3: 152 60% 45%;
+    --chart-4: 280 70% 55%;
+    --chart-5: 0 70% 55%;
+    --chart-6: 180 60% 45%;
   }
 }
 
@@ -121,6 +142,40 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', serif;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-xl border border-border/50 shadow-lg;
+  }
+  
+  .gradient-gold {
+    background: linear-gradient(135deg, hsl(var(--gradient-gold-start)), hsl(var(--gradient-gold-end)));
+  }
+  
+  .gradient-purple {
+    background: linear-gradient(135deg, hsl(var(--gradient-purple-start)), hsl(var(--gradient-purple-end)));
+  }
+  
+  .gradient-blue {
+    background: linear-gradient(135deg, hsl(var(--gradient-blue-start)), hsl(var(--gradient-blue-end)));
+  }
+  
+  .gradient-green {
+    background: linear-gradient(135deg, hsl(var(--gradient-green-start)), hsl(var(--gradient-green-end)));
+  }
+
+  .stat-card-shadow {
+    box-shadow: 0 4px 24px -4px hsl(var(--primary) / 0.15);
+  }
+
+  .chart-glow {
+    filter: drop-shadow(0 0 8px hsl(var(--primary) / 0.3));
   }
 }

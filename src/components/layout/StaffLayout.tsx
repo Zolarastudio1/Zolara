@@ -1,23 +1,30 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { format, subDays, eachDayOfInterval } from "date-fns";
 import {
-  Loader2,
   Calendar,
   Clock,
   DollarSign,
   TrendingUp,
   TrendingDown,
-  History,
+  Star,
+  Target,
 } from "lucide-react";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { StatCard } from "@/components/dashboard/StatCard";
+import { RevenueChart } from "@/components/dashboard/RevenueChart";
+import { DonutChart } from "@/components/dashboard/DonutChart";
+import { ActivityList } from "@/components/dashboard/ActivityList";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
+import { motion } from "framer-motion";
 import { fetchStaffBookings, fetchStaffPayments } from "@/lib/utils";
 
-const StaffLayout = () => {
+const StaffDashboard = () => {
   const [bookings, setBookings] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState("");
   const [stats, setStats] = useState({
     total: 0,
     completed: 0,
@@ -25,6 +32,8 @@ const StaffLayout = () => {
     upcoming: 0,
     totalEarned: 0,
   });
+  const [performanceData, setPerformanceData] = useState<{ name: string; revenue: number }[]>([]);
+  const [bookingStatusData, setBookingStatusData] = useState<{ name: string; value: number; color: string }[]>([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -36,171 +45,240 @@ const StaffLayout = () => {
 
     if (!user) return;
 
+    // Get user profile name
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .single();
+    
+    if (profile) setUserName(profile.full_name);
+
     const bookings = await fetchStaffBookings(user.id);
     setBookings(bookings);
 
     const { paymentsWithBooking, stats } = await fetchStaffPayments(user.id);
-
     setPayments(paymentsWithBooking);
     setStats(stats);
 
+    // Calculate status distribution
+    const statusCounts: Record<string, number> = {
+      completed: stats.completed,
+      cancelled: stats.cancelled,
+      upcoming: stats.upcoming,
+    };
+
+    const statusColors: Record<string, string> = {
+      completed: "hsl(152, 60%, 42%)",
+      cancelled: "hsl(0, 72%, 55%)",
+      upcoming: "hsl(210, 80%, 52%)",
+    };
+
+    const statusData = Object.entries(statusCounts)
+      .filter(([_, value]) => value > 0)
+      .map(([name, value]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value,
+        color: statusColors[name] || "hsl(220, 10%, 50%)",
+      }));
+    
+    setBookingStatusData(statusData);
+
+    // Calculate last 7 days performance
+    const today = new Date();
+    const last7Days = eachDayOfInterval({
+      start: subDays(today, 6),
+      end: today,
+    });
+
+    const revenueByDay = (paymentsWithBooking || []).reduce((acc: any, p: any) => {
+      if (p?.booking?.status === "completed" && p?.payment_date) {
+        const day = format(new Date(p.payment_date), "yyyy-MM-dd");
+        acc[day] = (acc[day] || 0) + Number(p.amount || 0);
+      }
+      return acc;
+    }, {});
+
+    const performanceChartData = last7Days.map((day) => ({
+      name: format(day, "EEE"),
+      revenue: revenueByDay[format(day, "yyyy-MM-dd")] || 0,
+    }));
+
+    setPerformanceData(performanceChartData);
     setLoading(false);
   };
 
-  console.log("Stats", stats, "Bookings", bookings)
-  const getStatusColor = (status: string) => {
-    const colors: any = {
-      scheduled: "bg-blue-100 text-blue-800",
-      confirmed: "bg-green-100 text-green-800",
-      completed: "bg-gray-100 text-gray-800",
-      cancelled: "bg-red-100 text-red-800",
-      no_show: "bg-yellow-100 text-yellow-800",
-    };
-    return colors[status] || "bg-muted text-muted-foreground";
-  };
+  // Calculate completion rate
+  const completionRate = stats.total > 0 
+    ? Math.round((stats.completed / stats.total) * 100) 
+    : 0;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="text-center space-y-4">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-primary/20 rounded-full" />
+            <Loader2 className="w-16 h-16 absolute inset-0 animate-spin text-primary" />
+          </div>
+          <p className="text-muted-foreground font-medium">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Format recent bookings for activity list
+  const recentBookingItems = bookings.slice(0, 5).map((b) => ({
+    id: b.id,
+    title: b.services?.name || "Service",
+    subtitle: format(new Date(b.appointment_date), "MMM d") + " at " + b.appointment_time,
+    date: b.appointment_date,
+    status: b.status,
+  }));
+
+  // Format recent payments for activity list
+  const recentPaymentItems = payments.slice(0, 5).map((p) => ({
+    id: p.id,
+    title: p.booking?.services?.name || "Service Payment",
+    date: p.payment_date,
+    amount: Number(p.amount),
+  }));
 
   return (
     <div className="space-y-8 p-6">
-      {/* HEADER */}
-      <div>
-        <h1 className="text-3xl font-bold">Dashboard Overview</h1>
-        <p className="text-muted-foreground">
-          Track your bookings, payments, and performance
-        </p>
+      <DashboardHeader
+        title="Staff Dashboard"
+        userName={userName}
+        subtitle="Track your bookings, performance, and earnings"
+      />
+
+      {/* Stats Grid */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Total Bookings"
+          value={stats.total}
+          icon={<Calendar className="w-6 h-6" />}
+          variant="gold"
+          delay={0}
+        />
+        <StatCard
+          title="Upcoming"
+          value={stats.upcoming}
+          icon={<Clock className="w-6 h-6" />}
+          variant="blue"
+          delay={0.1}
+        />
+        <StatCard
+          title="Completed"
+          value={stats.completed}
+          icon={<TrendingUp className="w-6 h-6" />}
+          variant="green"
+          delay={0.2}
+        />
+        <StatCard
+          title="Cancelled"
+          value={stats.cancelled}
+          icon={<TrendingDown className="w-6 h-6" />}
+          variant="default"
+          delay={0.3}
+        />
       </div>
 
-      {/* STATS GRID */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="flex items-center justify-between p-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Total Bookings</p>
-              <p className="text-2xl font-bold">{stats.total}</p>
-            </div>
-            <TrendingUp className="text-primary w-6 h-6" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex items-center justify-between p-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Upcoming</p>
-              <p className="text-2xl font-bold">{stats.upcoming}</p>
-            </div>
-            <Calendar className="text-blue-600 w-6 h-6" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex items-center justify-between p-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Completed</p>
-              <p className="text-2xl font-bold">{stats.completed}</p>
-            </div>
-            <TrendingUp className="text-green-600 w-6 h-6" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex items-center justify-between p-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Cancelled</p>
-              <p className="text-2xl font-bold">{stats.cancelled}</p>
-            </div>
-            <TrendingDown className="text-red-600 w-6 h-6" />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* TOTAL EARNINGS */}
-      <Card className="bg-primary/5 border border-primary/20">
-        <CardHeader>
-          <CardTitle className="flex justify-between items-center">
-            <span>Total Earnings</span>
-            <DollarSign className="w-6 h-6 text-primary" />
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-3xl font-bold text-primary">
-            GH₵{stats.totalEarned.toLocaleString()}
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* RECENT BOOKINGS */}
-      <div>
-        <h2 className="text-xl font-semibold mb-3">Recent Bookings</h2>
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin" />
-          </div>
-        ) : bookings.length === 0 ? (
-          <Card className="p-6 text-center text-muted-foreground">
-            No assigned bookings for now.
+      {/* Earnings & Performance */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Total Earnings Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+        >
+          <Card className="gradient-gold text-primary-foreground h-full overflow-hidden relative">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+            <CardHeader className="relative z-10">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5" />
+                <CardTitle className="text-lg font-display">Total Earnings</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="relative z-10">
+              <p className="text-4xl font-bold font-display">
+                GH₵{stats.totalEarned.toLocaleString()}
+              </p>
+              <p className="text-sm opacity-80 mt-2">From completed services</p>
+            </CardContent>
           </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {bookings.slice(0, 6).map((booking) => (
-              <Card key={booking.id} className="hover:shadow-md">
-                <CardHeader className="flex justify-between items-start">
-                  <div>
-                    <CardTitle>{booking.services?.name}</CardTitle>
-                  </div>
-                  <Badge className={getStatusColor(booking.status)}>
-                    {booking.status}
-                  </Badge>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Calendar className="w-4 h-4" />
-                    {format(new Date(booking.appointment_date), "PPP")}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Clock className="w-4 h-4" />
-                    {booking.appointment_time}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+        </motion.div>
 
-      {/* PAYMENT LOGS */}
-      <div>
-        <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
-          <History className="w-5 h-5" /> Payment Logs
-        </h2>
-
-        {payments.length === 0 ? (
-          <Card className="p-6 text-center text-muted-foreground">
-            No payments recorded yet.
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {payments.slice(0, 5).map((p) => (
-              <Card
-                key={p.id}
-                className="flex items-center justify-between p-4"
-              >
-                <div>
-                  <p className="font-medium">
-                    {p.booking?.services?.name || "Service Payment"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {format(new Date(p.payment_date), "PPP")}
-                  </p>
+        {/* Completion Rate */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.5 }}
+        >
+          <Card className="glass-card h-full">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Target className="w-5 h-5 text-success" />
+                <CardTitle className="text-lg font-display">Completion Rate</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-end gap-3">
+                <p className="text-4xl font-bold font-display">{completionRate}%</p>
+                <div className="flex items-center gap-1 text-sm text-success mb-1">
+                  <Star className="w-4 h-4 fill-success" />
+                  <span>Excellent</span>
                 </div>
-                <Badge className="bg-green-100 text-green-800">
-                  GH₵{Number(p.amount).toLocaleString()}
-                </Badge>
-              </Card>
-            ))}
-          </div>
-        )}
+              </div>
+              <div className="mt-4 h-2 bg-muted rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${completionRate}%` }}
+                  transition={{ duration: 1, delay: 0.6 }}
+                  className="h-full bg-success rounded-full"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Booking Distribution */}
+        <DonutChart
+          data={bookingStatusData}
+          title="Booking Status"
+          subtitle="Your distribution"
+          centerValue={stats.total}
+          centerLabel="Total"
+        />
+      </div>
+
+      {/* Performance Chart */}
+      <RevenueChart
+        data={performanceData}
+        title="Your Earnings"
+        subtitle="Last 7 days performance"
+      />
+
+      {/* Activity Row */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ActivityList
+          title="Recent Bookings"
+          subtitle="Your latest appointments"
+          items={recentBookingItems}
+          icon={<Calendar className="w-5 h-5 text-primary" />}
+          emptyMessage="No assigned bookings yet"
+        />
+        <ActivityList
+          title="Payment History"
+          subtitle="Your earnings log"
+          items={recentPaymentItems}
+          showAmount
+          icon={<DollarSign className="w-5 h-5 text-success" />}
+          emptyMessage="No payments recorded yet"
+        />
       </div>
     </div>
   );
 };
 
-export default StaffLayout;
+export default StaffDashboard;

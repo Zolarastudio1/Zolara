@@ -1,25 +1,31 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, subDays, eachDayOfInterval } from "date-fns";
 import {
-  Loader2,
   Calendar,
   Clock,
   DollarSign,
   TrendingUp,
   TrendingDown,
-  History,
+  Sparkles,
+  Heart,
 } from "lucide-react";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { StatCard } from "@/components/dashboard/StatCard";
+import { RevenueChart } from "@/components/dashboard/RevenueChart";
+import { DonutChart } from "@/components/dashboard/DonutChart";
+import { ActivityList } from "@/components/dashboard/ActivityList";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { fetchClientBookings, fetchClientPayments } from "@/lib/utils";
 
 const ClientDashboard = () => {
   const [bookings, setBookings] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState("");
   const [stats, setStats] = useState({
     total: 0,
     completed: 0,
@@ -28,6 +34,9 @@ const ClientDashboard = () => {
     pending: 0,
     totalSpent: 0,
   });
+  const [spendingData, setSpendingData] = useState<{ name: string; revenue: number }[]>([]);
+  const [bookingStatusData, setBookingStatusData] = useState<{ name: string; value: number; color: string }[]>([]);
+  const [favoriteService, setFavoriteService] = useState("N/A");
 
   useEffect(() => {
     fetchDashboardData();
@@ -40,6 +49,15 @@ const ClientDashboard = () => {
       const user = (await supabase.auth.getUser()).data.user;
       if (!user) return;
 
+      // Get user profile name
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .single();
+      
+      if (profile) setUserName(profile.full_name);
+
       // Fetch client bookings
       const bookings = await fetchClientBookings(user.id);
       setBookings(bookings);
@@ -51,17 +69,75 @@ const ClientDashboard = () => {
       // Fetch pending booking requests for this client
       const { data: pendingRequests = [], error: pendingError } = await supabase
         .from("booking_requests")
-        .select("*, clients(*), services(*)")
-        .eq("client_id", user.id) // fetch only requests for this client
-        .eq("status", "pending") // only pending requests
+        .select("*, services(*)")
+        .eq("client_id", user.id)
+        .eq("status", "pending")
         .order("created_at", { ascending: false });
 
       if (pendingError) throw pendingError;
 
+      // Calculate status distribution
+      const statusCounts: Record<string, number> = {
+        completed: stats.completed,
+        cancelled: stats.cancelled,
+        upcoming: stats.upcoming,
+        pending: pendingRequests.length,
+      };
+
+      const statusColors: Record<string, string> = {
+        completed: "hsl(152, 60%, 42%)",
+        cancelled: "hsl(0, 72%, 55%)",
+        upcoming: "hsl(210, 80%, 52%)",
+        pending: "hsl(38, 92%, 50%)",
+      };
+
+      const statusData = Object.entries(statusCounts)
+        .filter(([_, value]) => value > 0)
+        .map(([name, value]) => ({
+          name: name.charAt(0).toUpperCase() + name.slice(1),
+          value,
+          color: statusColors[name] || "hsl(220, 10%, 50%)",
+        }));
+      
+      setBookingStatusData(statusData);
+
+      // Find favorite service
+      const serviceCounts = bookings.reduce((acc: any, b: any) => {
+        const serviceName = b.services?.name || "Unknown";
+        acc[serviceName] = (acc[serviceName] || 0) + 1;
+        return acc;
+      }, {});
+      const topService = Object.entries(serviceCounts).sort(
+        (a: any, b: any) => b[1] - a[1]
+      )[0]?.[0] || "N/A";
+      setFavoriteService(topService);
+
+      // Calculate last 6 months spending
+      const today = new Date();
+      const months = Array.from({ length: 6 }, (_, i) => {
+        const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        return { date, name: format(date, "MMM") };
+      }).reverse();
+
+      const spendingByMonth = (paymentsWithBooking || []).reduce((acc: any, p: any) => {
+        if (p?.payment_date) {
+          const month = format(new Date(p.payment_date), "MMM");
+          acc[month] = (acc[month] || 0) + Number(p.amount || 0);
+        }
+        return acc;
+      }, {});
+
+      const spendingChartData = months.map((m) => ({
+        name: m.name,
+        revenue: spendingByMonth[m.name] || 0,
+      }));
+
+      setSpendingData(spendingChartData);
+
       // Update stats including pending requests
       setStats({
         ...stats,
-        pending: pendingRequests.length, // add number of pending requests
+        pending: pendingRequests.length,
       });
     } catch (error: any) {
       console.error("Error fetching dashboard data:", error);
@@ -71,169 +147,173 @@ const ClientDashboard = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    const colors: any = {
-      scheduled: "bg-blue-100 text-blue-800",
-      confirmed: "bg-green-100 text-green-800",
-      completed: "bg-gray-100 text-gray-800",
-      cancelled: "bg-red-100 text-red-800",
-      no_show: "bg-yellow-100 text-yellow-800",
-    };
-    return colors[status] || "bg-muted text-muted-foreground";
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="text-center space-y-4">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-primary/20 rounded-full" />
+            <Loader2 className="w-16 h-16 absolute inset-0 animate-spin text-primary" />
+          </div>
+          <p className="text-muted-foreground font-medium">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Format recent bookings for activity list
+  const recentBookingItems = bookings.slice(0, 5).map((b) => ({
+    id: b.id,
+    title: b.services?.name || "Service",
+    subtitle: format(new Date(b.appointment_date), "MMM d") + " at " + b.appointment_time,
+    date: b.appointment_date,
+    status: b.status,
+  }));
+
+  // Format recent payments for activity list
+  const recentPaymentItems = payments.slice(0, 5).map((p: any) => ({
+    id: p.id,
+    title: p.booking?.services?.name || "Service Payment",
+    date: p.payment_date,
+    amount: Number(p.amount),
+  }));
 
   return (
     <div className="space-y-8 p-6">
-      {/* HEADER */}
-      <div>
-        <h1 className="text-3xl font-bold">Dashboard Overview</h1>
-        <p className="text-muted-foreground">
-          Track your activity, spending, and appointment history
-        </p>
-      </div>
+      <DashboardHeader
+        title="My Dashboard"
+        userName={userName}
+        subtitle="Track your beauty journey and appointments"
+      />
 
-      {/* STATS GRID */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+      {/* Stats Grid */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
-          title="Total Bookings"
+          title="Total Visits"
           value={stats.total}
-          icon={<TrendingUp className="w-6 h-6 text-primary" />}
+          icon={<Calendar className="w-6 h-6" />}
+          variant="gold"
+          delay={0}
         />
         <StatCard
           title="Upcoming"
           value={stats.upcoming}
-          icon={<Calendar className="w-6 h-6 text-blue-600" />}
+          icon={<Clock className="w-6 h-6" />}
+          variant="blue"
+          delay={0.1}
         />
         <StatCard
           title="Completed"
           value={stats.completed}
-          icon={<TrendingUp className="w-6 h-6 text-green-600" />}
+          icon={<TrendingUp className="w-6 h-6" />}
+          variant="green"
+          delay={0.2}
         />
         <StatCard
           title="Cancelled"
           value={stats.cancelled}
-          icon={<TrendingDown className="w-6 h-6 text-red-600" />}
+          icon={<TrendingDown className="w-6 h-6" />}
+          variant="default"
+          delay={0.3}
         />
         <StatCard
           title="Pending Requests"
           value={stats.pending}
-          icon={<Clock className="w-6 h-6 text-yellow-500" />}
+          icon={<Clock className="w-6 h-6" />}
+          variant="purple"
+          delay={0.4}
         />
       </div>
 
-      {/* TOTAL EXPENSES */}
-      <Card className="bg-primary/5 border border-primary/20">
-        <CardHeader>
-          <CardTitle className="flex justify-between items-center">
-            <span>Total Expenses</span>
-            GH₵
-            {/* <DollarSign className="w-6 h-6 text-primary" /> */}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-3xl font-bold text-primary">
-            GH₵{stats.totalSpent}
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* RECENT BOOKINGS */}
-      <div>
-        <h2 className="text-xl font-semibold mb-3">Recent Bookings</h2>
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin" />
-          </div>
-        ) : bookings.length === 0 ? (
-          <Card className="p-6 text-center text-muted-foreground">
-            No bookings yet.
+      {/* Spending & Distribution */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Total Spent Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.5 }}
+        >
+          <Card className="gradient-purple text-primary-foreground h-full overflow-hidden relative">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+            <CardHeader className="relative z-10">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5" />
+                <CardTitle className="text-lg font-display">Total Spent</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="relative z-10">
+              <p className="text-4xl font-bold font-display">
+                GH₵{stats.totalSpent.toLocaleString()}
+              </p>
+              <p className="text-sm opacity-80 mt-2">On beauty services</p>
+            </CardContent>
           </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {bookings.slice(0, 6).map((booking) => (
-              <Card key={booking.id} className="hover:shadow-md">
-                <CardHeader className="flex justify-between items-start">
-                  <div>
-                    <CardTitle>{booking.services?.name}</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      {booking.staff?.full_name || "Unassigned"}
-                    </p>
-                  </div>
-                  <Badge className={getStatusColor(booking.status)}>
-                    {booking.status}
-                  </Badge>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Calendar className="w-4 h-4" />
-                    {format(new Date(booking.appointment_date), "PPP")}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Clock className="w-4 h-4" />
-                    {booking.appointment_time}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+        </motion.div>
+
+        {/* Favorite Service */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.6 }}
+        >
+          <Card className="glass-card h-full">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Heart className="w-5 h-5 text-destructive fill-destructive" />
+                <CardTitle className="text-lg font-display">Your Favorite</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-primary/10">
+                  <Sparkles className="w-8 h-8 text-primary" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold font-display">{favoriteService}</p>
+                  <p className="text-sm text-muted-foreground">Most booked service</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Booking Distribution */}
+        <DonutChart
+          data={bookingStatusData}
+          title="Booking Status"
+          subtitle="Your appointment history"
+          centerValue={stats.total}
+          centerLabel="Total"
+        />
       </div>
 
-      {/* PAYMENT LOGS */}
-      <div>
-        <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
-          <History className="w-5 h-5" /> Payment Logs
-        </h2>
-        {payments.length === 0 ? (
-          <Card className="p-6 text-center text-muted-foreground">
-            No payments recorded yet.
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {payments.slice(0, 5).map((p) => (
-              <Card
-                key={p.id}
-                className="flex items-center justify-between p-4"
-              >
-                <div>
-                  <p className="font-medium">
-                    {p.bookings?.services?.name || "Service Payment"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {format(new Date(p.payment_date), "PPP")}
-                  </p>
-                </div>
-                <Badge className="bg-green-100 text-green-800">
-                  GH₵{Number(p.amount).toLocaleString()}
-                </Badge>
-              </Card>
-            ))}
-          </div>
-        )}
+      {/* Spending Chart */}
+      <RevenueChart
+        data={spendingData}
+        title="Your Spending"
+        subtitle="Last 6 months"
+      />
+
+      {/* Activity Row */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ActivityList
+          title="Recent Appointments"
+          subtitle="Your latest visits"
+          items={recentBookingItems}
+          icon={<Calendar className="w-5 h-5 text-primary" />}
+          emptyMessage="No appointments yet"
+        />
+        <ActivityList
+          title="Payment History"
+          subtitle="Your transactions"
+          items={recentPaymentItems}
+          showAmount
+          icon={<DollarSign className="w-5 h-5 text-success" />}
+          emptyMessage="No payments recorded yet"
+        />
       </div>
     </div>
   );
 };
 
 export default ClientDashboard;
-
-// Reusable Stat Card
-const StatCard = ({
-  title,
-  value,
-  icon,
-}: {
-  title: string;
-  value: number;
-  icon: React.ReactNode;
-}) => (
-  <Card className="rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-    <CardContent className="flex items-center justify-between p-5">
-      <div>
-        <p className="text-sm text-gray-500 uppercase tracking-wide">{title}</p>
-        <p className="text-2xl font-bold text-gray-900">{value}</p>
-      </div>
-      {icon}
-    </CardContent>
-  </Card>
-);

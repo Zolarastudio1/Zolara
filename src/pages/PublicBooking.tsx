@@ -59,11 +59,7 @@ const PublicBooking = () => {
 
   const fetchServices = async () => {
     try {
-      const { data, error } = await supabase
-        .from("services")
-        .select("*")
-        .eq("is_active", true)
-        .order("name");
+      const { data, error } = await supabase.from("services").select("*").order("name")
 
       if (error) throw error;
       setServices(data || []);
@@ -131,8 +127,8 @@ const PublicBooking = () => {
         .insert({
           client_id: clientId,
           service_id: validated.serviceId,
-          appointment_date: validated.preferredDate,
-          appointment_time: validated.preferredTime,
+          preferred_date: validated.preferredDate,
+          preferred_time: validated.preferredTime,
           notes: validated.notes || null,
           status: "pending",
         });
@@ -348,9 +344,9 @@ const PublicBooking = () => {
                           <SelectItem key={service.id} value={service.id}>
                             <span className="flex items-center justify-between w-full gap-4">
                               <span>{service.name}</span>
-                              <span className="text-muted-foreground">
+                              {/* <span className="text-muted-foreground">
                                 GH₵ {service.price.toFixed(2)}
-                              </span>
+                              </span> */}
                             </span>
                           </SelectItem>
                         ))}
@@ -364,9 +360,9 @@ const PublicBooking = () => {
                             <span className="text-white/70"> - {selectedService.description}</span>
                           )}
                         </p>
-                        <p className="text-champagne text-sm mt-1">
+                        {/* <p className="text-champagne text-sm mt-1">
                           Duration: {selectedService.duration_minutes} mins • Price: GH₵ {selectedService.price.toFixed(2)}
-                        </p>
+                        </p> */}
                       </div>
                     )}
                   </div>

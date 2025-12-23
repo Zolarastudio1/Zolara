@@ -176,9 +176,7 @@ const Clients = () => {
   };
 
   const fetchClientActivity = async () => {
-    const { data, error } = await supabase
-      .from("bookings")
-      .select("client_id");
+    const { data, error } = await supabase.from("bookings").select("client_id");
 
     if (error) {
       console.error("Activity fetch error:", error);
@@ -226,47 +224,45 @@ const Clients = () => {
 
   // Centralized filter application so filters compose
   const runFilters = () => {
-  let data = [...clients];
+    let data = [...clients];
 
-  // --- Date Filter ---
-  if (startDate || endDate) {
-    data = data.filter((item) => {
-      const created = new Date(item.created_at);
-      if (startDate && created < new Date(startDate)) return false;
-      if (endDate && created > new Date(endDate)) return false;
-      return true;
-    });
-  }
+    // --- Date Filter ---
+    if (startDate || endDate) {
+      data = data.filter((item) => {
+        const created = new Date(item.created_at);
+        if (startDate && created < new Date(startDate)) return false;
+        if (endDate && created > new Date(endDate)) return false;
+        return true;
+      });
+    }
 
-  // --- Status Filter ---
-  if (activeFilter && activeFilter !== "none") {
-    // activeFilter is already typed, no need to filter by status here
-  }
+    // --- Status Filter ---
+    if (activeFilter && activeFilter !== "none") {
+      // activeFilter is already typed, no need to filter by status here
+    }
 
-  // --- Service Filter ---
-  if (selectedService && selectedService !== "all") {
-    data = data.filter((item) => item.service === selectedService);
-  }
+    // --- Service Filter ---
+    if (selectedService && selectedService !== "all") {
+      data = data.filter((item) => item.service === selectedService);
+    }
 
-  // --- Search Filter ---
-  if (searchTerm.trim() !== "") {
-    const term = searchTerm.toLowerCase();
-    data = data.filter(
-      (item) =>
-        item.full_name?.toLowerCase().includes(term) ||
-        item.phone?.toLowerCase().includes(term) ||
-        item.email?.toLowerCase().includes(term)
-    );
-  }
+    // --- Search Filter ---
+    if (searchTerm.trim() !== "") {
+      const term = searchTerm.toLowerCase();
+      data = data.filter(
+        (item) =>
+          item.full_name?.toLowerCase().includes(term) ||
+          item.phone?.toLowerCase().includes(term) ||
+          item.email?.toLowerCase().includes(term)
+      );
+    }
 
-  setFilteredClients(data);
-};
-
+    setFilteredClients(data);
+  };
 
   useEffect(() => {
     runFilters();
-}, [clients, startDate, endDate, activeFilter, selectedService, searchTerm]);
-
+  }, [clients, startDate, endDate, activeFilter, selectedService, searchTerm]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -320,8 +316,11 @@ const Clients = () => {
         if (error) throw error;
         toast.success("Client updated successfully");
       } else {
-        // Insert new client
-        const { error } = await supabase.from("clients").insert([clientData]);
+        // Invoke the generic invite Edge Function
+        const { data, error } = await supabase.functions.invoke("invite-user", {
+          method: "POST",
+          body: clientData,
+        });
         if (error) throw error;
         toast.success("Client added successfully");
       }
@@ -491,7 +490,7 @@ const Clients = () => {
             data={clients}
             placeholder="Search clients..."
             onSearchResults={(results) => {
-              setSearchResults(results);
+              setFilteredClients(results);
               setActiveFilter("search");
             }}
           />

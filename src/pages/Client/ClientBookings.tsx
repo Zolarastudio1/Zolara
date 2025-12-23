@@ -176,7 +176,8 @@ const ClientBookings = () => {
         phone: user.user_metadata.phone || "",
       });
     }
-// @ts-ignore
+
+    // @ts-ignore
     const { error } = await supabase.from("booking_requests").insert([
       {
         client_id: user.id,

@@ -254,9 +254,18 @@ const Staff = () => {
         if (error) throw error;
         toast.success("Staff updated successfully");
       } else {
-        const { error } = await supabase.from("staff").insert([staffData]);
-        if (error) throw error;
-        toast.success("Staff added successfully");
+         // Invoke the generic invite Edge Function
+        const { data, error } = await supabase.functions.invoke("invite-user", {
+          method: "POST",
+          body: JSON.stringify(staffData),
+        });
+
+        if (error) {
+          console.error("Edge function error:", error);
+        } else {
+          console.log("User created:", data);
+          toast.success("Staff added successfully");
+        }
       }
 
       setDialogOpen(false);

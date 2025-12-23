@@ -284,7 +284,8 @@ const Bookings = () => {
 
         if (insertError) throw insertError;
         toast.success("Booking created and request approved!");
-        fetchData(); // refresh bookings list
+        fetchBookingRequests();
+        fetchBookings();
       } else {
         toast.info("Request declined");
       }

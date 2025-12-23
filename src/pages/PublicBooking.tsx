@@ -123,7 +123,7 @@ const PublicBooking = () => {
 
       // Create booking request
       const { error: bookingError } = await supabase
-        .from("booking_requests")
+        .from("booking_requests") //@ts-ignore
         .insert({
           client_id: clientId,
           service_id: validated.serviceId,

@@ -274,7 +274,8 @@ const Clients = () => {
       const clientData: any = {
         full_name: validated.full_name,
         phone: validated.phone,
-        ...(validated.email && { email: validated.email }),
+        email: validated.email,
+        role: "client",
         ...(validated.address && { address: validated.address }),
         ...(validated.notes && { notes: validated.notes }),
       };

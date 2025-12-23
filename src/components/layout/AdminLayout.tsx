@@ -92,7 +92,7 @@ const AdminDashboard = () => {
         supabase.from("bookings").select("status").gte("created_at", startOfThisMonth),
         supabase.from("bookings").select("*, services(name), clients(full_name)").order("created_at", { ascending: false }).limit(5),
         supabase.from("payments").select("*, bookings(services(name))").order("payment_date", { ascending: false }).limit(5),
-        supabase.from("payments").select("amount, payment_date").gte("payment_date", format(subDays(today, 6), "yyyy-MM-dd")).eq("payment_status", "completed"),
+        supabase.from("payments").select("amount, payment_date").gte("payment_date", format(subDays(today, 30), "yyyy-MM-dd")).eq("payment_status", "completed"),
       ]);
 
       // Calculate stats
@@ -145,9 +145,9 @@ const AdminDashboard = () => {
           }))
         : [];
 
-      // Last 7 days revenue chart
+      // Last 30 days revenue chart
       const last7Days = eachDayOfInterval({
-        start: subDays(today, 6),
+        start: subDays(today, 30),
         end: today,
       });
 
@@ -304,7 +304,7 @@ const AdminDashboard = () => {
           <RevenueChart
             data={revenueData}
             title="Revenue Trend"
-            subtitle="Last 7 days performance"
+            subtitle="Last 30 days performance"
           />
         </div>
         <div className="lg:col-span-2">

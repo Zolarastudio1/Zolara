@@ -176,13 +176,13 @@ const ClientBookings = () => {
         phone: user.user_metadata.phone || "",
       });
     }
-
+// @ts-ignore
     const { error } = await supabase.from("booking_requests").insert([
       {
         client_id: user.id,
         service_id: selectedService,
-        appointment_date: preferredDate,
-        appointment_time: preferredTime,
+        preferred_date: preferredDate,
+        preferred_time: preferredTime,
         notes,
         status: "pending",
       },

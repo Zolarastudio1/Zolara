@@ -127,16 +127,16 @@ const ViewServices = () => {
                         </Badge>
                       </div>
                     </div>
-                    <p className="text-2xl font-bold text-primary">
+                    {/* <p className="text-2xl font-bold text-primary">
                       GH₵{service.price.toLocaleString()}
-                    </p>
+                    </p> */}
                   </CardHeader>
 
                   <CardContent className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    {/* <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Clock className="w-4 h-4" />
                       <span>{service.duration_minutes} minutes</span>
-                    </div>
+                    </div> */}
                     {service.description && (
                       <p className="text-sm text-muted-foreground line-clamp-2">
                         {service.description}

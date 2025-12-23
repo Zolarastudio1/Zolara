@@ -272,10 +272,10 @@ const Clients = () => {
       const validated = clientSchema.parse(formData);
 
       const clientData: any = {
+        role: "client",
         full_name: validated.full_name,
         phone: validated.phone,
         email: validated.email,
-        role: "client",
         ...(validated.address && { address: validated.address }),
         ...(validated.notes && { notes: validated.notes }),
       };
@@ -320,10 +320,15 @@ const Clients = () => {
         // Invoke the generic invite Edge Function
         const { data, error } = await supabase.functions.invoke("invite-user", {
           method: "POST",
-          body: clientData,
+          body: JSON.stringify(clientData),
         });
-        if (error) throw error;
-        toast.success("Client added successfully");
+
+        if (error) {
+          console.error("Edge function error:", error);
+        } else {
+          console.log("User created:", data);
+          toast.success("Client added successfully");
+        }
       }
 
       // Reset form

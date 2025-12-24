@@ -2,6 +2,16 @@ import { useState, useEffect } from "react";
 import { Outlet, useNavigate, Link, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { User } from "@supabase/supabase-js";
 import {
   LayoutDashboard,
@@ -29,6 +39,7 @@ const DashboardLayout = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -110,9 +121,13 @@ const DashboardLayout = () => {
         return baseNavItems
           .filter(
             (item) =>
-              !["Sales", "Reports", "Attendance Reports", "Settings", "Staff"].includes(
-                item.label
-              )
+              ![
+                "Sales",
+                "Reports",
+                "Attendance Reports",
+                "Settings",
+                "Staff",
+              ].includes(item.label)
           )
           .map((item) => ({
             ...item,
@@ -153,7 +168,7 @@ const DashboardLayout = () => {
             ...item,
             path: `/app/client/${item.path}`,
           }));
-      
+
       default:
         return [];
     }
@@ -247,11 +262,33 @@ const DashboardLayout = () => {
             <Button
               variant="ghost"
               className="w-full justify-start text-white hover:bg-white/20"
-              onClick={handleLogout}
+              onClick={() => setOpen(true)}
             >
               <LogOut className="w-4 h-4 mr-2" />
               Logout
             </Button>
+            <AlertDialog open={open} onOpenChange={setOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Log out?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    You will be signed out of your account.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      setOpen(false);
+                      handleLogout();
+                    }}
+                  >
+                    Logout
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </aside>

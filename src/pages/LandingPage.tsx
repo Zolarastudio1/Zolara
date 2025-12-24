@@ -1,35 +1,59 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { 
-  Scissors, 
-  Sparkles, 
-  Star, 
-  Clock, 
-  MapPin, 
-  Phone, 
+import {
+  Scissors,
+  Sparkles,
+  Star,
+  Clock,
+  MapPin,
+  Phone,
   Instagram,
   Facebook,
   Mail,
   ChevronRight,
-  Heart
+  Heart,
 } from "lucide-react";
 import { useSettings } from "@/context/SettingsContext";
 
 const LandingPage = () => {
   const { settings } = useSettings();
-  
+
   const services = [
-    { name: "Hair Styling", icon: Scissors, description: "Expert cuts, coloring & styling" },
-    { name: "Nail Care", icon: Sparkles, description: "Manicures, pedicures & nail art" },
-    { name: "Facial Treatments", icon: Heart, description: "Rejuvenating skin treatments" },
+    {
+      name: "Hair Styling",
+      icon: Scissors,
+      description: "Expert cuts, coloring & styling",
+    },
+    {
+      name: "Nail Care",
+      icon: Sparkles,
+      description: "Manicures, pedicures & nail art",
+    },
+    {
+      name: "Facial Treatments",
+      icon: Heart,
+      description: "Rejuvenating skin treatments",
+    },
     { name: "Makeup", icon: Star, description: "Bridal & occasion makeup" },
   ];
 
   const testimonials = [
-    { name: "Ama K.", text: "Best salon experience ever! The staff is so professional and friendly.", rating: 5 },
-    { name: "Efua M.", text: "I love coming here for my hair treatments. Always leave feeling beautiful!", rating: 5 },
-    { name: "Nana A.", text: "The ambiance is amazing and the services are top-notch.", rating: 5 },
+    {
+      name: "Ama K.",
+      text: "Best salon experience ever! The staff is so professional and friendly.",
+      rating: 5,
+    },
+    {
+      name: "Efua M.",
+      text: "I love coming here for my hair treatments. Always leave feeling beautiful!",
+      rating: 5,
+    },
+    {
+      name: "Nana A.",
+      text: "The ambiance is amazing and the services are top-notch.",
+      rating: 5,
+    },
   ];
 
   return (
@@ -39,9 +63,12 @@ const LandingPage = () => {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-champagne">
-              <img 
-                src={settings?.logo_url || "https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg"} 
-                alt="Zolara Logo" 
+              <img
+                src={
+                  settings?.logo_url ||
+                  "https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg"
+                }
+                alt="Zolara Logo"
                 className="w-full h-full object-cover"
               />
             </div>
@@ -51,11 +78,36 @@ const LandingPage = () => {
             </span>
           </div>
           <div className="hidden md:flex items-center gap-6">
-            <a href="#services" className="text-white/80 hover:text-champagne transition-colors">Services</a>
-            <a href="#gallery" className="text-white/80 hover:text-champagne transition-colors">Gallery</a>
-            <a href="#about" className="text-white/80 hover:text-champagne transition-colors">About</a>
-            <a href="#testimonials" className="text-white/80 hover:text-champagne transition-colors">Reviews</a>
-            <a href="#contact" className="text-white/80 hover:text-champagne transition-colors">Contact</a>
+            <a
+              href="#services"
+              className="text-white/80 hover:text-champagne transition-colors"
+            >
+              Services
+            </a>
+            <a
+              href="#gallery"
+              className="text-white/80 hover:text-champagne transition-colors"
+            >
+              Gallery
+            </a>
+            <a
+              href="#about"
+              className="text-white/80 hover:text-champagne transition-colors"
+            >
+              About
+            </a>
+            <a
+              href="#testimonials"
+              className="text-white/80 hover:text-champagne transition-colors"
+            >
+              Reviews
+            </a>
+            <a
+              href="#contact"
+              className="text-white/80 hover:text-champagne transition-colors"
+            >
+              Contact
+            </a>
           </div>
           <Link to="/book">
             <Button className="bg-champagne hover:bg-champagne-dark text-white">
@@ -66,10 +118,11 @@ const LandingPage = () => {
       </nav>
 
       {/* Hero Section */}
-      <section 
+      <section
         className="min-h-screen flex items-center justify-center relative pt-20"
         style={{
-          backgroundImage: "url('https://images.unsplash.com/photo-1560066984-138dadb4c035?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80')",
+          backgroundImage:
+            "url('https://images.unsplash.com/photo-1560066984-138dadb4c035?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80')",
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
@@ -77,9 +130,12 @@ const LandingPage = () => {
         <div className="absolute inset-0 bg-black/60" />
         <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
           <div className="mx-auto w-28 h-28 rounded-full overflow-hidden border-4 border-champagne mb-8 shadow-2xl">
-            <img 
-              src={settings?.logo_url || "https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg"} 
-              alt="Zolara Logo" 
+            <img
+              src={
+                settings?.logo_url ||
+                "https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg"
+              }
+              alt="Zolara Logo"
               className="w-full h-full object-cover"
             />
           </div>
@@ -93,17 +149,25 @@ const LandingPage = () => {
             <Sparkles className="w-6 h-6" />
           </p>
           <p className="text-lg text-white/80 mb-10 max-w-2xl mx-auto">
-            Experience premium beauty services in a luxurious setting. Our expert stylists are dedicated to bringing out your natural beauty.
+            Experience premium beauty services in a luxurious setting. Our
+            expert stylists are dedicated to bringing out your natural beauty.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/book">
-              <Button size="lg" className="bg-champagne hover:bg-champagne-dark text-white text-lg px-8 py-6 shadow-xl">
+              <Button
+                size="lg"
+                className="bg-champagne hover:bg-champagne-dark text-white text-lg px-8 py-6 shadow-xl"
+              >
                 Book an Appointment
                 <ChevronRight className="ml-2" />
               </Button>
             </Link>
             <a href="#services">
-              <Button size="lg" variant="outline" className="border-white text-gray hover:bg-white/10 text-lg px-8 py-6">
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-white text-gray hover:bg-white/10 text-lg px-8 py-6"
+              >
                 View Services
               </Button>
             </a>
@@ -115,19 +179,27 @@ const LandingPage = () => {
       <section id="services" className="py-20 bg-secondary">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-foreground mb-4">Our Services</h2>
+            <h2 className="text-4xl font-bold text-foreground mb-4">
+              Our Services
+            </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              We offer a wide range of premium beauty services to help you look and feel your best.
+              We offer a wide range of premium beauty services to help you look
+              and feel your best.
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {services.map((service, index) => (
-              <Card key={index} className="bg-card hover:shadow-xl transition-shadow border-champagne/20 group hover:border-champagne">
+              <Card
+                key={index}
+                className="bg-card hover:shadow-xl transition-shadow border-champagne/20 group hover:border-champagne"
+              >
                 <CardContent className="p-6 text-center">
                   <div className="w-16 h-16 mx-auto mb-4 bg-champagne/10 rounded-full flex items-center justify-center group-hover:bg-champagne/20 transition-colors">
                     <service.icon className="w-8 h-8 text-champagne" />
                   </div>
-                  <h3 className="text-xl font-semibold text-foreground mb-2">{service.name}</h3>
+                  <h3 className="text-xl font-semibold text-foreground mb-2">
+                    {service.name}
+                  </h3>
                   <p className="text-muted-foreground">{service.description}</p>
                 </CardContent>
               </Card>
@@ -149,13 +221,19 @@ const LandingPage = () => {
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
-              <h2 className="text-4xl font-bold text-foreground mb-6">About Us</h2>
+              <h2 className="text-4xl font-bold text-foreground mb-6">
+                About Us
+              </h2>
               <p className="text-muted-foreground mb-4 leading-relaxed">
                 {/* @ts-ignore */}
-                {settings?.business_name || "Zolara Beauty Studio"} is a premier beauty destination committed to providing exceptional services in a relaxing and luxurious environment.
+                {settings?.business_name || "Zolara Beauty Studio"} is a premier
+                beauty destination committed to providing exceptional services
+                in a relaxing and luxurious environment.
               </p>
               <p className="text-muted-foreground mb-6 leading-relaxed">
-                Our team of skilled professionals uses only the finest products and techniques to ensure you leave feeling refreshed, rejuvenated, and beautiful.
+                Our team of skilled professionals uses only the finest products
+                and techniques to ensure you leave feeling refreshed,
+                rejuvenated, and beautiful.
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex items-center gap-3">
@@ -165,7 +243,8 @@ const LandingPage = () => {
                   <div>
                     <p className="font-medium text-foreground">Open Hours</p>
                     <p className="text-sm text-muted-foreground">
-                      {(settings as any).opening_time || "9:00 AM"} - {(settings as any).closing_time || "6:00 PM"}
+                      {(settings as any).opening_time || "9:00 AM"} -{" "}
+                      {(settings as any).closing_time || "6:00 PM"}
                     </p>
                   </div>
                 </div>
@@ -174,14 +253,18 @@ const LandingPage = () => {
                     <Star className="w-5 h-5 text-champagne" />
                   </div>
                   <div>
-                    <p className="font-medium text-foreground">5-Star Service</p>
-                    <p className="text-sm text-muted-foreground">Premium Quality</p>
+                    <p className="font-medium text-foreground">
+                      5-Star Service
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Premium Quality
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
             <div className="relative">
-              <img 
+              <img
                 src="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
                 alt="Salon Interior"
                 className="rounded-2xl shadow-2xl"
@@ -205,25 +288,24 @@ const LandingPage = () => {
             </p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {[
-              "https://images.unsplash.com/photo-1560066984-138dadb4c035?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-              "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-              "https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-              "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-              "https://images.unsplash.com/photo-1562322140-8baeababf5df?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-              "https://images.unsplash.com/photo-1457972729786-0411a3b2b626?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-              "https://images.unsplash.com/photo-1470259078422-826894b933aa?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-              "https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-            ].map((src, index) => (
-              <div key={index} className="group relative overflow-hidden rounded-xl aspect-square">
-                <img 
-                  src={src}
-                  alt={`Gallery image ${index + 1}`}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300" />
-              </div>
-            ))}
+            {/* @ts-ignore */}
+            {settings.gallery_images?.length > 0 &&
+              // @ts-ignore
+              settings.gallery_images.map((src, index) => (
+                <div
+                  key={index}
+                  className="group relative overflow-hidden rounded-xl aspect-square"
+                >
+                  <img
+                    src={src}
+                    alt={`Gallery image ${index + 1}`}
+                    loading="lazy"
+                    onError={(e) => (e.currentTarget.src = "/placeholder.png")}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300" />
+                </div>
+              ))}
           </div>
         </div>
       </section>
@@ -239,15 +321,25 @@ const LandingPage = () => {
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {testimonials.map((testimonial, index) => (
-              <Card key={index} className="bg-white/5 border-white/10 backdrop-blur">
+              <Card
+                key={index}
+                className="bg-white/5 border-white/10 backdrop-blur"
+              >
                 <CardContent className="p-6">
                   <div className="flex gap-1 mb-4">
                     {[...Array(testimonial.rating)].map((_, i) => (
-                      <Star key={i} className="w-5 h-5 fill-champagne text-champagne" />
+                      <Star
+                        key={i}
+                        className="w-5 h-5 fill-champagne text-champagne"
+                      />
                     ))}
                   </div>
-                  <p className="text-white/80 mb-4 italic">"{testimonial.text}"</p>
-                  <p className="font-semibold text-champagne">{testimonial.name}</p>
+                  <p className="text-white/80 mb-4 italic">
+                    "{testimonial.text}"
+                  </p>
+                  <p className="font-semibold text-champagne">
+                    {testimonial.name}
+                  </p>
                 </CardContent>
               </Card>
             ))}
@@ -259,7 +351,9 @@ const LandingPage = () => {
       <section id="contact" className="py-20 bg-secondary">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-foreground mb-4">Visit Us</h2>
+            <h2 className="text-4xl font-bold text-foreground mb-4">
+              Visit Us
+            </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               We'd love to see you! Book an appointment or stop by our studio.
             </p>
@@ -273,7 +367,8 @@ const LandingPage = () => {
                 <h3 className="font-semibold text-foreground mb-2">Location</h3>
                 <p className="text-muted-foreground text-sm">
                   {/* @ts-ignore */}
-                  {settings?.business_address || "123 Beauty Lane, Accra, Ghana"}
+                  {settings?.business_address ||
+                    "123 Beauty Lane, Accra, Ghana"}
                 </p>
               </CardContent>
             </Card>
@@ -304,7 +399,10 @@ const LandingPage = () => {
           </div>
           <div className="text-center mt-10">
             <Link to="/book">
-              <Button size="lg" className="bg-champagne hover:bg-champagne-dark text-white text-lg px-8">
+              <Button
+                size="lg"
+                className="bg-champagne hover:bg-champagne-dark text-white text-lg px-8"
+              >
                 Book Your Appointment
                 <ChevronRight className="ml-2" />
               </Button>
@@ -320,9 +418,12 @@ const LandingPage = () => {
             <div>
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-champagne">
-                  <img 
-                    src={settings?.logo_url || "https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg"} 
-                    alt="Zolara Logo" 
+                  <img
+                    src={
+                      settings?.logo_url ||
+                      "https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg"
+                    }
+                    alt="Zolara Logo"
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -331,23 +432,70 @@ const LandingPage = () => {
                   {settings?.business_name || "Zolara"}
                 </span>
               </div>
-              <p className="text-white/60 text-sm">Where Beauty Meets Excellence</p>
+              <p className="text-white/60 text-sm">
+                Where Beauty Meets Excellence
+              </p>
             </div>
             <div>
               <h4 className="font-semibold mb-4 text-champagne">Quick Links</h4>
               <ul className="space-y-2 text-sm text-white/70">
-                <li><a href="#services" className="hover:text-champagne transition-colors">Services</a></li>
-                <li><a href="#gallery" className="hover:text-champagne transition-colors">Gallery</a></li>
-                <li><a href="#about" className="hover:text-champagne transition-colors">About Us</a></li>
-                <li><a href="#testimonials" className="hover:text-champagne transition-colors">Reviews</a></li>
-                <li><a href="#contact" className="hover:text-champagne transition-colors">Contact</a></li>
-                <li><Link to="/book" className="hover:text-champagne transition-colors">Book Appointment</Link></li>
+                <li>
+                  <a
+                    href="#services"
+                    className="hover:text-champagne transition-colors"
+                  >
+                    Services
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#gallery"
+                    className="hover:text-champagne transition-colors"
+                  >
+                    Gallery
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#about"
+                    className="hover:text-champagne transition-colors"
+                  >
+                    About Us
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#testimonials"
+                    className="hover:text-champagne transition-colors"
+                  >
+                    Reviews
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#contact"
+                    className="hover:text-champagne transition-colors"
+                  >
+                    Contact
+                  </a>
+                </li>
+                <li>
+                  <Link
+                    to="/book"
+                    className="hover:text-champagne transition-colors"
+                  >
+                    Book Appointment
+                  </Link>
+                </li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold mb-4 text-champagne">Hours</h4>
               <ul className="space-y-2 text-sm text-white/70">
-                <li>{(settings as any).open_time || "8:30 AM"} - {(settings as any).close_time || "20:30 PM"}</li>
+                <li>
+                  {(settings as any).open_time || "8:30 AM"} -{" "}
+                  {(settings as any).close_time || "20:30 PM"}
+                </li>
                 {/* <li>Saturday: {(settings as any).open_time || "9:00 AM"} - {(settings as any).close_time || "6:00 PM"}</li>
                 <li>Sunday: Closed</li> */}
               </ul>
@@ -355,10 +503,16 @@ const LandingPage = () => {
             <div>
               <h4 className="font-semibold mb-4 text-champagne">Follow Us</h4>
               <div className="flex gap-4">
-                <a href="#" className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-champagne transition-colors">
+                <a
+                  href="#"
+                  className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-champagne transition-colors"
+                >
                   <Instagram className="w-5 h-5" />
                 </a>
-                <a href="#" className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-champagne transition-colors">
+                <a
+                  href="#"
+                  className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-champagne transition-colors"
+                >
                   <Facebook className="w-5 h-5" />
                 </a>
               </div>
@@ -366,14 +520,21 @@ const LandingPage = () => {
           </div>
           <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-white/50 text-sm">
-              © {new Date().getFullYear()} {(settings as any)?.business_name || "Zolara Beauty Studio"}. All rights reserved.
+              © {new Date().getFullYear()}{" "}
+              {(settings as any)?.business_name || "Zolara Beauty Studio"}. All
+              rights reserved.
             </p>
             <div className="flex items-center gap-4">
-              <Link to="/app/auth" className="text-champagne/80 hover:text-champagne text-sm transition-colors font-medium">
+              <Link
+                to="/app/auth"
+                className="text-champagne/80 hover:text-champagne text-sm transition-colors font-medium"
+              >
                 Staff Login
               </Link>
               <span className="text-white/30">|</span>
-              <p className="text-white/50 text-sm">Powered by Zolara Management System</p>
+              <p className="text-white/50 text-sm">
+                Powered by Zolara Management System
+              </p>
             </div>
           </div>
         </div>

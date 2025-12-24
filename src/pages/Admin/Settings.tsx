@@ -10,6 +10,7 @@ import { PermissionLevelsSection } from "@/components/settings/PermissionLevelsS
 import { DataManagementSection } from "@/components/settings/DataManagementSection";
 import { BackupRestoreSection } from "@/components/settings/BackupRestoreSection";
 import { Loader2 } from "lucide-react";
+import { GallerySettingsSection } from "@/components/settings/GalllerySection";
 
 interface PaymentMethod {
   id: string;
@@ -137,7 +138,8 @@ export default function Settings() {
         business_email: settings.business_email,
         business_address: settings.business_address,
         payment_methods: settings.payment_methods,
-        paystack_enabled: settings.paystack_enabled,
+        paystack_enabled: settings.paystack_enabled, //@ts-ignore
+        gallery_images: settings.gallery_images,
       };
 
       if (settings.id) {
@@ -149,7 +151,9 @@ export default function Settings() {
         if (error) throw error;
         toast.success("Settings updated successfully!");
       } else {
-        const { error } = await (supabase as any).from("settings").insert([settingsData]);
+        const { error } = await (supabase as any)
+          .from("settings")
+          .insert([settingsData]);
         if (error) throw error;
         toast.success("Settings saved successfully!");
       }
@@ -207,12 +211,16 @@ export default function Settings() {
           phone={settings.business_phone}
           email={settings.business_email}
           address={settings.business_address}
-          onBusinessNameChange={(v) => setSettings({ ...settings, business_name: v })}
+          onBusinessNameChange={(v) =>
+            setSettings({ ...settings, business_name: v })
+          }
           onLogoUrlChange={(v) => setSettings({ ...settings, logo_url: v })}
           onLogoFileChange={setLogoFile}
           onPhoneChange={(v) => setSettings({ ...settings, business_phone: v })}
           onEmailChange={(v) => setSettings({ ...settings, business_email: v })}
-          onAddressChange={(v) => setSettings({ ...settings, business_address: v })}
+          onAddressChange={(v) =>
+            setSettings({ ...settings, business_address: v })
+          }
         />
 
         <OperatingHoursSection
@@ -223,21 +231,27 @@ export default function Settings() {
           onOpenTimeChange={(v) => setSettings({ ...settings, open_time: v })}
           onCloseTimeChange={(v) => setSettings({ ...settings, close_time: v })}
           onCurrencyChange={(v) => setSettings({ ...settings, currency: v })}
-          onFormatChange={(v) => setSettings({ ...settings, use_24_hour_format: v })}
+          onFormatChange={(v) =>
+            setSettings({ ...settings, use_24_hour_format: v })
+          }
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <DraggableListSection
             title="Staff Roles"
             items={settings.staff_roles}
-            onItemsChange={(items) => setSettings({ ...settings, staff_roles: items })}
+            onItemsChange={(items) =>
+              setSettings({ ...settings, staff_roles: items })
+            }
             addButtonText="Add Role"
           />
 
           <DraggableListSection
             title="Service Categories"
             items={settings.service_categories}
-            onItemsChange={(items) => setSettings({ ...settings, service_categories: items })}
+            onItemsChange={(items) =>
+              setSettings({ ...settings, service_categories: items })
+            }
             addButtonText="Add Category"
           />
         </div>
@@ -248,11 +262,20 @@ export default function Settings() {
           paymentMethods={settings.payment_methods}
           paystackEnabled={settings.paystack_enabled}
           onPaymentMethodToggle={handlePaymentMethodToggle}
-          onPaystackToggle={(v) => setSettings({ ...settings, paystack_enabled: v })}
+          onPaystackToggle={(v) =>
+            setSettings({ ...settings, paystack_enabled: v })
+          }
         />
 
         <DataManagementSection />
-
+        <GallerySettingsSection //@ts-ignore
+          settingsId={settings.id!} //@ts-ignore
+          images={settings.gallery_images || []} //@ts-ignore
+          onSaved={(imgs) => { //@ts-ignore
+            setSettings({ ...settings, gallery_images: imgs });
+            fetchSettings();
+          }}
+        />
         <BackupRestoreSection settings={settings} onRestore={handleRestore} />
       </div>
     </div>

@@ -277,6 +277,36 @@ const Auth = () => {
         return;
       }
 
+      const userId = authData.user.id;
+
+      // Insert into profiles
+      const { error: profileError } = await supabase.from("profiles").insert({
+        id: userId,
+        email: validated.email,
+        full_name: validated.fullName,
+        phone: validated.phone,
+      });
+      if (profileError) throw profileError;
+
+      // Insert into user_roles
+      const { error: roleError } = await supabase
+        .from("user_roles")
+        .insert({ user_id: userId, role: roleToAssign });
+      if (roleError) throw roleError;
+
+      if (roleToAssign === "client") {
+        const { error } = await supabase.from("clients").insert({
+          id: userId,
+          email: validated.email,
+          full_name: validated.fullName,
+          phone: validated.phone,
+          address: "",
+          notes: "",
+          image: "",
+        });
+        if (error) throw error;
+      }
+
       // Success: save user data locally
       const userData = {
         id: authData.user.id,
@@ -432,7 +462,10 @@ const Auth = () => {
         <div className="max-w-md text-center space-y-6">
           <div className="mx-auto w-24 h-24 bg-white/20 backdrop-blur rounded-full flex items-center justify-center overflow-hidden border-2 border-champagne shadow-xl">
             <img
-              src={settings.logo_url || "https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg"}
+              src={
+                settings.logo_url ||
+                "https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg"
+              }
               className="w-full h-full object-cover"
               alt="Zolara Logo"
             />

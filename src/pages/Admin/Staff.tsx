@@ -126,6 +126,7 @@ const Staff = () => {
         .order("full_name");
       if (error) throw error;
       setStaff(data || []);
+      
       // Staff ratings feature disabled - rating column doesn't exist on bookings table
       setStaffRatings({});
     } catch (error) {

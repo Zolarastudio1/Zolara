@@ -272,14 +272,14 @@ const Bookings = () => {
       // If approved, create a new booking automatically
       if (status === "approved") {
         const { data: bookingData, error: insertError } = await supabase
-          .from("bookings")
+          .from("bookings") //@ts-ignore
           .insert([
             {
               client_id: request.client_id,
               staff_id: request.staff_id || null,
               service_id: request.service_id,
-              appointment_date: request.appointment_date,
-              appointment_time: request.appointment_time,
+              appointment_date: request.preferred_date,
+              preferred_time: request.preferred_time,
               status: "scheduled",
               notes: request.notes,
             },

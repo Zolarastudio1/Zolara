@@ -50,8 +50,8 @@ export function ReviewsCardSection() {
     }
 
     // @ts-ignore
-    const { error } = await supabase
-      .from("reviews")
+    const { error } = await supabase  //@ts-ignore
+      .from("reviews")  //@ts-ignore
       .insert([{ name, comment, rating, visible: false }]);
 
     if (error) {

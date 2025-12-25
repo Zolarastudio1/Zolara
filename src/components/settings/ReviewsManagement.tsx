@@ -23,7 +23,7 @@ export function ReviewsSettingsSection({ settingsId }: { settingsId: string }) {
 
   const fetchReviews = async () => {
     setLoading(true);
-    const { data, error } = await supabase //@ts-ignore
+    const { data, error } = await supabase
       .from("reviews")
       .select("*")
       .order("created_at", { ascending: false });
@@ -35,34 +35,43 @@ export function ReviewsSettingsSection({ settingsId }: { settingsId: string }) {
       return;
     }
 
-    //@ts-ignore
-    setReviews(data);
+    setReviews(data ?? []);
     setLoading(false);
   };
 
   const toggleVisible = async (id: string, visible: boolean) => {
-    const { error } = await supabase //@ts-ignore
-      .from("reviews") //@ts-ignore
+    // Update individual review
+    const { error: reviewError } = await supabase
+      .from("reviews")
       .update({ visible })
       .eq("id", id);
 
-    if (error) {
-      console.error(error);
+    if (reviewError) {
+      console.error(reviewError);
       toast.error("Failed to update review");
       return;
     }
 
-    const updated = reviews.map((r) => (r.id === id ? { ...r, visible } : r));
-    setReviews(updated);
+    // Update local state
+    const updatedReviews = reviews.map((r) =>
+      r.id === id ? { ...r, visible } : r
+    );
+    setReviews(updatedReviews);
 
-    // Update settings.reviews with all visible reviews
-    const visibleReviews = updated.filter((r) => r.visible);
-    await supabase //@ts-ignore
-      .from("settings") //@ts-ignore
+    // Sync all visible reviews to settings
+    const visibleReviews = updatedReviews.filter((r) => r.visible);
+    const { error: settingsError } = await supabase
+      .from("settings")
       .update({ reviews: visibleReviews })
       .eq("id", settingsId);
 
-    toast.success("Review updated");
+    if (settingsError) {
+      console.error(settingsError);
+      toast.error("Failed to update settings");
+      return;
+    }
+
+    toast.success("Review visibility updated");
   };
 
   return (
@@ -76,16 +85,46 @@ export function ReviewsSettingsSection({ settingsId }: { settingsId: string }) {
           {reviews.map((r) => (
             <div
               key={r.id}
-              className="flex items-center justify-between border rounded p-2"
+              className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 rounded-lg border p-4 bg-background"
             >
-              <div>
-                <p className="font-medium">{r.name}</p>
-                <p className="text-sm text-muted-foreground">{r.comment}</p>
+              {/* REVIEW CONTENT */}
+              <div className="flex-1 space-y-2">
+                <p className="font-medium text-base md:text-lg leading-none">
+                  {r.name}
+                </p>
+
+                {/* STAR RATING */}
+                <div className="flex items-center gap-1 text-sm md:text-base">
+                  {[...Array(5)].map((_, i) => (
+                    <span
+                      key={i}
+                      className={`${
+                        i < r.rating ? "text-yellow-400" : "text-gray-300"
+                      } text-lg md:text-xl`}
+                    >
+                      ★
+                    </span>
+                  ))}
+                  <span className="ml-2 text-sm md:text-base text-muted-foreground">
+                    {r.rating}/5
+                  </span>
+                </div>
+
+                <p className="text-sm md:text-base text-muted-foreground line-clamp-3">
+                  {r.comment}
+                </p>
               </div>
-              <Switch
-                checked={r.visible}
-                onCheckedChange={(checked) => toggleVisible(r.id, checked)}
-              />
+
+              {/* VISIBILITY CONTROL */}
+              <div className="flex items-center gap-3 mt-2 md:mt-0">
+                <span className="text-xs md:text-sm text-muted-foreground whitespace-nowrap">
+                  Show on landing page
+                </span>
+                <Switch
+                  checked={r.visible}
+                  onCheckedChange={(checked) => toggleVisible(r.id, checked)}
+                />
+              </div>
             </div>
           ))}
         </div>

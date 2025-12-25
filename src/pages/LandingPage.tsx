@@ -45,23 +45,23 @@ const LandingPage = () => {
   ];
 
   useEffect(() => {
-    const fetchTestimonials = async () => {
-      const { data, error } = await supabase //@ts-ignore
-        .from("reviews")
-        .select("id, name, comment, rating")
-        .eq("visible", true)
-        .order("created_at", { ascending: false });
-
-      setTestimonials(data);
-
-      if (error) {
-        console.error("Failed to fetch reviews:", error);
-        setTestimonials([]);
-      }
-    };
-
     fetchTestimonials();
   });
+
+  const fetchTestimonials = async () => {
+    const { data, error } = await supabase //@ts-ignore
+      .from("reviews")
+      .select("*")
+      .eq("visible", true)
+
+    console.log("Reviews", data);
+    setTestimonials(data);
+
+    if (error) {
+      console.error("Failed to fetch reviews:", error);
+      setTestimonials([]);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -351,8 +351,8 @@ const LandingPage = () => {
 
                     {/* Review text */}
                     <p className="text-white/80 mb-6 italic leading-relaxed flex-1">
-                      {testimonial.text
-                        ? `"${testimonial.text}"`
+                      {testimonial.comment
+                        ? `"${testimonial.comment}"`
                         : "No review comment provided."}
                     </p>
 
@@ -368,7 +368,6 @@ const LandingPage = () => {
         </section>
       )}
       <ReviewsCardSection />
-
 
       {/* Contact Section */}
       <section id="contact" className="py-20 bg-secondary">
@@ -390,8 +389,7 @@ const LandingPage = () => {
                 <h3 className="font-semibold text-foreground mb-2">Location</h3>
                 <p className="text-muted-foreground text-sm">
                   {/* @ts-ignore */}
-                  {settings?.business_address ||
-                    "Ghana"}
+                  {settings?.business_address || "Ghana"}
                 </p>
               </CardContent>
             </Card>

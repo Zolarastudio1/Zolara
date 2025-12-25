@@ -11,6 +11,7 @@ import { DataManagementSection } from "@/components/settings/DataManagementSecti
 import { BackupRestoreSection } from "@/components/settings/BackupRestoreSection";
 import { Loader2 } from "lucide-react";
 import { GallerySettingsSection } from "@/components/settings/GalllerySection";
+import { ReviewsSettingsSection } from "@/components/settings/ReviewsManagement";
 
 interface PaymentMethod {
   id: string;
@@ -276,6 +277,8 @@ export default function Settings() {
             fetchSettings();
           }}
         />
+
+        <ReviewsSettingsSection settingsId={settings.id} />
         <BackupRestoreSection settings={settings} onRestore={handleRestore} />
       </div>
     </div>

@@ -180,6 +180,13 @@ const DashboardLayout = () => {
 
   const navItems = getNavItemsForRole(storedUser.role);
 
+  const roleLabels: Record<string, string> = {
+    owner: "Owner Access",
+    admin: "Admin Access",
+    receptionist: "Reception Access",
+    staff: "Staff Access",
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Mobile Overlay */}
@@ -214,6 +221,9 @@ const DashboardLayout = () => {
               <div>
                 <h1 className="font-bold text-lg">Zolara</h1>
                 <p className="text-xs opacity-60">Beauty Studio</p>
+                <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium tracking-wide text-white/80">
+                  {roleLabels[user.user_metadata.role]}
+                </div>
               </div>
             </div>
 

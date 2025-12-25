@@ -221,7 +221,7 @@ const Auth = () => {
       }
 
       // Clients: check if they already exist
-      // if (roleToAssign === "client") {
+      if (roleToAssign === "client") {
       const { data: existingClient, error: clientError } = await supabase
         .from("clients")
         .select("id")
@@ -248,7 +248,7 @@ const Auth = () => {
         );
         return; // Stop further execution
       }
-      // }
+      }
 
       // Create Supabase auth user
       const clientData = {
@@ -256,7 +256,10 @@ const Auth = () => {
         full_name: validated.fullName,
         email: validated.email,
         phone: validated.phone,
+        auth: true
       };
+
+      console.log(clientData)
 
       const { data, error } = await supabase.functions.invoke("invite-user", {
         method: "POST",

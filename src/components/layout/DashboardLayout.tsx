@@ -127,8 +127,9 @@ const DashboardLayout = () => {
                 "Sales",
                 "Reports",
                 "Attendance Reports",
-                "Settings",
                 "Staff",
+                "Checkout",
+                "Settings",
               ].includes(item.label)
           )
           .map((item) => ({
@@ -151,6 +152,8 @@ const DashboardLayout = () => {
                 "Staff",
                 "Reports",
                 "Attendance Reports",
+                "Checkout",
+                "Settings",
               ].includes(item.label)
           )
           .map((item) => ({

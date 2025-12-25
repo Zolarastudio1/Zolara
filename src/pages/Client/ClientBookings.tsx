@@ -177,13 +177,12 @@ const ClientBookings = () => {
       });
     }
 
-    // @ts-ignore
     const { error } = await supabase.from("booking_requests").insert([
       {
         client_id: user.id,
         service_id: selectedService,
-        preferred_date: preferredDate,
-        preferred_time: preferredTime,
+        appointment_date: preferredDate,
+        appointment_time: preferredTime,
         notes,
         status: "pending",
       },
@@ -457,10 +456,10 @@ const ClientBookings = () => {
                         <div className="flex items-center gap-1">
                           <Calendar className="w-5 h-5 text-blue-500" />
                           <span className="text-sm font-medium">
-                            {booking.preferred_date
-                              ? isValid(parseISO(booking.preferred_date))
+                            {booking.appointment_date
+                              ? isValid(parseISO(booking.appointment_date))
                                 ? format(
-                                    parseISO(booking.preferred_date),
+                                    parseISO(booking.appointment_date),
                                     "PPP"
                                   )
                                 : "Invalid Date"
@@ -470,7 +469,7 @@ const ClientBookings = () => {
                         <div className="flex items-center gap-1">
                           <Clock className="w-5 h-5 text-green-500" />
                           <span className="text-sm font-medium">
-                            {booking.preferred_time || "N/A"}
+                            {booking.appointment_time || "N/A"}
                           </span>
                         </div>
                       </div>

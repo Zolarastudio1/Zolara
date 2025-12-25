@@ -24,6 +24,7 @@ import Reports from "./pages/Admin/Reports";
 import NotFound from "./pages/Admin/NotFound";
 import Attendance from "./pages/Admin/Attendance";
 import AttendanceReports from "./pages/Admin/AttendanceReports";
+import Checkout from "./pages/Admin/Checkout";
 
 import StaffBookings from "./pages/Staff/StaffBookings";
 import MyAttendance from "./pages/Staff/MyAttendance";
@@ -58,6 +59,7 @@ const App = () => (
             <Route element={<DashboardLayout />}>
               <Route path="/app/admin/dashboard" element={<AdminLayout />} />
               <Route path="/app/admin/bookings" element={<Bookings />} />
+              <Route path="/app/admin/checkout" element={<Checkout />} />
               <Route path="/app/admin/services" element={<Services />} />
               <Route path="/app/admin/clients" element={<Clients />} />
               <Route path="/app/admin/staff" element={<Staff />} />
@@ -74,6 +76,7 @@ const App = () => (
             <Route element={<DashboardLayout />}>
               <Route path="/app/receptionist/dashboard" element={<AdminLayout />} />
               <Route path="/app/receptionist/bookings" element={<Bookings />} />
+              <Route path="/app/receptionist/checkout" element={<Checkout />} />
               <Route path="/app/receptionist/clients" element={<Clients />} />
               <Route path="/app/receptionist/attendance" element={<Attendance />} />
               <Route path="/app/receptionist/services" element={<ViewServices />} />

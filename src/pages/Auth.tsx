@@ -221,66 +221,64 @@ const Auth = () => {
       }
 
       // Clients: check if they already exist
-      if (roleToAssign === "client") {
-        const { data: existingClient, error: clientError } = await supabase
+      // if (roleToAssign === "client") {
+      const { data: existingClient, error: clientError } = await supabase
+        .from("clients")
+        .select("id")
+        .eq("email", validated.email)
+        .maybeSingle();
+
+      // Ignore "no rows" error
+      if (clientError && clientError.code !== "PGRST116") throw clientError;
+
+      if (existingClient) {
+        // Update existing client info instead of creating new
+        const { error: updateError } = await supabase
           .from("clients")
-          .select("id")
-          .eq("email", validated.email)
-          .maybeSingle();
-
-        // Ignore "no rows" error
-        if (clientError && clientError.code !== "PGRST116") throw clientError;
-
-        if (existingClient) {
-          // Update existing client info instead of creating new
-          const { error: updateError } = await supabase
-            .from("clients")
-            .update({
-              full_name: validated.fullName,
-              phone: validated.phone,
-              is_active: true,
-            } as any)
-            .eq("email", validated.email);
-
-          if (updateError) throw updateError;
-
-          toast.success(
-            "Your account exists. Updated info successfully. Please login."
-          );
-          return; // Stop further execution
-        }
-      }
-
-      // Create Supabase auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: validated.email,
-        password: validated.password,
-        options: {
-          data: {
+          .update({
             full_name: validated.fullName,
             phone: validated.phone,
-            role: roleToAssign,
-          },
-          emailRedirectTo: `${window.location.origin}/app/dashboard`,
-        },
+          } as any)
+          .eq("email", validated.email);
+
+        if (updateError) throw updateError;
+
+        toast.success(
+          "Your account exists. Updated info successfully. Please login."
+        );
+        return; // Stop further execution
+      }
+      // }
+
+      // Create Supabase auth user
+      const clientData = {
+        role: "client",
+        full_name: validated.fullName,
+        email: validated.email,
+        phone: validated.phone,
+      };
+
+      const { data, error } = await supabase.functions.invoke("invite-user", {
+        method: "POST",
+        body: JSON.stringify(clientData),
       });
 
       // Explicitly stop if signup fails
-      if (authError) {
-        console.error("Signup error:", authError);
-        toast.error(authError.message || "Signup failed");
+      if (error) {
+        console.error("Signup error:", error);
+        toast.error(error.message || "Signup failed");
         return;
       }
 
-      if (!authData?.user) {
+      if (!data?.user) {
         toast.error("Signup failed: user was not created");
         return;
       }
 
       // Success: save user data locally
       const userData = {
-        id: authData.user.id,
-        email: authData.user.email,
+        id: data.user.id,
+        email: data.user.email,
         phone: validated.phone,
         role: roleToAssign,
       };

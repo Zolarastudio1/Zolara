@@ -169,20 +169,26 @@ const ClientBookings = () => {
       .single();
 
     if (!existingClient) {
-      await supabase.from("clients").insert({
+      const clientData = {
         id: user.id,
         full_name: user.user_metadata.full_name,
         email: user.email,
         phone: user.user_metadata.phone || "",
+      };
+
+      const { data, error } = await supabase.functions.invoke("invite-user", {
+        method: "POST",
+        body: JSON.stringify(clientData),
       });
     }
 
+    // @ts-ignore
     const { error } = await supabase.from("booking_requests").insert([
       {
         client_id: user.id,
         service_id: selectedService,
-        appointment_date: preferredDate,
-        appointment_time: preferredTime,
+        preferred_date: preferredDate,
+        preferred_time: preferredTime,
         notes,
         status: "pending",
       },

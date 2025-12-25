@@ -219,6 +219,7 @@ const DashboardLayout = () => {
                       : "/assets/zolara-logo.jpg"
                   }
                   className="w-full h-full object-cover"
+                  onClick={()=> navigate("/")}
                 />
               </div>
               <div>

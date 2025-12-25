@@ -2,7 +2,13 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,16 +20,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { 
-  Sparkles, 
-  Calendar, 
-  Clock, 
-  ChevronLeft, 
+import {
+  Sparkles,
+  Calendar,
+  Clock,
+  ChevronLeft,
   Loader2,
   Check,
   Phone,
   Mail,
-  User
+  User,
 } from "lucide-react";
 import { useSettings } from "@/context/SettingsContext";
 import { z } from "zod";
@@ -59,7 +65,10 @@ const PublicBooking = () => {
 
   const fetchServices = async () => {
     try {
-      const { data, error } = await supabase.from("services").select("*").order("name")
+      const { data, error } = await supabase
+        .from("services")
+        .select("*")
+        .order("name");
 
       if (error) throw error;
       setServices(data || []);
@@ -98,18 +107,20 @@ const PublicBooking = () => {
 
       // Create client if doesn't exist
       if (!clientId) {
-        const { data: newClient, error: clientError } = await supabase
-          .from("clients")
-          .insert({
-            full_name: validated.fullName,
-            email: validated.email,
-            phone: validated.phone,
-          })
-          .select("id")
-          .single();
+        const clientData = {
+          role: "client",
+          full_name: validated.fullName,
+          email: validated.email,
+          phone: validated.phone,
+        };
 
-        if (clientError) throw clientError;
-        clientId = newClient.id;
+        const { data, error } = await supabase.functions.invoke("invite-user", {
+          method: "POST",
+          body: JSON.stringify(clientData),
+        });
+
+        if (error) throw error;
+        clientId = data.user.id;
       } else {
         // Update existing client info
         await supabase
@@ -123,12 +134,12 @@ const PublicBooking = () => {
 
       // Create booking request
       const { error: bookingError } = await supabase
-        .from("booking_requests")
+        .from("booking_requests") //@ts-ignore
         .insert({
           client_id: clientId,
           service_id: validated.serviceId,
-          appointment_date: validated.preferredDate,
-          appointment_time: validated.preferredTime,
+          preferred_date: validated.preferredDate,
+          preferred_time: validated.preferredTime,
           notes: validated.notes || null,
           status: "pending",
         });
@@ -166,15 +177,18 @@ const PublicBooking = () => {
         }}
       >
         <div className="absolute inset-0 bg-black/60" />
-        
+
         <Card className="w-full max-w-md relative z-10 bg-white/10 backdrop-blur-xl border-white/20 rounded-2xl text-center">
           <CardContent className="p-8 space-y-6">
             <div className="w-20 h-20 mx-auto bg-green-500/20 rounded-full flex items-center justify-center">
               <Check className="w-10 h-10 text-green-400" />
             </div>
-            <h2 className="text-2xl font-bold text-white">Booking Request Submitted!</h2>
+            <h2 className="text-2xl font-bold text-white">
+              Booking Request Submitted!
+            </h2>
             <p className="text-white/70">
-              Thank you for your booking request. Our team will review it and contact you shortly to confirm your appointment.
+              Thank you for your booking request. Our team will review it and
+              contact you shortly to confirm your appointment.
             </p>
             <div className="flex flex-col gap-3 pt-4">
               <Link to="/">
@@ -182,8 +196,8 @@ const PublicBooking = () => {
                   Return to Home
                 </Button>
               </Link>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full border-white/30 text-white hover:bg-white/10"
                 onClick={() => {
                   setSubmitted(false);
@@ -223,9 +237,12 @@ const PublicBooking = () => {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-champagne">
-              <img 
-                src={settings?.logo_url || "https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg"} 
-                alt="Logo" 
+              <img
+                src={
+                  settings?.logo_url ||
+                  "https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg"
+                }
+                alt="Logo"
                 className="w-full h-full object-cover"
               />
             </div>
@@ -249,13 +266,18 @@ const PublicBooking = () => {
           {/* Header */}
           <div className="text-center mb-8">
             <div className="mx-auto w-20 h-20 rounded-full overflow-hidden border-4 border-champagne mb-4 shadow-xl">
-              <img 
-                src={settings?.logo_url || "https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg"} 
-                alt="Logo" 
+              <img
+                src={
+                  settings?.logo_url ||
+                  "https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg"
+                }
+                alt="Logo"
                 className="w-full h-full object-cover"
               />
             </div>
-            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">Book an Appointment</h1>
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+              Book an Appointment
+            </h1>
             <p className="text-champagne flex items-center justify-center gap-2">
               <Sparkles className="w-5 h-5" />
               Where Beauty Meets Excellence
@@ -266,7 +288,9 @@ const PublicBooking = () => {
           {/* Booking Form Card */}
           <Card className="bg-white/10 backdrop-blur-xl border-white/20 rounded-2xl shadow-2xl">
             <CardHeader>
-              <CardTitle className="text-xl text-white">Your Information</CardTitle>
+              <CardTitle className="text-xl text-white">
+                Your Information
+              </CardTitle>
               <CardDescription className="text-white/60">
                 Fill in your details and preferred appointment time
               </CardDescription>
@@ -281,7 +305,10 @@ const PublicBooking = () => {
                   {/* Personal Information */}
                   <div className="space-y-4">
                     <div>
-                      <Label htmlFor="fullName" className="text-white/90 flex items-center gap-2">
+                      <Label
+                        htmlFor="fullName"
+                        className="text-white/90 flex items-center gap-2"
+                      >
                         <User className="w-4 h-4 text-champagne" />
                         Full Name
                       </Label>
@@ -294,10 +321,13 @@ const PublicBooking = () => {
                         className="mt-1 bg-white/10 border-white/30 text-white placeholder:text-white/50"
                       />
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="email" className="text-white/90 flex items-center gap-2">
+                        <Label
+                          htmlFor="email"
+                          className="text-white/90 flex items-center gap-2"
+                        >
                           <Mail className="w-4 h-4 text-champagne" />
                           Email
                         </Label>
@@ -312,7 +342,10 @@ const PublicBooking = () => {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="phone" className="text-white/90 flex items-center gap-2">
+                        <Label
+                          htmlFor="phone"
+                          className="text-white/90 flex items-center gap-2"
+                        >
                           <Phone className="w-4 h-4 text-champagne" />
                           Phone Number
                         </Label>
@@ -331,7 +364,10 @@ const PublicBooking = () => {
 
                   {/* Service Selection */}
                   <div>
-                    <Label htmlFor="service" className="text-white/90 flex items-center gap-2">
+                    <Label
+                      htmlFor="service"
+                      className="text-white/90 flex items-center gap-2"
+                    >
                       <Sparkles className="w-4 h-4 text-champagne" />
                       Select Service
                     </Label>
@@ -355,9 +391,14 @@ const PublicBooking = () => {
                     {selectedService && (
                       <div className="mt-2 p-3 bg-champagne/10 rounded-lg border border-champagne/20">
                         <p className="text-white text-sm">
-                          <span className="font-medium">{selectedService.name}</span>
+                          <span className="font-medium">
+                            {selectedService.name}
+                          </span>
                           {selectedService.description && (
-                            <span className="text-white/70"> - {selectedService.description}</span>
+                            <span className="text-white/70">
+                              {" "}
+                              - {selectedService.description}
+                            </span>
                           )}
                         </p>
                         {/* <p className="text-champagne text-sm mt-1">
@@ -370,7 +411,10 @@ const PublicBooking = () => {
                   {/* Date and Time */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="date" className="text-white/90 flex items-center gap-2">
+                      <Label
+                        htmlFor="date"
+                        className="text-white/90 flex items-center gap-2"
+                      >
                         <Calendar className="w-4 h-4 text-champagne" />
                         Preferred Date
                       </Label>
@@ -385,7 +429,10 @@ const PublicBooking = () => {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="time" className="text-white/90 flex items-center gap-2">
+                      <Label
+                        htmlFor="time"
+                        className="text-white/90 flex items-center gap-2"
+                      >
                         <Clock className="w-4 h-4 text-champagne" />
                         Preferred Time
                       </Label>
@@ -445,7 +492,10 @@ const PublicBooking = () => {
         <p className="text-white/50 text-sm">
           Powered by Zolara Management System
         </p>
-        <Link to="/app/auth" className="text-champagne/70 hover:text-champagne text-sm transition-colors">
+        <Link
+          to="/app/auth"
+          className="text-champagne/70 hover:text-champagne text-sm transition-colors"
+        >
           Staff Login
         </Link>
       </div>

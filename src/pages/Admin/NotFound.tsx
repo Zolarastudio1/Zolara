@@ -45,7 +45,7 @@ const NotFound = () => {
             Go Back
           </Button>
           <Button
-            onClick={() => navigate("/")}
+            onClick={() => navigate(-1)}
             className="bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity"
           >
             Return Home

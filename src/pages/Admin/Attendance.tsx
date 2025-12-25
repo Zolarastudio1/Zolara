@@ -203,18 +203,18 @@ export default function Attendance() {
   console.log(attendanceRecords)
 
   /** Role Restriction View */
-  if (!loading && userRole !== "owner" && userRole !== "receptionist") {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Card className="p-10 text-center max-w-lg">
-          <h2 className="text-2xl font-semibold mb-2">Access Denied</h2>
-          <p className="text-muted-foreground">
-            Only owners and receptionists can manage staff attendance.
-          </p>
-        </Card>
-      </div>
-    );
-  }
+  // if (!loading && userRole !== "owner" && userRole !== "receptionist") {
+  //   return (
+  //     <div className="flex min-h-screen items-center justify-center">
+  //       <Card className="p-10 text-center max-w-lg">
+  //         <h2 className="text-2xl font-semibold mb-2">Access Denied</h2>
+  //         <p className="text-muted-foreground">
+  //           Only owners and receptionists can manage staff attendance.
+  //         </p>
+  //       </Card>
+  //     </div>
+  //   );
+  // }
 
   /** Main UI */
   return (

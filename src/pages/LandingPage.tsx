@@ -391,7 +391,7 @@ const LandingPage = () => {
                 <p className="text-muted-foreground text-sm">
                   {/* @ts-ignore */}
                   {settings?.business_address ||
-                    "123 Beauty Lane, Accra, Ghana"}
+                    "Ghana"}
                 </p>
               </CardContent>
             </Card>
@@ -415,7 +415,7 @@ const LandingPage = () => {
                 <h3 className="font-semibold text-foreground mb-2">Email</h3>
                 <p className="text-muted-foreground text-sm">
                   {/* @ts-ignore */}
-                  {settings?.business_email || "info@zolara.com"}
+                  {settings?.business_email || "info@zolarasalon.com"}
                 </p>
               </CardContent>
             </Card>
@@ -452,7 +452,7 @@ const LandingPage = () => {
                 </div>
                 <span className="text-lg font-bold">
                   {/* @ts-ignore */}
-                  {settings?.business_name || "Zolara"}
+                  {settings?.business_name || "Zolara Beauty Studio Ltd"}
                 </span>
               </div>
               <p className="text-white/60 text-sm">

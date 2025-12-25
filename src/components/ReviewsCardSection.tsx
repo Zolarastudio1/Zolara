@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-
+import StarRating from "./StarRating";
 
 interface Review {
   id: string;
@@ -13,7 +13,6 @@ interface Review {
   visible: boolean;
   created_at?: string;
 }
-
 
 export function ReviewsCardSection() {
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -28,9 +27,9 @@ export function ReviewsCardSection() {
 
   const fetchReviews = async () => {
     // @ts-ignore
-    const { data, error } = await supabase   // @ts-ignore
+    const { data, error } = await supabase // @ts-ignore
       .from("reviews")
-      .select("*")   
+      .select("*")
       .eq("visible", true)
       .order("created_at", { ascending: false });
 
@@ -51,9 +50,9 @@ export function ReviewsCardSection() {
     }
 
     // @ts-ignore
-    const { error } = await supabase.from("reviews").insert([
-      { name, comment, rating, visible: false },
-    ]);
+    const { error } = await supabase
+      .from("reviews")
+      .insert([{ name, comment, rating, visible: false }]);
 
     if (error) {
       console.error(error);
@@ -69,61 +68,79 @@ export function ReviewsCardSection() {
   };
 
   return (
-    <Card className="p-6 space-y-4">
-      <h2 className="text-xl font-semibold mb-4">Customer Reviews</h2>
+    <Card className="p-6 space-y-6 bg-white/5 border-white/10 backdrop-blur-xl">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-white">Customer Reviews</h2>
+        {!adding && (
+          <Button
+            onClick={() => setAdding(true)}
+            className="bg-champagne text-black hover:bg-champagne/90"
+          >
+            Add Review
+          </Button>
+        )}
+      </div>
 
-      <div className="space-y-4">
+      {/* REVIEWS */}
+      <div className="grid md:grid-cols-2 gap-4">
         {reviews.map((r) => (
-          <div key={r.id} className="border rounded-lg p-4 space-y-2">
-            <div className="flex items-center gap-2">
-              {[...Array(r.rating)].map((_, i) => (
-                <span key={i} className="text-yellow-400">★</span>
-              ))}
-              {[...Array(5 - r.rating)].map((_, i) => (
-                <span key={i} className="text-gray-300">★</span>
-              ))}
-              <span className="ml-2 font-medium">{r.name}</span>
+          <div
+            key={r.id}
+            className="rounded-xl p-4 bg-black/30 border border-white/10 space-y-2"
+          >
+            <div className="flex items-center justify-between">
+              <StarRating value={r.rating} />
+              <span className="text-sm font-medium text-champagne">
+                {r.name}
+              </span>
             </div>
-            <p className="text-sm">{r.comment}</p>
+
+            <p className="text-sm text-white/80 leading-relaxed italic">
+              “{r.comment}”
+            </p>
           </div>
         ))}
       </div>
 
-      {!adding && (
-        <Button onClick={() => setAdding(true)}>Add Review</Button>
-      )}
-
+      {/* ADD REVIEW */}
       {adding && (
-        <div className="space-y-2 mt-4">
+        <div className="rounded-xl p-5 bg-black/40 border border-white/10 space-y-4">
+          <h3 className="font-semibold text-white">Leave a Review</h3>
+
           <input
             type="text"
-            placeholder="Your Name"
-            className="w-full p-2 border rounded"
+            placeholder="Your name"
+            className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white placeholder:text-white/40"
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
+
           <textarea
-            placeholder="Your Comment"
-            className="w-full p-2 border rounded"
+            placeholder="Share your experience..."
+            className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white placeholder:text-white/40 min-h-[100px]"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
           />
-          <div className="flex items-center gap-2">
-            <label>Rating:</label>
-            <select
-              value={rating}
-              onChange={(e) => setRating(Number(e.target.value))}
-            >
-              {[5, 4, 3, 2, 1].map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
+
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-white/70">Your rating</span>
+            <StarRating value={rating} onChange={setRating} size={24} />
+            <span className="text-sm text-white/50">{rating}/5</span>
           </div>
-          <div className="flex gap-2">
-            <Button onClick={submitReview}>Submit</Button>
-            <Button variant="ghost" onClick={() => setAdding(false)}>
+
+          <div className="flex gap-3 pt-2">
+            <Button
+              onClick={submitReview}
+              className="bg-champagne text-black hover:bg-champagne/90"
+            >
+              Submit Review
+            </Button>
+
+            <Button
+              variant="ghost"
+              className="text-white/70"
+              onClick={() => setAdding(false)}
+            >
               Cancel
             </Button>
           </div>

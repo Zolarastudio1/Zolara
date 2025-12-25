@@ -17,9 +17,13 @@ import {
 } from "lucide-react";
 import { useSettings } from "@/context/SettingsContext";
 import { SocialIcon } from "react-social-icons";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { ReviewsCardSection } from "@/components/ReviewsCardSection";
 
 const LandingPage = () => {
   const { settings } = useSettings();
+  const [testimonials, setTestimonials] = useState([]);
 
   const services = [
     {
@@ -40,23 +44,24 @@ const LandingPage = () => {
     { name: "Makeup", icon: Star, description: "Bridal & occasion makeup" },
   ];
 
-  const testimonials = [
-    {
-      name: "Ama K.",
-      text: "Best salon experience ever! The staff is so professional and friendly.",
-      rating: 5,
-    },
-    {
-      name: "Efua M.",
-      text: "I love coming here for my hair treatments. Always leave feeling beautiful!",
-      rating: 5,
-    },
-    {
-      name: "Nana A.",
-      text: "The ambiance is amazing and the services are top-notch.",
-      rating: 5,
-    },
-  ];
+  useEffect(() => {
+    const fetchTestimonials = async () => {
+      const { data, error } = await supabase //@ts-ignore
+        .from("reviews")
+        .select("id, name, comment, rating")
+        .eq("visible", true)
+        .order("created_at", { ascending: false });
+
+      setTestimonials(data);
+
+      if (error) {
+        console.error("Failed to fetch reviews:", error);
+        setTestimonials([]);
+      }
+    };
+
+    fetchTestimonials();
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -245,8 +250,8 @@ const LandingPage = () => {
                   <div>
                     <p className="font-medium text-foreground">Open Hours</p>
                     <p className="text-sm text-muted-foreground">
-                      {(settings as any).opening_time || "9:00 AM"} -{" "}
-                      {(settings as any).closing_time || "6:00 PM"}
+                      {(settings as any).opening_time || "8:30 AM"} -{" "}
+                      {(settings as any).closing_time || "20:30 PM"}
                     </p>
                   </div>
                 </div>
@@ -313,41 +318,57 @@ const LandingPage = () => {
       </section>
 
       {/* Testimonials */}
-      <section id="testimonials" className="py-20 bg-black text-white">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold mb-4">What Our Clients Say</h2>
-            <p className="text-white/70 max-w-2xl mx-auto">
-              Don't just take our word for it - hear from our satisfied clients.
-            </p>
+      {testimonials.length > 0 && (
+        <section id="testimonials" className="py-20 bg-black text-white">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-12">
+              <h2 className="text-4xl font-bold mb-4">What Our Clients Say</h2>
+              <p className="text-white/70 max-w-2xl mx-auto">
+                Don't just take our word for it - hear from our satisfied
+                clients.
+              </p>
+            </div>
+            <div className="grid md:grid-cols-3 gap-6">
+              {testimonials.map((testimonial, index) => (
+                <Card
+                  key={index}
+                  className="bg-white/5 border-white/10 backdrop-blur rounded-xl"
+                >
+                  <CardContent className="p-6 flex flex-col h-full">
+                    {/* Stars */}
+                    <div className="flex items-center gap-1 mb-4">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`w-5 h-5 ${
+                            i < Math.min(testimonial.rating ?? 0, 5)
+                              ? "fill-champagne text-champagne"
+                              : "text-white/20"
+                          }`}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Review text */}
+                    <p className="text-white/80 mb-6 italic leading-relaxed flex-1">
+                      {testimonial.text
+                        ? `"${testimonial.text}"`
+                        : "No review comment provided."}
+                    </p>
+
+                    {/* Reviewer */}
+                    <p className="font-semibold text-champagne">
+                      {testimonial.name || "Anonymous"}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            {testimonials.map((testimonial, index) => (
-              <Card
-                key={index}
-                className="bg-white/5 border-white/10 backdrop-blur"
-              >
-                <CardContent className="p-6">
-                  <div className="flex gap-1 mb-4">
-                    {[...Array(testimonial.rating)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className="w-5 h-5 fill-champagne text-champagne"
-                      />
-                    ))}
-                  </div>
-                  <p className="text-white/80 mb-4 italic">
-                    "{testimonial.text}"
-                  </p>
-                  <p className="font-semibold text-champagne">
-                    {testimonial.name}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
+      <ReviewsCardSection />
+
 
       {/* Contact Section */}
       <section id="contact" className="py-20 bg-secondary">

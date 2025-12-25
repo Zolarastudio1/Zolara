@@ -120,6 +120,8 @@ const PublicBooking = () => {
         });
 
         if (error) throw error;
+
+        console.log("New user", data)
         clientId = data.user.id;
       } else {
         // Update existing client info

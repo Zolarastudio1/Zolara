@@ -26,6 +26,7 @@ import {
   X,
   Clock,
   Settings,
+  CheckIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -91,6 +92,7 @@ const DashboardLayout = () => {
     { icon: UserCog, label: "Staff", path: "staff" },
     { icon: Scissors, label: "Services", path: "services" },
     { icon: CreditCard, label: "Sales", path: "sales" },
+    { icon: CheckIcon, label: "Checkout", path: "checkout" },
     { icon: FileText, label: "Reports", path: "reports" },
     { icon: Clock, label: "Attendance", path: "attendance" },
     { icon: FileText, label: "Attendance Reports", path: "attendance-reports" },

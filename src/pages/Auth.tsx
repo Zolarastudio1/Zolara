@@ -277,36 +277,6 @@ const Auth = () => {
         return;
       }
 
-      const userId = authData.user.id;
-
-      // Insert into profiles
-      const { error: profileError } = await supabase.from("profiles").insert({
-        id: userId,
-        email: validated.email,
-        full_name: validated.fullName,
-        phone: validated.phone,
-      });
-      if (profileError) throw profileError;
-
-      // Insert into user_roles
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .insert({ user_id: userId, role: roleToAssign });
-      if (roleError) throw roleError;
-
-      if (roleToAssign === "client") {
-        const { error } = await supabase.from("clients").insert({
-          id: userId,
-          email: validated.email,
-          full_name: validated.fullName,
-          phone: validated.phone,
-          address: "",
-          notes: "",
-          image: "",
-        });
-        if (error) throw error;
-      }
-
       // Success: save user data locally
       const userData = {
         id: authData.user.id,

@@ -389,7 +389,7 @@ const LandingPage = () => {
                 <h3 className="font-semibold text-foreground mb-2">Location</h3>
                 <p className="text-muted-foreground text-sm">
                   {/* @ts-ignore */}
-                  {settings?.business_address || "Ghana"}
+                  {settings?.business_address || "Sakasaka, Opposite CalBank, Tamale"}
                 </p>
               </CardContent>
             </Card>
@@ -401,7 +401,7 @@ const LandingPage = () => {
                 <h3 className="font-semibold text-foreground mb-2">Phone</h3>
                 <p className="text-muted-foreground text-sm">
                   {/* @ts-ignore */}
-                  {settings?.business_phone || "+233 XX XXX XXXX"}
+                  {settings?.business_phone || "+233249978750"}
                 </p>
               </CardContent>
             </Card>

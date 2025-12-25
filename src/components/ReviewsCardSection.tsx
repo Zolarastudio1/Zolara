@@ -81,27 +81,6 @@ export function ReviewsCardSection() {
         )}
       </div>
 
-      {/* REVIEWS */}
-      <div className="grid md:grid-cols-2 gap-4">
-        {reviews.map((r) => (
-          <div
-            key={r.id}
-            className="rounded-xl p-4 bg-black/30 border border-white/10 space-y-2"
-          >
-            <div className="flex items-center justify-between">
-              <StarRating value={r.rating} />
-              <span className="text-sm font-medium text-champagne">
-                {r.name}
-              </span>
-            </div>
-
-            <p className="text-sm text-white/80 leading-relaxed italic">
-              “{r.comment}”
-            </p>
-          </div>
-        ))}
-      </div>
-
       {/* ADD REVIEW */}
       {adding && (
         <div className="rounded-xl p-5 bg-black/40 border border-white/10 space-y-4">

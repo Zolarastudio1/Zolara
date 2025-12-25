@@ -225,7 +225,7 @@ const DashboardLayout = () => {
                 <h1 className="font-bold text-lg">Zolara</h1>
                 <p className="text-xs opacity-60">Beauty Studio</p>
                 <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium tracking-wide text-white/80">
-                  {roleLabels[user.user_metadata.role]}
+                  {roleLabels[storedUser.role]}
                 </div>
               </div>
             </div>
@@ -241,7 +241,13 @@ const DashboardLayout = () => {
           </div>
 
           {/* NAV */}
-          <nav className="flex-1 p-4 space-y-1">
+          <nav
+            className="flex-1 overflow-auto p-4 space-y-1"
+            style={{
+              scrollbarWidth: "none", // Firefox
+              msOverflowStyle: "none", // IE 10+
+            }}
+          >
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;

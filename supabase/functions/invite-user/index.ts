@@ -35,11 +35,18 @@ Deno.serve(async (req)=>{
     if (!ALLOWED_ROLES.includes(role)) {
       throw new Error(`Invalid role: ${role}`);
     }
-    const supabase = createClient(Deno.env.get("SUPABASE_URL"), Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error("Missing Supabase environment variables");
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseKey);
     // Create user in Supabase Auth
     const { data, error } = await supabase.auth.admin.createUser({
       email,
-      email_confirmed: true,
+      email_confirm: true,
       user_metadata: {
         full_name,
         phone: phone || "",
@@ -70,10 +77,11 @@ Deno.serve(async (req)=>{
       status: 200,
       headers: corsHeaders
     });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("User creation error:", err);
+    const errorMessage = err instanceof Error ? err.message : "Internal server error";
     return new Response(JSON.stringify({
-      error: err.message || "Internal server error"
+      error: errorMessage
     }), {
       status: 400,
       headers: corsHeaders

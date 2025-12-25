@@ -26,6 +26,7 @@ import {
   X,
   Clock,
   Settings,
+  CheckIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -91,6 +92,7 @@ const DashboardLayout = () => {
     { icon: UserCog, label: "Staff", path: "staff" },
     { icon: Scissors, label: "Services", path: "services" },
     { icon: CreditCard, label: "Sales", path: "sales" },
+    { icon: CheckIcon, label: "Checkout", path: "checkout" },
     { icon: FileText, label: "Reports", path: "reports" },
     { icon: Clock, label: "Attendance", path: "attendance" },
     { icon: FileText, label: "Attendance Reports", path: "attendance-reports" },
@@ -125,8 +127,9 @@ const DashboardLayout = () => {
                 "Sales",
                 "Reports",
                 "Attendance Reports",
-                "Settings",
                 "Staff",
+                "Checkout",
+                "Settings",
               ].includes(item.label)
           )
           .map((item) => ({
@@ -149,6 +152,7 @@ const DashboardLayout = () => {
                 "Staff",
                 "Reports",
                 "Attendance Reports",
+                "Checkout",
                 "Settings",
               ].includes(item.label)
           )
@@ -175,16 +179,16 @@ const DashboardLayout = () => {
     }
   };
 
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+
+  const navItems = getNavItemsForRole(storedUser.role);
+
   const roleLabels: Record<string, string> = {
     owner: "Owner Access",
     admin: "Admin Access",
     receptionist: "Reception Access",
     staff: "Staff Access",
   };
-
-  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-
-  const navItems = getNavItemsForRole(storedUser.role);
 
   return (
     <div className="min-h-screen bg-background">
@@ -221,7 +225,6 @@ const DashboardLayout = () => {
                 <h1 className="font-bold text-lg">Zolara</h1>
                 <p className="text-xs opacity-60">Beauty Studio</p>
                 <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium tracking-wide text-white/80">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                   {roleLabels[user.user_metadata.role]}
                 </div>
               </div>

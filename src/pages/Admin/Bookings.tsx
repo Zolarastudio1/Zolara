@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +30,7 @@ import {
   CalendarClock,
   CreditCard,
   AlertTriangle,
+  CheckCircle2,
 } from "lucide-react";
 import PaymentDialog from "@/components/PaymentDialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -55,6 +57,8 @@ const bookingSchema = z.object({
 });
 
 const Bookings = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [bookings, setBookings] = useState<any[]>([]);
   const [filteredBookings, setFilteredBookings] = useState(bookings);
   const [requests, setRequests] = useState<any[]>([]);
@@ -272,11 +276,10 @@ const Bookings = () => {
           .insert([
             {
               client_id: request.client_id,
-              staff_id: request.staff_id,
+              staff_id: request.staff_id || null,
               service_id: request.service_id,
-              appointment_date: request.preferred_date,
-              appointment_time: request.preferred_time,
-              payment_method: request.payment_method,
+              appointment_date: request.appointment_date,
+              appointment_time: request.appointment_time,
               status: "scheduled",
               notes: request.notes,
             },
@@ -627,19 +630,24 @@ const Bookings = () => {
                 </div>
 
                 {/* Action buttons */}
-                <div className="flex justify-end gap-3 pt-2">
-                  <Button
-                    size="sm"
-                    variant="default"
-                    className="rounded-xl flex items-center gap-1"
-                    onClick={() => {
-                      setSelectedBooking(b);
-                      setPaymentDialogOpen(true);
-                    }}
-                  >
-                    <CreditCard className="w-4 h-4" />
-                    Payment
-                  </Button>
+                <div className="flex justify-end gap-2 pt-2 flex-wrap">
+                  {/* Checkout button - only for scheduled/confirmed bookings */}
+                  {["scheduled", "confirmed"].includes(b.status) && (
+                    <Button
+                      size="sm"
+                      className="rounded-xl flex items-center gap-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                      onClick={() => {
+                        // Determine the correct path based on current route
+                        const basePath = location.pathname.includes("/receptionist/") 
+                          ? "/app/receptionist/checkout" 
+                          : "/app/admin/checkout";
+                        navigate(`${basePath}?booking=${b.id}`);
+                      }}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      Check Out
+                    </Button>
+                  )}
 
                   <Button
                     size="sm"

@@ -222,32 +222,32 @@ const Auth = () => {
 
       // Clients: check if they already exist
       if (roleToAssign === "client") {
-      const { data: existingClient, error: clientError } = await supabase
-        .from("clients")
-        .select("id")
-        .eq("email", validated.email)
-        .maybeSingle();
-
-      // Ignore "no rows" error
-      if (clientError && clientError.code !== "PGRST116") throw clientError;
-
-      if (existingClient) {
-        // Update existing client info instead of creating new
-        const { error: updateError } = await supabase
+        const { data: existingClient, error: clientError } = await supabase
           .from("clients")
-          .update({
-            full_name: validated.fullName,
-            phone: validated.phone,
-          } as any)
-          .eq("email", validated.email);
+          .select("id")
+          .eq("email", validated.email)
+          .maybeSingle();
 
-        if (updateError) throw updateError;
+        // Ignore "no rows" error
+        if (clientError && clientError.code !== "PGRST116") throw clientError;
 
-        toast.success(
-          "Your account exists. Updated info successfully. Please login."
-        );
-        return; // Stop further execution
-      }
+        if (existingClient) {
+          // Update existing client info instead of creating new
+          const { error: updateError } = await supabase
+            .from("clients")
+            .update({
+              full_name: validated.fullName,
+              phone: validated.phone,
+            } as any)
+            .eq("email", validated.email);
+
+          if (updateError) throw updateError;
+
+          toast.success(
+            "Your account exists. Updated info successfully. Please login."
+          );
+          return; // Stop further execution
+        }
       }
 
       // Create Supabase auth user
@@ -256,10 +256,11 @@ const Auth = () => {
         full_name: validated.fullName,
         email: validated.email,
         phone: validated.phone,
-        auth: true
+        password: validated.password,
+        auth: true,
       };
 
-      console.log(clientData)
+      console.log("Client data", clientData);
 
       const { data, error } = await supabase.functions.invoke("invite-user", {
         method: "POST",

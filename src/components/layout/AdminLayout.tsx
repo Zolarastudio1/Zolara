@@ -18,6 +18,8 @@ import {
   subMonths,
   subDays,
   eachDayOfInterval,
+  startOfDay,
+  endOfDay,
 } from "date-fns";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -25,12 +27,32 @@ import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { DonutChart } from "@/components/dashboard/DonutChart";
 import { ActivityList } from "@/components/dashboard/ActivityList";
 import { TopServiceCard } from "@/components/dashboard/TopServiceCard";
+import { DateFilter, DateFilterType } from "@/components/dashboard/DateFilter";
+import { PaymentMethodChart } from "@/components/dashboard/PaymentMethodChart";
+import { TopStaffCard } from "@/components/dashboard/TopStaffCard";
+import { UpcomingAppointments } from "@/components/dashboard/UpcomingAppointments";
+import { AlertsPanel, generateAlerts, Alert } from "@/components/dashboard/AlertsPanel";
+import { SyncStatus } from "@/components/dashboard/SyncStatus";
 import { Loader2 } from "lucide-react";
 
+interface DateRange {
+  start: Date;
+  end: Date;
+}
+
 const AdminDashboard = () => {
+  const [dateFilter, setDateFilter] = useState<DateFilterType>("today");
+  const [dateRange, setDateRange] = useState<DateRange>({
+    start: startOfDay(new Date()),
+    end: endOfDay(new Date()),
+  });
+  const [lastSync, setLastSync] = useState<Date | null>(null);
+
   const [stats, setStats] = useState({
     todayBookings: 0,
+    periodBookings: 0,
     todayRevenue: 0,
+    periodRevenue: 0,
     weeklyRevenue: 0,
     monthlyRevenue: 0,
     totalClients: 0,
@@ -41,24 +63,38 @@ const AdminDashboard = () => {
     clientChangePercentage: 0,
     bookingChangePercentage: 0,
     pendingBookings: 0,
+    pendingRequests: 0,
   });
 
   const [revenueData, setRevenueData] = useState<{ name: string; revenue: number; bookings: number }[]>([]);
   const [bookingStatusData, setBookingStatusData] = useState<{ name: string; value: number; color: string }[]>([]);
   const [recentBookings, setRecentBookings] = useState<any[]>([]);
   const [recentPayments, setRecentPayments] = useState<any[]>([]);
+  const [paymentMethodData, setPaymentMethodData] = useState<any[]>([]);
+  const [topStaff, setTopStaff] = useState<any[]>([]);
+  const [upcomingAppointments, setUpcomingAppointments] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [absentStaff, setAbsentStaff] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchStats();
-  }, []);
+  }, [dateRange]);
+
+  const handleFilterChange = (filter: DateFilterType, range: DateRange) => {
+    setDateFilter(filter);
+    setDateRange(range);
+  };
 
   const fetchStats = async () => {
     try {
+      setLoading(true);
       const today = new Date();
       const startOfToday = format(today, "yyyy-MM-dd");
-      const startOfThisWeek = format(startOfWeek(today), "yyyy-MM-dd");
-      const endOfThisWeek = format(endOfWeek(today), "yyyy-MM-dd");
+      const periodStart = format(dateRange.start, "yyyy-MM-dd");
+      const periodEnd = format(dateRange.end, "yyyy-MM-dd");
+      const startOfThisWeek = format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
+      const endOfThisWeek = format(endOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
       const startOfThisMonth = format(startOfMonth(today), "yyyy-MM-dd");
       const endOfThisMonth = format(endOfMonth(today), "yyyy-MM-dd");
       const previousMonthStart = format(startOfMonth(subMonths(today, 1)), "yyyy-MM-dd");
@@ -67,7 +103,9 @@ const AdminDashboard = () => {
       // Fetch all data in parallel
       const [
         todayBookingsRes,
+        periodBookingsRes,
         todayPaymentsRes,
+        periodPaymentsRes,
         weeklyPaymentsRes,
         monthlyPaymentsRes,
         previousMonthPaymentsRes,
@@ -78,25 +116,36 @@ const AdminDashboard = () => {
         allBookingsRes,
         recentBookingsRes,
         recentPaymentsRes,
-        last7DaysPaymentsRes,
+        last30DaysPaymentsRes,
+        pendingRequestsRes,
+        upcomingBookingsRes,
+        staffBookingsRes,
+        todayAttendanceRes,
       ] = await Promise.all([
         supabase.from("bookings").select("*").eq("appointment_date", startOfToday),
-        supabase.from("payments").select("amount").gte("payment_date", startOfToday),
+        supabase.from("bookings").select("*").gte("appointment_date", periodStart).lte("appointment_date", periodEnd),
+        supabase.from("payments").select("amount, payment_method").gte("payment_date", startOfToday),
+        supabase.from("payments").select("amount, payment_method").gte("payment_date", periodStart).lte("payment_date", periodEnd),
         supabase.from("payments").select("amount").gte("payment_date", startOfThisWeek).lte("payment_date", endOfThisWeek),
         supabase.from("payments").select("amount").eq("payment_status", "completed").gte("payment_date", startOfThisMonth).lte("payment_date", endOfThisMonth),
         supabase.from("payments").select("amount").gte("payment_date", previousMonthStart).lte("payment_date", previousMonthEnd),
         supabase.from("clients").select("*", { count: "exact" }),
         supabase.from("clients").select("*", { count: "exact" }).lte("created_at", previousMonthEnd),
-        supabase.from("staff").select("*", { count: "exact" }).eq("is_active", true),
+        supabase.from("staff").select("*").eq("is_active", true),
         supabase.from("bookings").select("service_id, services(name)").gte("appointment_date", startOfThisMonth).lte("appointment_date", endOfThisMonth),
         supabase.from("bookings").select("status").gte("created_at", startOfThisMonth),
         supabase.from("bookings").select("*, services(name), clients(full_name)").order("created_at", { ascending: false }).limit(5),
         supabase.from("payments").select("*, bookings(services(name))").order("payment_date", { ascending: false }).limit(5),
         supabase.from("payments").select("amount, payment_date").gte("payment_date", format(subDays(today, 30), "yyyy-MM-dd")).eq("payment_status", "completed"),
+        supabase.from("booking_requests").select("*", { count: "exact" }).eq("status", "pending"),
+        supabase.from("bookings").select("*, services(name), clients(full_name)").gte("appointment_date", startOfToday).in("status", ["scheduled", "confirmed"]).order("appointment_date", { ascending: true }).order("appointment_time", { ascending: true }).limit(5),
+        supabase.from("bookings").select("staff_id, staff(full_name, specialization), services(price)").gte("appointment_date", periodStart).lte("appointment_date", periodEnd).eq("status", "completed"),
+        supabase.from("attendance").select("staff_id").eq("created_at", startOfToday),
       ]);
 
       // Calculate stats
       const todayRevenue = todayPaymentsRes.data?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+      const periodRevenue = periodPaymentsRes.data?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
       const weeklyRevenue = weeklyPaymentsRes.data?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
       const monthlyRevenue = monthlyPaymentsRes.data?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
       const previousMonthRevenue = previousMonthPaymentsRes.data?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
@@ -146,45 +195,123 @@ const AdminDashboard = () => {
         : [];
 
       // Last 30 days revenue chart
-      const last7Days = eachDayOfInterval({
+      const last30Days = eachDayOfInterval({
         start: subDays(today, 30),
         end: today,
       });
 
-      const revenueByDay = last7DaysPaymentsRes.data?.reduce((acc: any, p: any) => {
+      const revenueByDay = last30DaysPaymentsRes.data?.reduce((acc: any, p: any) => {
         const day = format(new Date(p.payment_date), "yyyy-MM-dd");
         acc[day] = (acc[day] || 0) + Number(p.amount);
         return acc;
       }, {});
 
-      const revenueChartData = last7Days.map((day) => ({
-        name: format(day, "EEE"),
+      const revenueChartData = last30Days.map((day) => ({
+        name: format(day, "MMM d"),
         revenue: revenueByDay?.[format(day, "yyyy-MM-dd")] || 0,
         bookings: 0,
       }));
+
+      // Payment method breakdown
+      const paymentMethods = periodPaymentsRes.data?.reduce((acc: any, p: any) => {
+        const method = p.payment_method || "cash";
+        if (!acc[method]) {
+          acc[method] = { amount: 0, count: 0 };
+        }
+        acc[method].amount += Number(p.amount);
+        acc[method].count += 1;
+        return acc;
+      }, {});
+
+      const totalPaymentAmount = periodRevenue || 1;
+      const paymentMethodBreakdown = paymentMethods
+        ? Object.entries(paymentMethods).map(([method, data]: [string, any]) => ({
+            method,
+            amount: data.amount,
+            count: data.count,
+            percentage: (data.amount / totalPaymentAmount) * 100,
+          }))
+        : [];
+
+      // Top performing staff
+      const staffPerformance = staffBookingsRes.data?.reduce((acc: any, booking: any) => {
+        if (!booking.staff_id || !booking.staff) return acc;
+        const staffId = booking.staff_id;
+        if (!acc[staffId]) {
+          acc[staffId] = {
+            id: staffId,
+            name: booking.staff.full_name,
+            specialization: booking.staff.specialization,
+            bookings: 0,
+            revenue: 0,
+          };
+        }
+        acc[staffId].bookings += 1;
+        acc[staffId].revenue += Number(booking.services?.price || 0);
+        return acc;
+      }, {});
+
+      const topStaffList = staffPerformance
+        ? Object.values(staffPerformance)
+            .sort((a: any, b: any) => b.bookings - a.bookings)
+            .slice(0, 5)
+        : [];
+
+      // Upcoming appointments
+      const upcomingList = upcomingBookingsRes.data?.map((b: any) => ({
+        id: b.id,
+        clientName: b.clients?.full_name || "Unknown",
+        serviceName: b.services?.name || "Service",
+        date: b.appointment_date,
+        time: b.appointment_time,
+        status: b.status,
+      })) || [];
+
+      // Check for absent staff
+      const checkedInStaffIds = todayAttendanceRes.data?.map((a: any) => a.staff_id) || [];
+      const allActiveStaff = staffRes.data || [];
+      const absentStaffNames = allActiveStaff
+        .filter((s: any) => !checkedInStaffIds.includes(s.id))
+        .map((s: any) => s.full_name);
 
       // Pending bookings count
       const pendingBookings = todayBookingsRes.data?.filter(
         (b) => b.status === "scheduled" || b.status === "confirmed"
       ).length || 0;
 
+      // Generate alerts
+      const generatedAlerts = generateAlerts({
+        todayBookings: todayBookingsRes.data?.length || 0,
+        pendingRequests: pendingRequestsRes.count || 0,
+        absentStaff: absentStaffNames,
+        lowBookingThreshold: 3,
+      });
+
       setStats({
         todayBookings: todayBookingsRes.data?.length || 0,
+        periodBookings: periodBookingsRes.data?.length || 0,
         todayRevenue,
+        periodRevenue,
         weeklyRevenue,
         monthlyRevenue,
         totalClients,
-        activeStaff: staffRes.count || 0,
+        activeStaff: allActiveStaff.length,
         topService: topServiceEntry?.[0] as string || "N/A",
         topServiceCount: topServiceEntry?.[1] as number || 0,
         monthChangePercentage: Number(monthChangePercentage.toFixed(1)),
         clientChangePercentage: Number(clientChangePercentage.toFixed(1)),
         bookingChangePercentage: 0,
         pendingBookings,
+        pendingRequests: pendingRequestsRes.count || 0,
       });
 
       setRevenueData(revenueChartData);
       setBookingStatusData(bookingStatusData);
+      setPaymentMethodData(paymentMethodBreakdown);
+      setTopStaff(topStaffList as any[]);
+      setUpcomingAppointments(upcomingList);
+      setAlerts(generatedAlerts);
+      setAbsentStaff(absentStaffNames);
 
       // Format recent bookings
       setRecentBookings(
@@ -201,12 +328,13 @@ const AdminDashboard = () => {
       setRecentPayments(
         recentPaymentsRes.data?.map((p) => ({
           id: p.id,
-          title: p.bookings?.services?.name || "Payment",
+          title: (p.bookings as any)?.services?.name || "Payment",
           date: p.payment_date,
           amount: Number(p.amount),
         })) || []
       );
 
+      setLastSync(new Date());
     } catch (error) {
       console.error("Error fetching stats:", error);
     } finally {
@@ -214,7 +342,17 @@ const AdminDashboard = () => {
     }
   };
 
-  if (loading) {
+  const getFilterLabel = () => {
+    switch (dateFilter) {
+      case "today": return "Today";
+      case "week": return "This Week";
+      case "month": return "This Month";
+      case "custom": return `${format(dateRange.start, "MMM d")} - ${format(dateRange.end, "MMM d")}`;
+      default: return "";
+    }
+  };
+
+  if (loading && !lastSync) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="text-center space-y-4">
@@ -229,24 +367,38 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="space-y-8 p-6">
-      <DashboardHeader
-        title="Dashboard"
-        subtitle="Welcome back! Here's your salon overview"
-      />
+    <div className="space-y-6 p-6">
+      {/* Header with Filters */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <DashboardHeader
+          title="Dashboard"
+          subtitle="Welcome back! Here's your salon overview"
+        />
+        <div className="flex flex-col gap-2 md:items-end">
+          <DateFilter
+            currentFilter={dateFilter}
+            onFilterChange={handleFilterChange}
+          />
+          <SyncStatus
+            lastSync={lastSync}
+            isLoading={loading}
+            onRefresh={fetchStats}
+          />
+        </div>
+      </div>
 
-      {/* Stats Grid */}
+      {/* Period Stats */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Today's Bookings"
-          value={stats.todayBookings}
+          title={`${getFilterLabel()}'s Bookings`}
+          value={stats.periodBookings}
           icon={<Calendar className="w-6 h-6" />}
           variant="gold"
           delay={0}
         />
         <StatCard
-          title="Today's Revenue"
-          value={`GH₵${stats.todayRevenue.toLocaleString()}`}
+          title={`${getFilterLabel()}'s Revenue`}
+          value={`GH₵${stats.periodRevenue.toLocaleString()}`}
           icon={<DollarSign className="w-6 h-6" />}
           variant="green"
           delay={0.1}
@@ -298,6 +450,12 @@ const AdminDashboard = () => {
         />
       </div>
 
+      {/* Alerts & Upcoming */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <AlertsPanel alerts={alerts} />
+        <UpcomingAppointments appointments={upcomingAppointments} />
+      </div>
+
       {/* Charts Row */}
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="lg:col-span-3">
@@ -316,6 +474,19 @@ const AdminDashboard = () => {
             centerLabel="Today"
           />
         </div>
+      </div>
+
+      {/* Payment & Staff Performance */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <PaymentMethodChart
+          data={paymentMethodData}
+          title={`Payment Methods (${getFilterLabel()})`}
+        />
+        <TopStaffCard
+          data={topStaff}
+          title="Top Performing Staff"
+          subtitle={getFilterLabel()}
+        />
       </div>
 
       {/* Activity Row */}

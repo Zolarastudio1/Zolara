@@ -136,12 +136,12 @@ const PublicBooking = () => {
 
       // Create booking request
       const { error: bookingError } = await supabase
-        .from("booking_requests") //@ts-ignore
+        .from("booking_requests")
         .insert({
           client_id: clientId,
           service_id: validated.serviceId,
-          preferred_date: validated.preferredDate,
-          preferred_time: validated.preferredTime,
+          appointment_date: validated.preferredDate,
+          appointment_time: validated.preferredTime,
           notes: validated.notes || null,
           status: "pending",
         });

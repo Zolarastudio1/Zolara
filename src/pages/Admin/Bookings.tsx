@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -21,38 +21,25 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { format, isToday, parseISO, isAfter, startOfToday } from "date-fns";
 import { z } from "zod";
-import {
-  Plus,
-  Pencil,
-  Trash2,
-  CalendarClock,
-  CreditCard,
-  AlertTriangle,
-  CheckCircle2,
-} from "lucide-react";
-import PaymentDialog from "@/components/PaymentDialog";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { CollapsibleSearchBar } from "@/components/SearchBar";
+import { BookingFilters, BookingFilter, ViewMode } from "@/components/bookings/BookingFilters";
+import { BulkActions } from "@/components/bookings/BulkActions";
+import { BookingCard } from "@/components/bookings/BookingCard";
+import { CalendarView } from "@/components/bookings/CalendarView";
+import { TodaysBookings } from "@/components/bookings/TodaysBookings";
+import { CancelBookingDialog } from "@/components/bookings/CancelBookingDialog";
 
 const bookingSchema = z.object({
   client_id: z.string().uuid("Invalid client selection"),
   service_id: z.string().uuid("Invalid service selection"),
-  staff_id: z
-    .string()
-    .uuid("Invalid staff selection")
-    .optional()
-    .or(z.literal("")),
+  staff_id: z.string().uuid("Invalid staff selection").optional().or(z.literal("")),
   appointment_date: z.string().min(1, "Date is required"),
-  appointment_time: z
-    .string()
-    .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid time format"),
-  status: z
-    .enum(["scheduled", "confirmed", "completed", "cancelled", "no_show"])
-    .optional(),
-  payment_mode: z.enum(["cash", "card", "transfer"]).optional(),
-  payment_status: z.enum(["paid", "unpaid", "partial"]).optional(),
+  appointment_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid time format"),
+  status: z.enum(["scheduled", "confirmed", "completed", "cancelled", "no_show"]).optional(),
   notes: z.string().max(1000, "Notes too long").optional(),
 });
 
@@ -60,12 +47,9 @@ const Bookings = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [bookings, setBookings] = useState<any[]>([]);
-  const [filteredBookings, setFilteredBookings] = useState(bookings);
+  const [allBookings, setAllBookings] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
-  const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [isBookingModalOpen, setBookingModalOpen] = useState(false);
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -82,8 +66,14 @@ const Bookings = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
-  const start = (page - 1) * itemsPerPage;
-  const end = start + itemsPerPage - 1;
+
+  // New state for enhanced features
+  const [activeFilter, setActiveFilter] = useState<BookingFilter>("all");
+  const [viewMode, setViewMode] = useState<ViewMode>("card");
+  const [selectedBookings, setSelectedBookings] = useState<Set<string>>(new Set());
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [bookingToCancel, setBookingToCancel] = useState<any>(null);
+  const [searchResults, setSearchResults] = useState<any[] | null>(null);
 
   const [formData, setFormData] = useState<any>({
     client_id: "",
@@ -92,13 +82,12 @@ const Bookings = () => {
     appointment_date: "",
     appointment_time: "",
     status: "scheduled",
-    payment_method: "",
-    payment_status: "unpaid",
     notes: "",
   });
 
   useEffect(() => {
     fetchData();
+    fetchAllBookings();
   }, []);
 
   useEffect(() => {
@@ -108,6 +97,20 @@ const Bookings = () => {
   useEffect(() => {
     fetchBookingRequests(requestPage);
   }, [requestPage]);
+
+  const fetchAllBookings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("bookings")
+        .select("*, clients(*), staff(*), services(*)")
+        .order("appointment_date", { ascending: false });
+
+      if (error) throw error;
+      setAllBookings(data || []);
+    } catch (error) {
+      console.error("Error fetching all bookings:", error);
+    }
+  };
 
   const fetchBookings = async (pageNumber = page) => {
     try {
@@ -174,6 +177,37 @@ const Bookings = () => {
     }
   };
 
+  // Filter bookings based on active filter
+  const filteredBookings = useMemo(() => {
+    const sourceBookings = searchResults !== null ? searchResults : bookings;
+    const today = startOfToday();
+
+    return sourceBookings.filter((b) => {
+      const bookingDate = parseISO(b.appointment_date);
+
+      switch (activeFilter) {
+        case "today":
+          return isToday(bookingDate);
+        case "upcoming":
+          return isAfter(bookingDate, today) && !["completed", "cancelled"].includes(b.status);
+        case "completed":
+          return b.status === "completed";
+        case "cancelled":
+          return b.status === "cancelled";
+        case "confirmed":
+          return b.status === "confirmed";
+        case "scheduled":
+          return b.status === "scheduled";
+        default:
+          return true;
+      }
+    });
+  }, [bookings, searchResults, activeFilter]);
+
+  const todayBookingsCount = useMemo(() => {
+    return allBookings.filter((b) => isToday(parseISO(b.appointment_date))).length;
+  }, [allBookings]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -187,13 +221,10 @@ const Bookings = () => {
         appointment_date: validated.appointment_date,
         appointment_time: validated.appointment_time,
         status: validated.status || "scheduled",
-        // payment_method: validated.payment_method,
-        // payment_status: validated.payment_status || "unpaid",
         notes: validated.notes || "",
       };
 
       if (editingBookingId) {
-        // Update
         const { error } = await supabase
           .from("bookings")
           .update(bookingData)
@@ -201,7 +232,6 @@ const Bookings = () => {
         if (error) throw error;
         toast.success("Booking updated successfully");
       } else {
-        // Create new
         const { error } = await supabase.from("bookings").insert([bookingData]);
         if (error) throw error;
         toast.success("Booking created successfully");
@@ -209,18 +239,9 @@ const Bookings = () => {
 
       setDialogOpen(false);
       setEditingBookingId(null);
-      setFormData({
-        client_id: "",
-        staff_id: "",
-        service_id: "",
-        appointment_date: "",
-        appointment_time: "",
-        status: "scheduled",
-        // payment_method: validated.payment_method,
-        // payment_status: "unpaid",
-        notes: "",
-      });
-      fetchData();
+      resetFormData();
+      fetchBookings();
+      fetchAllBookings();
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
@@ -230,19 +251,28 @@ const Bookings = () => {
     }
   };
 
+  const resetFormData = () => {
+    setFormData({
+      client_id: "",
+      staff_id: "",
+      service_id: "",
+      appointment_date: "",
+      appointment_time: "",
+      status: "scheduled",
+      notes: "",
+    });
+  };
+
   const handleDelete = async () => {
     if (!deleteBookingId) return;
 
     try {
-      const { error } = await supabase
-        .from("bookings")
-        .delete()
-        .eq("id", deleteBookingId);
-
+      const { error } = await supabase.from("bookings").delete().eq("id", deleteBookingId);
       if (error) throw error;
 
       toast.success("Booking deleted successfully");
-      fetchData();
+      fetchBookings();
+      fetchAllBookings();
     } catch (error: any) {
       toast.error("Failed to delete booking");
     } finally {
@@ -251,17 +281,11 @@ const Bookings = () => {
     }
   };
 
-  // Handle admin approval or decline of requests
-  const handleRequestStatus = async (
-    requestId: string,
-    status: "approved" | "declined"
-  ) => {
-    // Find the request
+  const handleRequestStatus = async (requestId: string, status: "approved" | "declined") => {
     const request = requests.find((r) => r.id === requestId);
     if (!request) return;
 
     try {
-      // Update booking request status
       const { error: updateError } = await supabase
         .from("booking_requests")
         .update({ status })
@@ -269,28 +293,27 @@ const Bookings = () => {
 
       if (updateError) throw updateError;
 
-      // If approved, create a new booking automatically
       if (status === "approved") {
-        const { data: bookingData, error: insertError } = await supabase
-          .from("bookings")
-          .insert([
-            {
-              client_id: request.client_id,
-              staff_id: request.staff_id || null,
-              service_id: request.service_id,
-              appointment_date: request.appointment_date,
-              appointment_time: request.appointment_time,
-              status: "scheduled",
-              notes: request.notes,
-            },
-          ]);
+        const { error: insertError } = await supabase.from("bookings").insert([
+          {
+            client_id: request.client_id,
+            staff_id: request.staff_id || null,
+            service_id: request.service_id,
+            appointment_date: request.appointment_date,
+            appointment_time: request.appointment_time,
+            status: "scheduled",
+            notes: request.notes,
+          },
+        ]);
 
         if (insertError) throw insertError;
         toast.success("Booking created and request approved!");
         fetchBookingRequests();
         fetchBookings();
+        fetchAllBookings();
       } else {
         toast.info("Request declined");
+        fetchBookingRequests();
       }
     } catch (err: any) {
       console.error(err);
@@ -299,6 +322,14 @@ const Bookings = () => {
   };
 
   const handleStatusUpdate = async (bookingId: string, newStatus: string) => {
+    // If cancelling, show cancel dialog with reason
+    if (newStatus === "cancelled") {
+      const booking = bookings.find((b) => b.id === bookingId);
+      setBookingToCancel(booking);
+      setCancelDialogOpen(true);
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from("bookings")
@@ -309,12 +340,148 @@ const Bookings = () => {
       if (error) throw error;
 
       toast.success("Booking status updated");
-
-      // Refresh booking list
-      fetchData();
+      fetchBookings();
+      fetchAllBookings();
     } catch (err: any) {
       toast.error(err.message || "Status update failed");
     }
+  };
+
+  const handleCancelWithReason = async (reason: string) => {
+    if (!bookingToCancel) return;
+
+    try {
+      const { error } = await supabase
+        .from("bookings")
+        .update({
+          status: "cancelled",
+          notes: bookingToCancel.notes
+            ? `${bookingToCancel.notes}\n\nCancellation reason: ${reason}`
+            : `Cancellation reason: ${reason}`,
+        })
+        .eq("id", bookingToCancel.id);
+
+      if (error) throw error;
+
+      toast.success("Booking cancelled");
+      setCancelDialogOpen(false);
+      setBookingToCancel(null);
+      fetchBookings();
+      fetchAllBookings();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to cancel booking");
+    }
+  };
+
+  const handleQuickAssign = async (bookingId: string, staffId: string) => {
+    try {
+      const { error } = await supabase
+        .from("bookings")
+        .update({ staff_id: staffId })
+        .eq("id", bookingId);
+
+      if (error) throw error;
+
+      toast.success("Staff assigned");
+      fetchBookings();
+      fetchAllBookings();
+    } catch (err: any) {
+      toast.error("Failed to assign staff");
+    }
+  };
+
+  // Bulk actions
+  const handleSelectBooking = (id: string) => {
+    setSelectedBookings((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleClearSelection = () => {
+    setSelectedBookings(new Set());
+  };
+
+  const handleBulkComplete = async () => {
+    try {
+      const { error } = await supabase
+        .from("bookings")
+        .update({ status: "completed" })
+        .in("id", Array.from(selectedBookings));
+
+      if (error) throw error;
+
+      toast.success(`${selectedBookings.size} bookings marked as completed`);
+      handleClearSelection();
+      fetchBookings();
+      fetchAllBookings();
+    } catch (err: any) {
+      toast.error("Failed to update bookings");
+    }
+  };
+
+  const handleBulkCancel = async (reason: string) => {
+    try {
+      // We need to update each booking with the reason appended to notes
+      const updates = Array.from(selectedBookings).map(async (id) => {
+        const booking = bookings.find((b) => b.id === id);
+        return supabase
+          .from("bookings")
+          .update({
+            status: "cancelled",
+            notes: booking?.notes
+              ? `${booking.notes}\n\nCancellation reason: ${reason}`
+              : `Cancellation reason: ${reason}`,
+          })
+          .eq("id", id);
+      });
+
+      await Promise.all(updates);
+
+      toast.success(`${selectedBookings.size} bookings cancelled`);
+      handleClearSelection();
+      fetchBookings();
+      fetchAllBookings();
+    } catch (err: any) {
+      toast.error("Failed to cancel bookings");
+    }
+  };
+
+  const handleBulkAssignStaff = async (staffId: string) => {
+    try {
+      const { error } = await supabase
+        .from("bookings")
+        .update({ staff_id: staffId })
+        .in("id", Array.from(selectedBookings));
+
+      if (error) throw error;
+
+      const staffMember = staff.find((s) => s.id === staffId);
+      toast.success(`${selectedBookings.size} bookings assigned to ${staffMember?.full_name}`);
+      handleClearSelection();
+      fetchBookings();
+      fetchAllBookings();
+    } catch (err: any) {
+      toast.error("Failed to assign staff");
+    }
+  };
+
+  const handleEditBooking = (booking: any) => {
+    setEditingBookingId(booking.id);
+    const timeFormatted = booking.appointment_time?.substring(0, 5) || "00:00";
+    setFormData({
+      ...booking,
+      client_id: booking.client_id,
+      staff_id: booking.staff_id || "",
+      service_id: booking.service_id,
+      appointment_time: timeFormatted,
+    });
+    setDialogOpen(true);
   };
 
   const getStatusColor = (status: string) => {
@@ -347,15 +514,12 @@ const Bookings = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Bookings</h1>
-          <p className="text-muted-foreground">
-            Manage and track all appointments
-          </p>
+          <p className="text-muted-foreground">Manage and track all appointments</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />{" "}
-              {editingBookingId ? "Edit Booking" : "New Booking"}
+            <Button onClick={() => { setEditingBookingId(null); resetFormData(); }}>
+              <Plus className="w-4 h-4 mr-2" /> New Booking
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
@@ -366,14 +530,11 @@ const Bookings = () => {
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Client */}
               <div>
                 <Label>Client</Label>
                 <Select
                   value={formData.client_id || ""}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, client_id: value })
-                  }
+                  onValueChange={(value) => setFormData({ ...formData, client_id: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select client" />
@@ -388,14 +549,11 @@ const Bookings = () => {
                 </Select>
               </div>
 
-              {/* Service */}
               <div>
                 <Label>Service</Label>
                 <Select
                   value={formData.service_id || ""}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, service_id: value })
-                  }
+                  onValueChange={(value) => setFormData({ ...formData, service_id: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select service" />
@@ -410,14 +568,11 @@ const Bookings = () => {
                 </Select>
               </div>
 
-              {/* Staff */}
               <div>
                 <Label>Staff</Label>
                 <Select
                   value={formData.staff_id || ""}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, staff_id: value })
-                  }
+                  onValueChange={(value) => setFormData({ ...formData, staff_id: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Assign staff" />
@@ -432,91 +587,31 @@ const Bookings = () => {
                 </Select>
               </div>
 
-              {/* Date & Time */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Date</Label>
                   <Input
                     type="date"
                     value={formData.appointment_date || ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        appointment_date: e.target.value,
-                      })
-                    }
-                    className="pl-3 pr-10 py-2 text-sm rounded-lg border border-gray-300"
+                    onChange={(e) => setFormData({ ...formData, appointment_date: e.target.value })}
                   />
                 </div>
-
                 <div>
                   <Label>Time</Label>
                   <Input
                     type="time"
                     value={formData.appointment_time || ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        appointment_time: e.target.value,
-                      })
-                    }
+                    onChange={(e) => setFormData({ ...formData, appointment_time: e.target.value })}
                   />
                 </div>
               </div>
 
-              {/* Payment */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Payment Method</Label>
-                  <Select
-                    value={formData.payment_method || ""}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, payment_method: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select mode" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="card">Card (Paystack)</SelectItem>
-                      <SelectItem value="momo">Mobile Money</SelectItem>
-                      <SelectItem value="bank_transfer">
-                        Bank Transfer
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* <div>
-                  <Label>Payment Status</Label>
-                  <Select
-                    value={formData.payment_status || ""}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, payment_status: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="paid">Paid</SelectItem>
-                      <SelectItem value="unpaid">Unpaid</SelectItem>
-                      <SelectItem value="partial">Partial</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div> */}
-              </div>
-
-              {/* Notes */}
               <div>
                 <Label>Notes</Label>
                 <Textarea
                   placeholder="Optional notes"
                   value={formData.notes || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, notes: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   rows={3}
                 />
               </div>
@@ -534,14 +629,10 @@ const Bookings = () => {
               <DialogTitle>Delete Booking</DialogTitle>
             </DialogHeader>
             <p className="text-sm text-muted-foreground mb-4">
-              Are you sure you want to delete this booking? This action cannot
-              be undone.
+              Are you sure you want to delete this booking? This action cannot be undone.
             </p>
             <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setDeleteDialogOpen(false)}
-              >
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
                 Cancel
               </Button>
               <Button variant="destructive" onClick={handleDelete}>
@@ -552,211 +643,121 @@ const Bookings = () => {
         </Dialog>
       </div>
 
+      {/* Today's Bookings Summary */}
+      <TodaysBookings bookings={allBookings} onBookingClick={handleEditBooking} />
+
+      {/* Filters and View Toggle */}
+      <BookingFilters
+        activeFilter={activeFilter}
+        onFilterChange={setActiveFilter}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        todayCount={todayBookingsCount}
+      />
+
+      {/* Bulk Actions */}
+      <BulkActions
+        selectedCount={selectedBookings.size}
+        onClearSelection={handleClearSelection}
+        onBulkComplete={handleBulkComplete}
+        onBulkCancel={handleBulkCancel}
+        onBulkAssignStaff={handleBulkAssignStaff}
+        staff={staff}
+      />
+
       {/* Bookings List */}
-      <div className="w-full px-4 space-y-10">
-        <div className="flex justify-end mb-4">
+      <div className="w-full space-y-4">
+        <div className="flex justify-end">
           <CollapsibleSearchBar
             data={bookings}
             placeholder="Search bookings..."
-            onSearchResults={(results) => setFilteredBookings(results)}
+            onSearchResults={(results) => setSearchResults(results.length > 0 ? results : null)}
           />
         </div>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filteredBookings.map((b) => (
-            <Card
-              key={b.id}
-              className="rounded-2xl border border-gray-200/60 shadow-sm hover:shadow-lg bg-white/70 backdrop-blur-sm transition-all"
+
+        {viewMode === "card" ? (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {filteredBookings.map((b) => (
+              <BookingCard
+                key={b.id}
+                booking={b}
+                staff={staff}
+                isSelected={selectedBookings.has(b.id)}
+                onSelect={handleSelectBooking}
+                onEdit={handleEditBooking}
+                onDelete={(id) => {
+                  setDeleteBookingId(id);
+                  setDeleteDialogOpen(true);
+                }}
+                onStatusUpdate={handleStatusUpdate}
+                onQuickAssign={handleQuickAssign}
+              />
+            ))}
+          </div>
+        ) : (
+          <CalendarView bookings={filteredBookings} onBookingClick={handleEditBooking} />
+        )}
+
+        {filteredBookings.length === 0 && (
+          <p className="text-muted-foreground text-center py-8">
+            No bookings found for the selected filter.
+          </p>
+        )}
+
+        {/* Pagination (card view only) */}
+        {viewMode === "card" && (
+          <div className="flex justify-center items-center gap-2 mt-4">
+            <button
+              disabled={page === 1}
+              onClick={() => setPage((prev) => prev - 1)}
+              className="px-4 py-2 rounded-lg bg-muted text-foreground disabled:opacity-50 hover:bg-muted/80 transition"
             >
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start gap-2">
-                  <div>
-                    <CardTitle className="text-lg font-semibold">
-                      {b.clients?.full_name || "Unknown Client"}
-                    </CardTitle>
-                    <p className="text-sm text-gray-500">
-                      {b.services?.name || "No service"}
-                    </p>
-                  </div>
-
-                  <Badge
-                    className={`${getStatusColor(
-                      b.status
-                    )} text-xs px-3 py-1 rounded-full`}
-                  >
-                    {b.status.charAt(0).toUpperCase() + b.status.slice(1)}
-                  </Badge>
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-3 text-sm">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-gray-500 text-xs">Staff</p>
-                    <p className="font-medium">
-                      {b.staff?.full_name || "Unassigned"}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-gray-500 text-xs">Date & Time</p>
-                    <p className="font-medium">
-                      {format(new Date(b.appointment_date), "MMM dd, yyyy")} at{" "}
-                      {b.appointment_time}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Notes */}
-                <p className="text-gray-600 italic border-l-4 border-gray-300 pl-3">
-                  {b.notes || "No note"}
-                </p>
-
-                {/* Status update */}
-                <div className="flex justify-between items-center mt-2">
-                  <span className="text-gray-600 text-sm font-medium">
-                    Update status
-                  </span>
-                  <select
-                    className="border rounded-lg px-2 py-1 text-sm"
-                    value={b.status}
-                    onChange={(e) => handleStatusUpdate(b.id, e.target.value)}
-                  >
-                    <option value="scheduled">Scheduled</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                    <option value="no_show">No response</option>
-                  </select>
-                </div>
-
-                {/* Action buttons */}
-                <div className="flex justify-end gap-2 pt-2 flex-wrap">
-                  {/* Checkout button - only for scheduled/confirmed bookings */}
-                  {["scheduled", "confirmed"].includes(b.status) && (
-                    <Button
-                      size="sm"
-                      className="rounded-xl flex items-center gap-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
-                      onClick={() => {
-                        // Determine the correct path based on current route
-                        const basePath = location.pathname.includes("/receptionist/") 
-                          ? "/app/receptionist/checkout" 
-                          : "/app/admin/checkout";
-                        navigate(`${basePath}?booking=${b.id}`);
-                      }}
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      Check Out
-                    </Button>
-                  )}
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="rounded-xl"
-                    onClick={() => {
-                      setEditingBookingId(b.id);
-                      const timeFormatted =
-                        b.appointment_time?.substring(0, 5) || "00:00";
-                      setFormData({
-                        ...b,
-                        client_id: b.client_id,
-                        staff_id: b.staff_id || "",
-                        service_id: b.service_id,
-                        appointment_time: timeFormatted,
-                      });
-                      setDialogOpen(true);
-                    }}
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="rounded-xl text-red-500 border-red-300"
-                    onClick={() => {
-                      setDeleteDialogOpen(true);
-                      setDeleteBookingId(b.id);
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Pagination */}
-        <div className="flex justify-center items-center gap-2 mt-4">
-          <button
-            disabled={page === 1}
-            onClick={() => {
-              setPage((prev) => prev - 1);
-              fetchBookings(page - 1);
-            }}
-            className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50 hover:bg-gray-200 dark:hover:bg-gray-600 transition"
-          >
-            Prev
-          </button>
-          <span className="px-3 py-2 text-sm text-gray-600 dark:text-gray-300">
-            Page {page} of {totalBookingPages}
-          </span>
-          <button
-            disabled={page === totalBookingPages}
-            onClick={() => setPage((p) => p + 1)}
-            className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50 hover:bg-gray-200 dark:hover:bg-gray-600 transition"
-          >
-            Next
-          </button>
-        </div>
+              Prev
+            </button>
+            <span className="px-3 py-2 text-sm text-muted-foreground">
+              Page {page} of {totalBookingPages}
+            </span>
+            <button
+              disabled={page === totalBookingPages}
+              onClick={() => setPage((p) => p + 1)}
+              className="px-4 py-2 rounded-lg bg-muted text-foreground disabled:opacity-50 hover:bg-muted/80 transition"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Booking Requests Section */}
-      <div className="w-full px-4 space-y-10">
-        <h1 className="text-3xl font-bold mb-4">Booking Requests</h1>
+      <div className="w-full space-y-4">
+        <h2 className="text-2xl font-bold">Booking Requests</h2>
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {requests.map((r) => (
             <Card
               key={r.id}
-              className="rounded-2xl border border-gray-200/60 shadow-sm hover:shadow-lg transition-all bg-white/70 backdrop-blur-sm"
+              className="rounded-2xl border shadow-sm hover:shadow-lg transition-all"
             >
               <CardHeader className="flex justify-between items-start pb-2">
                 <div>
-                  <CardTitle className="text-xl font-semibold">
-                    {r.services?.name}
-                  </CardTitle>
-
-                  <p className="text-sm text-gray-500 mt-1">
-                    <span className="font-medium">Client:</span>{" "}
-                    {r.profiles?.full_name || "Unknown"}
+                  <CardTitle className="text-xl font-semibold">{r.services?.name}</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    <span className="font-medium">Client:</span> {r.clients?.full_name || "Unknown"}
                   </p>
-
-                  <p className="text-sm text-gray-500">
-                    {format(new Date(r.preferred_date), "MMM dd, yyyy")} at{" "}
-                    {r.preferred_time}
+                  <p className="text-sm text-muted-foreground">
+                    {format(new Date(r.appointment_date), "MMM dd, yyyy")} at {r.appointment_time}
                   </p>
                 </div>
-
-                <Badge
-                  className={`${getStatusColor(
-                    r.status
-                  )} text-xs px-3 py-1 rounded-full`}
-                >
+                <Badge className={`${getStatusColor(r.status)} text-xs px-3 py-1 rounded-full`}>
                   {r.status}
                 </Badge>
               </CardHeader>
 
               {r.status === "pending" && (
                 <CardContent className="flex gap-3 pt-2">
-                  <Button
-                    className="flex-1 rounded-xl"
-                    onClick={() => handleRequestStatus(r.id, "approved")}
-                  >
+                  <Button className="flex-1 rounded-xl" onClick={() => handleRequestStatus(r.id, "approved")}>
                     Approve
                   </Button>
-
                   <Button
                     className="flex-1 rounded-xl"
                     variant="destructive"
@@ -770,7 +771,7 @@ const Bookings = () => {
           ))}
 
           {requests.length === 0 && (
-            <p className="text-gray-500 text-center py-4 col-span-full">
+            <p className="text-muted-foreground text-center py-4 col-span-full">
               No booking requests at the moment.
             </p>
           )}
@@ -781,33 +782,37 @@ const Bookings = () => {
           <button
             disabled={requestPage === 1}
             onClick={() => setRequestPage((p) => p - 1)}
-            className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50 hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+            className="px-4 py-2 rounded-lg bg-muted text-foreground disabled:opacity-50 hover:bg-muted/80 transition"
           >
             Prev
           </button>
-          <span className="px-3 py-2 text-sm text-gray-600 dark:text-gray-300">
+          <span className="px-3 py-2 text-sm text-muted-foreground">
             Page {requestPage} of {totalRequestPages}
           </span>
           <button
             disabled={requestPage === totalRequestPages}
             onClick={() => setRequestPage((p) => p + 1)}
-            className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50 hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+            className="px-4 py-2 rounded-lg bg-muted text-foreground disabled:opacity-50 hover:bg-muted/80 transition"
           >
             Next
           </button>
         </div>
       </div>
 
-      {/* Payment Dialog */}
-      {selectedBooking && (
-        <PaymentDialog
-          admin={true}
-          open={paymentDialogOpen}
-          onOpenChange={setPaymentDialogOpen}
-          booking={selectedBooking}
-          onPaymentComplete={fetchData}
-        />
-      )}
+      {/* Cancel Booking Dialog */}
+      <CancelBookingDialog
+        open={cancelDialogOpen}
+        onOpenChange={setCancelDialogOpen}
+        onConfirm={handleCancelWithReason}
+        bookingInfo={
+          bookingToCancel
+            ? {
+                clientName: bookingToCancel.clients?.full_name,
+                serviceName: bookingToCancel.services?.name,
+              }
+            : undefined
+        }
+      />
     </div>
   );
 };

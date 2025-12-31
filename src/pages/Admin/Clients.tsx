@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Plus,
   Mail,
@@ -13,6 +13,7 @@ import {
   CalendarClock,
   TrendingUp,
 } from "lucide-react";
+import { History } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -63,16 +71,27 @@ const Clients = () => {
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [deleteClientId, setDeleteClientId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [archiveReason, setArchiveReason] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [userRole, setUserRole] = useState<string>("");
   const [services, setServices] = useState([]);
+  const [servicesLoading, setServicesLoading] = useState(false);
   const [selectedService, setSelectedService] = useState("");
   const [showServiceList, setShowServiceList] = useState(false);
   const [activeFilter, setActiveFilter] = useState<
-    "none" | "date" | "most_active" | "service_history" | "search"
+    | "none"
+    | "date"
+    | "most_active"
+    | "service_history"
+    | "search"
+    | "last_visit"
+    | "most_frequent"
+    | "highest_spenders"
+    | "inactive_60"
+    | "inactive_90"
   >("none");
   const [searchResults, setSearchResults] = useState<any[] | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -88,6 +107,7 @@ const Clients = () => {
   const [totalClients, setTotalClients] = useState(0);
   const [selectedClient, setSelectedClient] = useState<any | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [filtering, setFiltering] = useState(false);
   const totalPages = Math.ceil(totalClients / pageSize);
 
   const [formData, setFormData] = useState<any>({
@@ -143,12 +163,14 @@ const Clients = () => {
       const { data, count, error } = await supabase
         .from("clients")
         .select(`*, bookings(*, services(*))`, { count: "exact" })
-        .order("full_name")
         .range(from, to);
 
       if (error) throw error;
 
-      setClients(data || []);
+      // filter out archived clients by default (safe if archived not present)
+      const activeClients = (data || []).filter((c: any) => !c?.archived);
+      setClients(activeClients);
+      setFilteredClients(activeClients);
       setTotalClients(count || 0); // total clients in DB
     } catch (error) {
       console.error("Error fetching clients:", error);
@@ -160,6 +182,7 @@ const Clients = () => {
 
   const fetchServices = async () => {
     try {
+      setServicesLoading(true);
       const { data, error } = await supabase
         .from("services")
         .select("*")
@@ -171,6 +194,7 @@ const Clients = () => {
       console.error(error);
       toast.error("Failed to fetch services");
     } finally {
+      setServicesLoading(false);
       setLoading(false);
     }
   };
@@ -192,6 +216,32 @@ const Clients = () => {
     return counts;
   };
 
+  const handleArchiveClient = async () => {
+    if (!deleteClientId) return;
+    try {
+      const { error } = await supabase
+        .from("clients")
+        .update({
+          //@ts-ignore
+          archived: true,
+          archive_reason: archiveReason || null,
+          archived_at: new Date().toISOString(),
+        })
+        .eq("id", deleteClientId);
+
+      if (error) throw error;
+
+      toast.success("Client archived");
+      fetchClients();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to archive client");
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeleteClientId(null);
+      setArchiveReason("");
+    }
+  };
+
   const handleFilterByDate = () => {
     setActiveFilter("date");
   };
@@ -209,6 +259,8 @@ const Clients = () => {
   const clearFilters = () => {
     setActiveFilter("none");
     setSelectedService("");
+    setSearchTerm("");
+    setSearchResults(null);
     setFilteredClients(clients);
   };
 
@@ -224,45 +276,143 @@ const Clients = () => {
 
   // Centralized filter application so filters compose
   const runFilters = () => {
-    let data = [...clients];
+    setFiltering(true);
+    // enrich clients with derived metrics used by smart filters
+    const enriched = (clients || []).map((c: any) => {
+      const bookings = c.bookings || [];
+      const visitsCount = bookings.length;
+      const totalSpent = bookings.reduce((s: number, b: any) => {
+        const st = (b.status || "").toLowerCase();
+        // count only completed-type statuses as spent
+        if (st.includes("complete")) return s + Number(b.services?.price || 0);
+        return s;
+      }, 0);
+      const lastBooking =
+        bookings
+          .map((b: any) => b.appointment_date)
+          .filter(Boolean)
+          .sort()
+          .reverse()[0] || null;
+      const noShowCount = bookings.filter((b: any) =>
+        (b.status || "").toLowerCase().includes("no")
+      ).length;
+      const lateCancelCount = bookings.filter((b: any) => {
+        const st = (b.status || "").toLowerCase();
+        if (st.includes("late")) return true;
+        if (
+          st.includes("cancel") &&
+          (b.is_late_cancel ||
+            (b.cancel_reason || "").toLowerCase().includes("late"))
+        )
+          return true;
+        return false;
+      }).length;
+      return {
+        ...c,
+        visitsCount,
+        totalSpent,
+        lastBooking,
+        noShowCount,
+        lateCancelCount,
+      };
+    });
 
-    // --- Date Filter ---
-    if (startDate || endDate) {
-      data = data.filter((item) => {
+    // Base data: if user used the search widget and we have searchResults, respect them
+    let data =
+      activeFilter === "search" && searchResults && searchResults.length > 0
+        ? (searchResults || []).slice()
+        : enriched.slice();
+
+    // --- Date Filter (created_at) --- (only when date filter is active)
+    if (activeFilter === "date" && (startDate || endDate)) {
+      data = data.filter((item: any) => {
         const created = new Date(item.created_at);
-        if (startDate && created < new Date(startDate)) return false;
-        if (endDate && created > new Date(endDate)) return false;
+        if (startDate && created < new Date(startDate + "T00:00:00"))
+          return false;
+        if (endDate && created > new Date(endDate + "T23:59:59")) return false;
         return true;
       });
     }
 
-    // --- Status Filter ---
-    if (activeFilter && activeFilter !== "none") {
-      // activeFilter is already typed, no need to filter by status here
-    }
-
-    // --- Service Filter ---
-    if (selectedService && selectedService !== "all") {
-      data = data.filter((item) => item.service === selectedService);
-    }
-
-    // --- Search Filter ---
-    if (searchTerm.trim() !== "") {
-      const term = searchTerm.toLowerCase();
-      data = data.filter(
-        (item) =>
-          item.full_name?.toLowerCase().includes(term) ||
-          item.phone?.toLowerCase().includes(term) ||
-          item.email?.toLowerCase().includes(term)
+    // --- Service Filter: clients who had the selected service (only when service filter active) ---
+    if (
+      (activeFilter === "service_history" || selectedService) &&
+      selectedService &&
+      selectedService !== "all"
+    ) {
+      data = data.filter((item: any) =>
+        (item.bookings || []).some(
+          (b: any) => (b.services?.name || "") === selectedService
+        )
       );
     }
 
+    // --- Search Filter (if using the text input search rather than the collapsible) ---
+    if (activeFilter !== "search" && searchTerm.trim() !== "") {
+      const term = searchTerm.toLowerCase();
+      data = data.filter(
+        (item: any) =>
+          item.full_name?.toLowerCase().includes(term) ||
+          (item.phone || "").toLowerCase().includes(term) ||
+          (item.email || "").toLowerCase().includes(term)
+      );
+    }
+
+    // --- Smart / active filters ---
+    switch (activeFilter) {
+      case "most_active":
+      case "most_frequent":
+        data = data.sort(
+          (a: any, b: any) => (b.visitsCount || 0) - (a.visitsCount || 0)
+        );
+        break;
+      case "highest_spenders":
+        data = data.sort(
+          (a: any, b: any) => (b.totalSpent || 0) - (a.totalSpent || 0)
+        );
+        break;
+      case "last_visit":
+        data = data.sort(
+          (a: any, b: any) =>
+            new Date(b.lastBooking || 0).getTime() -
+            new Date(a.lastBooking || 0).getTime()
+        );
+        break;
+      case "inactive_60": {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 60);
+        data = data.filter(
+          (c: any) => !c.lastBooking || new Date(c.lastBooking) < cutoff
+        );
+        break;
+      }
+      case "inactive_90": {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 90);
+        data = data.filter(
+          (c: any) => !c.lastBooking || new Date(c.lastBooking) < cutoff
+        );
+        break;
+      }
+      default:
+        break;
+    }
+
     setFilteredClients(data);
+    setFiltering(false);
   };
 
   useEffect(() => {
     runFilters();
-  }, [clients, startDate, endDate, activeFilter, selectedService, searchTerm]);
+  }, [
+    clients,
+    startDate,
+    endDate,
+    activeFilter,
+    selectedService,
+    searchTerm,
+    searchResults,
+  ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -468,21 +618,30 @@ const Clients = () => {
         <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Delete client</DialogTitle>
+              <DialogTitle>Archive client</DialogTitle>
             </DialogHeader>
             <p className="text-sm text-muted-foreground mb-4">
-              Are you sure you want to delete this client? This action cannot be
-              undone.
+              Instead of deleting, you can archive this client. Archiving hides
+              the client from lists but preserves history. Please provide a
+              reason (optional).
             </p>
-            <div className="flex justify-end gap-2">
+            <div className="space-y-3">
+              <Label>Reason for archiving (optional)</Label>
+              <Textarea
+                value={archiveReason}
+                onChange={(e) => setArchiveReason(e.target.value)}
+                placeholder="e.g. duplicate, test data, no-show"
+              />
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
               <Button
                 variant="outline"
                 onClick={() => setDeleteDialogOpen(false)}
               >
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={handleDeleteClient}>
-                Delete
+              <Button variant="destructive" onClick={handleArchiveClient}>
+                Archive
               </Button>
             </div>
           </DialogContent>
@@ -495,7 +654,7 @@ const Clients = () => {
             data={clients}
             placeholder="Search clients..."
             onSearchResults={(results) => {
-              setFilteredClients(results);
+              setSearchResults(results);
               setActiveFilter("search");
             }}
           />
@@ -550,6 +709,38 @@ const Clients = () => {
               <TrendingUp className="w-4 h-4 mr-2" /> Most Active
             </Button>
 
+            {/* Smart Filters */}
+            <div>
+              <Select
+                value={activeFilter}
+                onValueChange={(v) => setActiveFilter(v as any)}
+              >
+                <SelectTrigger className="w-44 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">All</SelectItem>
+                  <SelectItem value="last_visit">Last Visit</SelectItem>
+                  <SelectItem value="most_frequent">Most Frequent</SelectItem>
+                  <SelectItem value="highest_spenders">
+                    Highest Spenders
+                  </SelectItem>
+                  <SelectItem value="inactive_60">
+                    Inactive (60 days)
+                  </SelectItem>
+                  <SelectItem value="inactive_90">
+                    Inactive (90 days)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {/* small spinner while filtering */}
+            {filtering && (
+              <div className="flex items-center">
+                <div className="ml-2 w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+
             {/* Service History Dropdown (desktop) */}
             <div className="relative w-auto">
               <Button
@@ -557,23 +748,32 @@ const Clients = () => {
                 variant={
                   activeFilter === "service_history" ? "default" : "outline"
                 }
-                className="w-auto"
+                className="w-auto flex items-center gap-2"
               >
-                {selectedService || "Service History"}
+                {servicesLoading ? (
+                  <div className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                ) : null}
+                <span>{selectedService || "Service History"}</span>
               </Button>
 
               {showServiceList && (
                 <div className="absolute right-0 mt-1 w-56 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-xl z-50">
                   <div className="p-2 max-h-64 overflow-auto">
-                    {services.map((service: any) => (
-                      <button
-                        key={service.id}
-                        onClick={() => handleServiceHistory(service.name)}
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm rounded-md transition"
-                      >
-                        {service.name}
-                      </button>
-                    ))}
+                    {servicesLoading ? (
+                      <div className="flex items-center justify-center p-4">
+                        <div className="w-6 h-6 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    ) : (
+                      services.map((service: any) => (
+                        <button
+                          key={service.id}
+                          onClick={() => handleServiceHistory(service.name)}
+                          className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm rounded-md transition"
+                        >
+                          {service.name}
+                        </button>
+                      ))
+                    )}
                   </div>
                 </div>
               )}
@@ -630,6 +830,33 @@ const Clients = () => {
                 </Button>
 
                 <div>
+                  <label className="block text-sm mb-1">Quick Filters</label>
+                  <div className="mb-2">
+                    <Select
+                      value={activeFilter}
+                      onValueChange={(v) => setActiveFilter(v as any)}
+                    >
+                      <SelectTrigger className="w-full text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">All</SelectItem>
+                        <SelectItem value="last_visit">Last Visit</SelectItem>
+                        <SelectItem value="most_frequent">
+                          Most Frequent
+                        </SelectItem>
+                        <SelectItem value="highest_spenders">
+                          Highest Spenders
+                        </SelectItem>
+                        <SelectItem value="inactive_60">
+                          Inactive (60 days)
+                        </SelectItem>
+                        <SelectItem value="inactive_90">
+                          Inactive (90 days)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <label className="block text-sm mb-1">Service History</label>
                   <div className="flex flex-col gap-2">
                     {services.map((service: any) => (
@@ -650,7 +877,7 @@ const Clients = () => {
       </div>
       <div className="space-y-6">
         {/* Client Grid */}
-        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr items-stretch">
           {filteredClients.map((client) => {
             const s = new Date(`${startDate}T00:00:00`);
             const e = new Date(`${endDate}T23:59:59`);
@@ -677,114 +904,186 @@ const Clients = () => {
                   setSelectedClient(client);
                   setProfileOpen(true);
                 }}
-                className="cursor-pointer hover:shadow-2xl transition-all transform hover:-translate-y-1 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-white/80 to-white/60 dark:from-gray-900/70 dark:to-gray-800/50 backdrop-blur-lg"
+                className="h-full cursor-pointer hover:shadow-2xl transition-all transform hover:-translate-y-1 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-white/80 to-white/60 dark:from-gray-900/70 dark:to-gray-800/50 backdrop-blur-lg"
               >
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                      {/* Avatar */}
-                      <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-100 flex-shrink-0 ring-1 ring-gray-100 dark:ring-gray-700 shadow">
-                        {client.image ? (
-                          <img
-                            src={client.image}
-                            alt={client.full_name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-green-500 to-teal-500 text-white flex items-center justify-center font-semibold text-lg shadow-md">
-                            {client.full_name
-                              .split(" ")
-                              .map((n: string) => n[0])
-                              .join("")}
-                          </div>
-                        )}
-                      </div>
-
-                      <div>
-                        <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                          {client.full_name}
-                          <span className="ml-2 text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700">
-                            {bookingsCount} visits
-                          </span>
-                        </CardTitle>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {lastBooking
-                            ? `Last: ${format(
-                                new Date(lastBooking),
-                                "MMM dd, yyyy"
-                              )}`
-                            : "No appointments yet"}
-                        </p>
-                      </div>
+                <CardHeader className="pb-3">
+                  <div className="flex items-start gap-4">
+                    {/* Avatar */}
+                    <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-100 flex-shrink-0 ring-1 ring-gray-200 dark:ring-gray-700">
+                      {client.image ? (
+                        <img
+                          src={client.image}
+                          alt={client.full_name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-green-500 to-teal-500 text-white flex items-center justify-center font-semibold text-lg">
+                          {client.full_name
+                            .split(" ")
+                            .map((n: string) => n[0])
+                            .join("")}
+                        </div>
+                      )}
                     </div>
 
-                    {client.specialization && (
-                      <p className="text-sm text-gray-500 mt-1">
-                        {client.specialization}
+                    {/* Identity */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <CardTitle className="text-lg truncate">
+                          {client.full_name}
+                        </CardTitle>
+
+                        {/* Status */}
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full ${
+                            client.noShowCount >= 3
+                              ? "bg-red-100 text-red-700"
+                              : client.totalSpent > 5000 ||
+                                client.visitsCount > 10
+                              ? "bg-yellow-100 text-yellow-700"
+                              : client.visitsCount === 0
+                              ? "bg-green-100 text-green-700"
+                              : "bg-gray-100 text-gray-700"
+                          }`}
+                        >
+                          {client.noShowCount >= 3
+                            ? "Blacklisted"
+                            : client.totalSpent > 5000 ||
+                              client.visitsCount > 10
+                            ? "VIP"
+                            : client.visitsCount === 0
+                            ? "New"
+                            : "Regular"}
+                        </span>
+
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800">
+                          {bookingsCount} visits
+                        </span>
+                      </div>
+
+                      <p className="text-sm text-muted-foreground mt-1 truncate">
+                        {lastBooking
+                          ? `Last visit: ${format(
+                              new Date(lastBooking),
+                              "MMM dd, yyyy"
+                            )}`
+                          : "No appointments yet"}
                       </p>
-                    )}
+
+                      {client.specialization && (
+                        <p className="text-sm text-gray-500 truncate">
+                          {client.specialization}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
 
-                <CardContent className="space-y-3">
-                  {/* Phone */}
-                  <a
-                    href={`tel:${client.phone}`}
-                    className="flex items-center gap-2 text-sm text-gray-600 hover:text-green-600 hover:underline transition-colors"
-                  >
-                    <Phone className="w-4 h-4" />
-                    <span>{client.phone}</span>
-                  </a>
+                <CardContent className="space-y-4">
+                  {/* Stats */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <Stat
+                      label="No-shows"
+                      value={() =>
+                        (client.bookings || []).filter((b: any) =>
+                          (b.status || "").toLowerCase().includes("no")
+                        ).length
+                      }
+                    />
+                    <Stat
+                      label="Late cancels"
+                      value={() =>
+                        (client.bookings || []).filter((b: any) => {
+                          const st = (b.status || "").toLowerCase();
+                          return st.includes("late") || b.is_late_cancel;
+                        }).length
+                      }
+                    />
+                  </div>
 
-                  {/* Email */}
-                  {client.email && (
-                    <a
-                      href={`mailto:${client.email}`}
-                      className="flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600 hover:underline transition-colors"
-                    >
-                      <Mail className="w-4 h-4" />
-                      <span>{client.email}</span>
-                    </a>
-                  )}
-
-                  {/* Action Buttons */}
-                  <div className="flex justify-end gap-2 pt-3">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="rounded-xl flex items-center gap-1"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFormData({
-                          full_name: client.full_name,
-                          phone: client.phone,
-                          email: client.email || "",
-                          address: client.address || "",
-                          notes: client.notes || "",
-                          image: client.image || null,
-                        });
-                        setDialogOpen(true);
-                        setEditingClientId(client.id);
-                      }}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                    {userRole === "owner" && (
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="rounded-xl flex items-center gap-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteClientId(client.id);
-                          setDeleteDialogOpen(true);
-                        }}
+                  {/* Contact */}
+                  <div className="space-y-1">
+                    {client.phone && (
+                      <a
+                        href={`tel:${client.phone}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-2 text-sm text-gray-600 truncate"
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                        <Phone className="w-4 h-4" />
+                        {client.phone}
+                      </a>
+                    )}
+
+                    {client.email && (
+                      <a
+                        href={`mailto:${client.email}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-2 text-sm text-gray-600 truncate"
+                      >
+                        <Mail className="w-4 h-4" />
+                        {client.email}
+                      </a>
                     )}
                   </div>
                 </CardContent>
+
+                <CardFooter className="flex flex-wrap gap-2 justify-end border-t pt-3">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setProfileOpen(true);
+                      setSelectedClient(client);
+                    }}
+                  >
+                    <History className="w-4 h-4" />
+                    <span className="hidden sm:inline ml-1">History</span>
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDialogOpen(true);
+                      setEditingClientId(client.id);
+                    }}
+                  >
+                    <Pencil className="w-4 h-4" />
+                    <span className="hidden sm:inline ml-1">Edit</span>
+                  </Button>
+
+                  {client.phone && (
+                    <a
+                      href={`https://wa.me/${String(client.phone).replace(
+                        /\D/g,
+                        ""
+                      )}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Button size="sm" variant="ghost">
+                        <Phone className="w-4 h-4" />
+                      </Button>
+                    </a>
+                  )}
+
+                  {userRole === "owner" && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteClientId(client.id);
+                        setDeleteDialogOpen(true);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </CardFooter>
               </Card>
             );
           })}

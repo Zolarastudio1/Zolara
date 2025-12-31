@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Clipboard, CreditCard, Loader2 } from "lucide-react";
+import { useSettings } from "@/context/SettingsContext";
 import { Textarea } from "@/components/ui/textarea";
 
 interface PaymentDialogProps {
@@ -40,9 +41,14 @@ export default function PaymentDialog({
   const [loading, setLoading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  const [paymentMethod, setPaymentMethod] = useState<
-    "cash" | "card" | "momo" | "bank_transfer"
-  >("cash");
+  const { settings } = useSettings();
+
+  const enabledMethods = settings?.payment_methods?.filter((m) => m.enabled) || [];
+
+  // allow empty string when no method selected / configured
+  const [paymentMethod, setPaymentMethod] = useState<string>(
+    enabledMethods[0]?.id || (admin && settings?.payment_methods?.some((m) => m.id === "cash" && m.enabled) ? "cash" : "")
+  );
 
   const [amount, setAmount] = useState<string>(booking?.services?.price || "");
   const [notes, setNotes] = useState<string>("");
@@ -85,6 +91,17 @@ export default function PaymentDialog({
     setLoading(true);
 
     try {
+        if (!paymentMethod) {
+          toast.error("Please select a payment method");
+          return;
+        }
+
+        // ensure selected method is enabled in settings
+        if (!enabledMethods.some((m) => m.id === paymentMethod)) {
+          toast.error("Selected payment method is not available");
+          return;
+        }
+
       if (!amount || parseFloat(amount) <= 0) {
         toast.error("Please enter a valid amount");
         return;
@@ -234,10 +251,19 @@ export default function PaymentDialog({
                 <SelectValue placeholder="Select payment method" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="card">Card</SelectItem>
-                <SelectItem value="momo">Mobile Money</SelectItem>
-                <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                {admin && <SelectItem value="cash">Cash</SelectItem>}
+                {enabledMethods.length === 0 ? (
+                  <div className="p-3 text-sm text-gray-500">No payment methods configured. Ask admin to enable at least one method.</div>
+                ) : (
+                  enabledMethods.map((m) => {
+                    // only show cash for admin if it's enabled
+                    if (m.id === "cash" && !admin) return null;
+                    return (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name}
+                      </SelectItem>
+                    );
+                  })
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -325,7 +351,7 @@ export default function PaymentDialog({
           {/* PAYMENT BUTTON */}
           <Button
             onClick={handlePaymentSubmit}
-            disabled={loading}
+            disabled={loading || !paymentMethod || !amount || parseFloat(String(amount || 0)) <= 0}
             className="w-full"
           >
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

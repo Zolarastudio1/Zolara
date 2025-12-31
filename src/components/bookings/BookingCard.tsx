@@ -38,7 +38,7 @@ interface BookingCardProps {
   onDelete: (id: string) => void;
   onStatusUpdate: (id: string, status: string) => void;
   onQuickAssign: (bookingId: string, staffId: string) => void;
-  paymentStatus?: "unpaid" | "paid" | "partial";
+  paymentStatus?: "pending" | "completed" | "refunded";
 }
 
 const getStatusColor = (status: string) => {
@@ -93,7 +93,7 @@ export const BookingCard = ({
   onDelete,
   onStatusUpdate,
   onQuickAssign,
-  paymentStatus = "unpaid",
+  paymentStatus = "pending",
 }: BookingCardProps) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -132,7 +132,7 @@ export const BookingCard = ({
                 <Badge className={cn(getStatusColor(booking.status), "text-xs px-3 py-1 rounded-full")}>
                   {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                 </Badge>
-                {getPaymentStatusBadge(paymentStatus)}
+                {/* {getPaymentStatusBadge(paymentStatus)} */}
               </div>
             </div>
           </div>

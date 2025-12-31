@@ -12,7 +12,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FileDown, TrendingUp } from "lucide-react";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { useSettings } from "@/context/SettingsContext";
+import { format, startOfMonth, endOfMonth, subDays } from "date-fns";
 import jsPDF from "jspdf";
 
 const Reports = () => {
@@ -29,6 +30,7 @@ const Reports = () => {
   const [clients, setClients] = useState<any[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const { settings } = useSettings();
 
   const formatDateTime = (date: string, time: string) => {
     if (!date || !time) return "";
@@ -88,6 +90,7 @@ const Reports = () => {
   const generateReport = async () => {
     setLoading(true);
     try {
+      // include transaction_reference and service price/duration when available
       let query = supabase
         .from("payments")
         .select(
@@ -97,13 +100,14 @@ const Reports = () => {
         payment_method,
         payment_status,
         payment_date,
+        transaction_reference,
         bookings:booking_id (
           id,
           appointment_date,
           appointment_time,
           status,
           rating,
-          services:service_id (id, name, category),
+          services:service_id (id, name, category, price, duration_minutes),
           staff:staff_id (id, full_name),
           clients:client_id (id, full_name)
         )
@@ -145,25 +149,44 @@ const Reports = () => {
        BASIC METRICS
     ============================== */
       const totalRevenue = rows.reduce((sum: number, p: any) => sum + Number(p.amount), 0) || 0;
-
       const totalBookings = rows.length || 0;
 
       /* ===============================
-       SERVICE BREAKDOWN
+       PAYMENT METHOD TOTALS
+    ============================== */
+      const methodTotals: any = {};
+      rows.forEach((r: any) => {
+        const m = r.payment_method || "unknown";
+        methodTotals[m] = (methodTotals[m] || 0) + Number(r.amount || 0);
+      });
+
+      /* ===============================
+       SERVICE BREAKDOWN + STATS
     ============================== */
       const serviceBreakdown = rows.reduce((acc: any, row: any) => {
         const booking = getBooking(row);
         const serviceRel = normalizeRel(booking?.services);
         const name = serviceRel?.name || "Unknown";
-        if (!acc[name]) acc[name] = { count: 0, revenue: 0 };
+        if (!acc[name]) acc[name] = { count: 0, revenue: 0, avgPrice: 0, avgDuration: 0 };
 
         acc[name].count += 1;
         acc[name].revenue += Number(row.amount);
+        // collect price/duration if available
+        if (serviceRel?.price) acc[name].avgPrice = (acc[name].avgPrice + Number(serviceRel.price)) || Number(serviceRel.price);
+        if (serviceRel?.duration_minutes) acc[name].avgDuration = (acc[name].avgDuration + Number(serviceRel.duration_minutes)) || Number(serviceRel.duration_minutes);
         return acc;
       }, {});
 
+      // finalize avg price/duration for services
+      const serviceStats = Object.entries(serviceBreakdown).map(([name, s]: any) => {
+        const avgPrice = s.count ? s.avgPrice / s.count : 0;
+        const avgDuration = s.count ? s.avgDuration / s.count : 0;
+        const revenuePerHour = avgDuration > 0 ? (s.revenue / (avgDuration / 60)) : 0;
+        return { name, count: s.count, revenue: s.revenue, avgPrice, avgDuration, revenuePerHour };
+      }).sort((a: any, b: any) => b.revenue - a.revenue);
+
       /* ===============================
-       MOST ACTIVE CLIENTS
+       MOST ACTIVE CLIENTS / TOP SPENDERS
     ============================== */
       const mostActiveClients = rows.reduce((acc: any, row: any) => {
         const booking = getBooking(row);
@@ -179,7 +202,7 @@ const Reports = () => {
       }, {});
 
       const mostActiveList = Object.values(mostActiveClients || {}).sort(
-        (a: any, b: any) => b.count - a.count
+        (a: any, b: any) => b.revenue - a.revenue
       );
 
       /* ===============================
@@ -208,17 +231,15 @@ const Reports = () => {
       /* ===============================
        STAFF BREAKDOWN
     ============================== */
-  // Calculate staff breakdown with optional average rating if booking.rating exists
-  const staffBreakdown = rows.reduce((acc: any, row: any) => {
+      const staffBreakdown = rows.reduce((acc: any, row: any) => {
         const staffObj = Array.isArray(row.bookings) ? row.bookings[0]?.staff : row.bookings?.staff;
         const name = staffObj?.full_name || "Unassigned";
-        const staffId = staffObj?.id || "unknown";
+        const staffId = staffObj?.id || name || "unknown";
         if (!acc[staffId]) acc[staffId] = { name, count: 0, revenue: 0, ratingSum: 0, ratingCount: 0 };
 
         acc[staffId].count += 1;
         acc[staffId].revenue += Number(row.amount);
 
-        // support multiple possible rating fields on the booking
         const booking = Array.isArray(row.bookings) ? row.bookings[0] : row.bookings;
         const rating = booking?.rating ?? booking?.rating_value ?? booking?.client_rating ?? null;
         if (rating !== null && !isNaN(Number(rating))) {
@@ -229,7 +250,6 @@ const Reports = () => {
         return acc;
       }, {});
 
-      // Convert accumulated map to object keyed by name for UI consumption
       const staffBreakdownByName: any = {};
       Object.entries(staffBreakdown || {}).forEach(([staffId, v]: any) => {
         const item = v as any;
@@ -237,13 +257,61 @@ const Reports = () => {
           count: item.count,
           revenue: item.revenue,
           avgRating: item.ratingCount ? item.ratingSum / item.ratingCount : null,
+          avgRevenuePerBooking: item.count ? item.revenue / item.count : 0,
         };
       });
 
-  /* ===============================
-   COMBINED EXPORT FORMAT
-   ============================== */
-  const exportRows = rows.map((p) => {
+      /* ===============================
+       DAILY TIMELINE & PEAK HOURS
+    ============================== */
+      const dailyTimeline: any = {};
+      const hourTimeline: any = {};
+      rows.forEach((r: any) => {
+        const booking = getBooking(r);
+        const dateKey = (r.payment_date || booking?.appointment_date || "").toString().slice(0, 10);
+        dailyTimeline[dateKey] = (dailyTimeline[dateKey] || 0) + Number(r.amount || 0);
+
+        const time = booking?.appointment_time || r.payment_date?.toString()?.split("T")?.[1] || "";
+        const hour = time ? String(time).split(":")[0] : "unknown";
+        hourTimeline[hour] = (hourTimeline[hour] || 0) + Number(r.amount || 0);
+      });
+
+      /* ===============================
+       BOOKING COUNTS (performance)
+    ============================== */
+      const bookingCounts = rows.reduce((acc: any, r: any) => {
+        const booking = getBooking(r);
+        const status = (booking?.status || "unknown").toLowerCase();
+        if (status.includes("complete")) acc.completed += 1;
+        else if (status.includes("cancel")) acc.cancelled += 1;
+        else if (status.includes("no")) acc.no_show += 1;
+        return acc;
+      }, { completed: 0, cancelled: 0, no_show: 0 });
+
+      /* ===============================
+       PREVIOUS PERIOD COMPARISON
+    ============================== */
+      // compute previous period range by shifting the current range back by its length
+      const msPerDay = 24 * 60 * 60 * 1000;
+      const s = new Date(startDate);
+      const e = new Date(endDate);
+      const lenDays = Math.round((e.getTime() - s.getTime()) / msPerDay) + 1;
+      const prevEnd = subDays(s, 1);
+      const prevStart = subDays(prevEnd, lenDays - 1);
+
+      // fetch previous period revenue
+      const { data: prevData } = await supabase
+        .from("payments")
+        .select("amount")
+        .gte("payment_date", format(prevStart, "yyyy-MM-dd"))
+        .lte("payment_date", format(prevEnd, "yyyy-MM-dd"));
+
+      const prevRevenue = (prevData || []).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0) || 0;
+
+      /* ===============================
+       COMBINED EXPORT FORMAT
+    ============================== */
+      const exportRows = rows.map((p) => {
         const booking = getBooking(p);
         const clientRel = normalizeRel(booking?.clients);
         const staffRel = normalizeRel(booking?.staff);
@@ -257,25 +325,50 @@ const Reports = () => {
           Client: clientRel?.full_name ?? "",
           Staff: staffRel?.full_name ?? "",
           Service: serviceRel?.name ?? "",
-          ServiceCategory: serviceRel?.category ?? "",
-          Amount: p.amount ?? 0,
-          PaymentMethod: p.payment_method ?? "",
-          PaymentDate: p.payment_date ?? "",
+          ServiceCategory: serviceRel?.category ?? "",            // @ts-ignore
+          Amount: p?.amount ?? 0,               // @ts-ignore
+          PaymentMethod: p?.payment_method ?? "",             // @ts-ignore
+          PaymentDate: p?.payment_date ? format(new Date(p?.payment_date), "yyyy-MM-dd HH:mm") : "",
           BookingStatus: booking?.status ?? "",
-          BookingID: booking?.id ?? "",
-          PaymentID: p.id ?? "",
+          BookingID: booking?.id ?? "",           // @ts-ignore
+          PaymentID: p?.id ?? "",             // @ts-ignore
+          TransactionRef: p?.transaction_reference ?? "",
         };
       });
+
+      /* ===============================
+       AUDIT: generatedAt / generatedBy
+    ============================== */
+      let generatedBy = "Unknown";
+      try {
+        const authRes: any = await (supabase.auth as any).getUser?.();
+        const user = authRes?.data?.user || authRes?.user || null;
+        if (user?.id) {
+          const { data: profile } = await supabase.from("profiles").select("role, full_name").eq("id", user.id).single();
+          // @ts-ignore
+          generatedBy = profile?.role ? `${profile.role}` : profile?.full_name || "User";
+        }
+      } catch (e) {
+        // ignore
+      }
 
       setReportData({
         totalRevenue,
         totalBookings,
         serviceBreakdown,
+        serviceStats,
         staffBreakdown: staffBreakdownByName,
+        methodTotals,
         exportRows,
         rawData: data,
         mostActiveList,
         serviceHistory,
+        bookingCounts,
+        dailyTimeline,
+        hourTimeline,
+        prevRevenue,
+        generatedAt: new Date().toISOString(),
+        generatedBy,
       });
     } catch (err) {
       console.error("Report Error:", err);
@@ -311,13 +404,22 @@ const Reports = () => {
 ================================= */
   const exportToCSV = () => {
     if (!reportData?.exportRows || reportData.exportRows.length === 0) return;
-
     const rows = reportData.exportRows;
     const headers = Object.keys(rows[0]);
-    const csv = [
+
+    // metadata lines
+    const metaLines = [
+      `Generated At:,"${reportData.generatedAt || new Date().toISOString()}"`,
+      `Generated By:,"${reportData.generatedBy || "Unknown"}"`,
+      "",
+    ];
+
+    const csvBody = [
       headers.join(","),
-      ...rows.map((r: any) => headers.map((h) => `"${r[h] ?? ""}"`).join(",")),
+      ...rows.map((r: any) => headers.map((h) => `"${String(r[h] ?? "").replace(/"/g, '""')}"`).join(",")),
     ].join("\n");
+
+    const csv = metaLines.join("\n") + csvBody;
 
     const blob = new Blob([csv], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
@@ -391,10 +493,11 @@ const Reports = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All</SelectItem>
-                      <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="momo">MOMO</SelectItem>
-                      <SelectItem value="card">Card</SelectItem>
-                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                      {settings?.payment_methods?.filter((m) => m.enabled).map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -429,8 +532,8 @@ const Reports = () => {
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All clients</SelectItem>
+                    <SelectContent>
+                      <SelectItem value="all">All clients</SelectItem>
                     {clients.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.full_name}
@@ -451,7 +554,7 @@ const Reports = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All clients</SelectItem>
+                    <SelectItem value="all">All clients</SelectItem>
                     {clients.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.full_name}
@@ -497,15 +600,15 @@ const Reports = () => {
 
                   const headers = Object.keys(rows[0] || {});
                   const tableRowsHtml = rows
-                    .map(
-                      (r: any) =>
-                        `<tr>${headers
-                          .map((h) => `<td>${(r[h] ?? "").toString()}</td>`)
-                          .join("")}</tr>`
+                    .map((r: any) =>
+                      `<tr>${headers
+                        .map((h) => `<td>${(r[h] ?? "").toString()}</td>`)
+                        .join("")}</tr>`
                     )
                     .join("");
 
-                  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>${style}</head><body><h2>${title}</h2><table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${tableRowsHtml}</tbody></table></body></html>`;
+                  // Ensure body has padding so header isn't hidden in PDF renders
+                  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>${style}</head><body style="padding:20mm"><h2 style="margin-top:0;margin-bottom:12px">${title}</h2><table style="margin-top:8px"><thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${tableRowsHtml}</tbody></table></body></html>`;
 
                   // create offscreen wrapper and load html2canvas dynamically
                   const wrapper = document.createElement("div");
@@ -662,7 +765,124 @@ const Reports = () => {
             </CardContent>
           </Card>
 
-          {/* Most active clients (when selected) */}
+            {/* PAYMENT BREAKDOWN & PROFIT SUMMARY */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Payment Breakdown</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    {reportData?.methodTotals && Object.entries(reportData.methodTotals).map(([m, amt]: any) => (
+                      <div key={m} className="flex justify-between">
+                        <div className="capitalize">{m.replace(/_/g, " ")}</div>
+                        <div>GH₵{Number(amt).toLocaleString()} ({((Number(amt) / (reportData.totalRevenue || 1)) * 100).toFixed(1)}%)</div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Profit Summary (estimate)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between"><div>Estimated Net Profit</div><div>GH₵{(reportData.totalRevenue * 0.75).toLocaleString()}</div></div>
+                    <div className="flex justify-between"><div>Staff Payouts (estimate)</div><div>GH₵0.00</div></div>
+                    <div className="flex justify-between font-semibold"><div>Owner Net Balance</div><div>GH₵{(reportData.totalRevenue * 0.75).toLocaleString()}</div></div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Booking performance & period comparison */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Booking Performance</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between"><div>Completed</div><div>{reportData.bookingCounts?.completed ?? 0}</div></div>
+                    <div className="flex justify-between"><div>Cancelled</div><div>{reportData.bookingCounts?.cancelled ?? 0}</div></div>
+                    <div className="flex justify-between"><div>No-shows</div><div>{reportData.bookingCounts?.no_show ?? 0}</div></div>
+                    <div className="flex justify-between font-semibold"><div>Completion rate</div><div>{((reportData.bookingCounts?.completed || 0) / Math.max(1, (reportData.bookingCounts?.completed || 0) + (reportData.bookingCounts?.cancelled || 0) + (reportData.bookingCounts?.no_show || 0)) * 100).toFixed(1)}%</div></div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Period Comparison</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between"><div>This period</div><div>GH₵{reportData.totalRevenue.toLocaleString()}</div></div>
+                    <div className="flex justify-between"><div>Previous period</div><div>GH₵{(reportData.prevRevenue || 0).toLocaleString()}</div></div>
+                    <div className="flex justify-between font-semibold"><div>Change</div><div>{reportData.prevRevenue ? (((reportData.totalRevenue - reportData.prevRevenue) / Math.abs(reportData.prevRevenue || 1)) * 100).toFixed(1) : "N/A"}%</div></div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Service profitability and daily timeline */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Service Profitability</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    {(reportData.serviceStats || []).slice(0, 8).map((s: any) => (
+                      <div key={s.name} className="flex justify-between">
+                        <div>
+                          <div className="font-medium">{s.name}</div>
+                          <div className="text-xs text-muted-foreground">Avg price: GH₵{Number(s.avgPrice || 0).toFixed(2)} • Avg duration: {Number(s.avgDuration || 0).toFixed(0)} min</div>
+                        </div>
+                        <div className="text-sm">GH₵{Number(s.revenue || 0).toLocaleString()}<div className="text-xs text-muted-foreground">GH₵{Number(s.revenuePerHour || 0).toFixed(2)}/hr</div></div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Daily Revenue Timeline</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    {Object.entries(reportData.dailyTimeline || {}).slice(0, 14).map(([d, amt]: any) => (
+                      <div key={d} className="flex justify-between">
+                        <div>{d}</div>
+                        <div>GH₵{Number(amt).toLocaleString()}</div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Top spenders */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Top Client Spenders</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  {(reportData.mostActiveList || []).slice(0, 10).map((c: any) => (
+                    <div key={c.name} className="flex justify-between">
+                      <div>{c.name}</div>
+                      <div>GH₵{Number(c.revenue).toLocaleString()}</div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Most active clients (when selected) */}
           {filterType === "most_active" && (
             <Card>
               <CardHeader>

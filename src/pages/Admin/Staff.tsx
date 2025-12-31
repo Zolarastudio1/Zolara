@@ -22,9 +22,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useSettings } from "@/context/SettingsContext";
+import { useCatalog } from "@/context/CatalogContext";
 import { z } from "zod";
 import PhoneInput from "@/lib/phoneInput";
 import { AvatarUpload } from "@/components/AvatarUpload";
+import {
+  fetchSpecializations,
+  fetchStaffWithDetails,
+  assignServicesToStaff,
+  getServicesForStaff,
+  addWorkingHours,
+  getWorkingHours,
+  addOffDay,
+  getOffDays,
+  setStaffStatus,
+} from "@/lib/staff";
 
 // Schema for validation
 const staffSchema = z.object({
@@ -46,11 +59,14 @@ const staffSchema = z.object({
     .regex(/^\+?[0-9]{7,15}$/, "Invalid emergency contact format")
     .optional()
     .or(z.literal("")),
-  role: z.enum(["staff", "receptionist"]),
+  // allow arbitrary role strings (managed via Settings) rather than a strict enum
+  role: z.string().min(1, "Role is required"),
   image: z.union([z.instanceof(File), z.null()]).optional(),
 });
 
 const Staff = () => {
+  const { settings } = useSettings();
+  const catalog = useCatalog();
   const [staff, setStaff] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -64,31 +80,51 @@ const Staff = () => {
     phone: "",
     email: "",
     specialization: "",
-    role: "staff" as "staff" | "receptionist",
+    role: "staff",
     is_active: true,
     image: null as File | string | null,
     emergency_contact: "",
   });
   const [selectedStaff, setSelectedStaff] = useState<any | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [specializations, setSpecializations] = useState<any[]>([]);
+  const [servicesList, setServicesList] = useState<any[]>([]);
+  const [assignedServices, setAssignedServices] = useState<string[]>([]);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [workingHours, setWorkingHours] = useState<any[]>([]);
+  const [offDays, setOffDays] = useState<any[]>([]);
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [staffBookings, setStaffBookings] = useState<any[]>([]);
   const [staffAttendance, setStaffAttendance] = useState<any[]>([]);
   const [profileLoading, setProfileLoading] = useState(false);
-  const [staffRatings, setStaffRatings] = useState<Record<string, number | null>>({});
+  const [staffRatings, setStaffRatings] = useState<
+    Record<string, number | null>
+  >({});
 
-  const SPECIALIZATIONS = [
-    "Hair Stylist",
-    "Nail Technician",
-    "Therapist",
-    "Barber",
-    "Makeup Artist",
-    "Receptionist",
-    "Manager",
-  ];
+  // Specializations list (if you have a settings-managed list use it, otherwise fallback to empty)
+  const SPECIALIZATIONS: string[] = (settings as any)?.staff_roles || [];
 
   useEffect(() => {
     fetchStaff();
     fetchUserRole();
+    // refresh catalog in case staff list changed elsewhere
+    try {
+      catalog?.refreshCatalog?.();
+    } catch (e) {
+      /* noop */
+    }
+    // load specializations and services for assignment UI
+    (async () => {
+      try {
+        const sp = await fetchSpecializations();
+        if (!sp.error) setSpecializations((sp.data || []) || []);
+      } catch (e) {}
+
+      try {
+        const { data, error } = await supabase.from("services").select("*").order("name");
+        if (!error) setServicesList(data || []);
+      } catch (e) {}
+    })();
   }, []);
 
   /** Fetch Logged-in User Role */
@@ -126,7 +162,7 @@ const Staff = () => {
         .order("full_name");
       if (error) throw error;
       setStaff(data || []);
-      
+
       // Staff ratings feature disabled - rating column doesn't exist on bookings table
       setStaffRatings({});
     } catch (error) {
@@ -143,9 +179,9 @@ const Staff = () => {
       full_name: member.full_name,
       phone: member.phone,
       email: member.email || "",
-      specialization: member.specialization || "",
+      specialization: member.specialization || member.specialization_id || "",
       role: member.role || "staff",
-      is_active: member.is_active ?? true,
+      is_active: member.status ? member.status === "active" : member.is_active ?? true,
       image: member.image || null,
       emergency_contact: member.emergency_contact || "",
     });
@@ -195,6 +231,23 @@ const Staff = () => {
 
       setStaffBookings((bookingsRes as any).data || []);
       setStaffAttendance((attendanceRes as any).data || []);
+
+      // fetch assigned services for this staff
+      try {
+        const svc = await getServicesForStaff(staffId);
+        if (!svc.error) setAssignedServices(svc.data || []);
+      } catch (e) {}
+
+      // fetch working hours and off days
+      try {
+        const wh = await getWorkingHours(staffId);
+        if (!wh.error) setWorkingHours(wh.data || []);
+      } catch (e) {}
+
+      try {
+        const od = await getOffDays(staffId);
+        if (!od.error) setOffDays(od.data || []);
+      } catch (e) {}
     } catch (err: any) {
       console.error("Error fetching staff profile:", err);
       toast.error("Failed to load staff profile data");
@@ -219,7 +272,8 @@ const Staff = () => {
           emergency_contact: validated.emergency_contact,
         }),
         role: validated.role,
-        is_active: formData.is_active,
+        //@ts-ignore
+        ...(formData.status ? { status: formData.status } : { is_active: formData.is_active }),
       };
 
       // Upload image if selected
@@ -255,7 +309,7 @@ const Staff = () => {
         if (error) throw error;
         toast.success("Staff updated successfully");
       } else {
-         // Invoke the generic invite Edge Function
+        // Invoke the generic invite Edge Function
         const { data, error } = await supabase.functions.invoke("invite-user", {
           method: "POST",
           body: JSON.stringify(staffData),
@@ -283,6 +337,11 @@ const Staff = () => {
       });
 
       fetchStaff();
+      try {
+        catalog.refreshCatalog();
+      } catch (e) {
+        /* noop */
+      }
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
@@ -340,11 +399,15 @@ const Staff = () => {
                   }
                   required
                 />
-                {selectedStaff && staffRatings[selectedStaff.id] !== undefined && (
-                  <p className="text-sm mt-1">
-                    Avg rating: {staffRatings[selectedStaff.id] !== null ? Number(staffRatings[selectedStaff.id]).toFixed(2) : "N/A"}
-                  </p>
-                )}
+                {selectedStaff &&
+                  staffRatings[selectedStaff.id] !== undefined && (
+                    <p className="text-sm mt-1">
+                      Avg rating:{" "}
+                      {staffRatings[selectedStaff.id] !== null
+                        ? Number(staffRatings[selectedStaff.id]).toFixed(2)
+                        : "N/A"}
+                    </p>
+                  )}
               </div>
 
               <div className="space-y-2">
@@ -368,23 +431,36 @@ const Staff = () => {
 
               <div className="space-y-2">
                 <Label>Specialization</Label>
-                <Select
-                  value={formData.specialization}
-                  onValueChange={(v) =>
-                    setFormData({ ...formData, specialization: v })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select specialization" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SPECIALIZATIONS.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {s}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {SPECIALIZATIONS.length > 0 ? (
+                  <Select
+                    value={formData.specialization}
+                    onValueChange={(v) =>
+                      setFormData({ ...formData, specialization: v })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select specialization" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SPECIALIZATIONS.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    placeholder="e.g. Hair Stylist"
+                    value={formData.specialization}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        specialization: e.target.value,
+                      })
+                    }
+                  />
+                )}
               </div>
 
               <div className="space-y-2">
@@ -405,7 +481,7 @@ const Staff = () => {
                 <Label>Role *</Label>
                 <Select
                   value={formData.role}
-                  onValueChange={(value: "staff" | "receptionist") =>
+                  onValueChange={(value: string) =>
                     setFormData({ ...formData, role: value })
                   }
                 >
@@ -413,8 +489,26 @@ const Staff = () => {
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="staff">Staff</SelectItem>
-                    <SelectItem value="receptionist">Receptionist</SelectItem>
+                      <SelectItem value="staff">Staff</SelectItem>
+                      <SelectItem value="receptionist">Receptionist</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Status</Label> 
+                {/* @ts-ignore */}
+                <Select //@ts-ignore
+                  onValueChange={(value: string) => setFormData({ ...formData, status: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="onleave">On leave</SelectItem>
+                    <SelectItem value="suspended">Suspended</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -488,24 +582,36 @@ const Staff = () => {
                   </div>
 
                   <div>
-                    <CardTitle className="text-lg font-semibold">
-                      {member.full_name}
-                    </CardTitle>
-                    {member.specialization && (
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-lg font-semibold">
+                        {member.full_name}
+                      </CardTitle>
+                      {member.role && (
+                        <span className="text-xs px-2 py-1 rounded-md bg-gray-100 text-gray-700">
+                          {member.role}
+                        </span>
+                      )}
+                    </div>
+                    {(
+                      member.specialization || member.specialization_id
+                    ) && (
                       <p className="text-sm text-gray-500 mt-1">
-                        {member.specialization}
+                        {member.specialization || specializations.find((s:any)=>s.id===member.specialization_id)?.name}
                       </p>
                     )}
                     {staffRatings[member.id] !== undefined && (
                       <p className="text-sm text-gray-500 mt-1">
-                        Avg rating: {staffRatings[member.id] !== null ? Number(staffRatings[member.id]).toFixed(2) : "N/A"}
+                        Avg rating:{" "}
+                        {staffRatings[member.id] !== null
+                          ? Number(staffRatings[member.id]).toFixed(2)
+                          : "N/A"}
                       </p>
                     )}
                   </div>
                 </div>
 
-                <Badge variant={member.is_active ? "default" : "secondary"}>
-                  {member.is_active ? "Active" : "Inactive"}
+                <Badge variant={(member.status ? member.status === 'active' : member.is_active) ? "default" : "secondary"}>
+                  {member.status ? member.status.replace('_', ' ') : (member.is_active ? "Active" : "Inactive")}
                 </Badge>
               </div>
             </CardHeader>
@@ -534,6 +640,33 @@ const Staff = () => {
                 >
                   <Pencil className="w-4 h-4" />
                 </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="rounded-xl"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // open profile then assign dialog
+                      setSelectedStaff(member);
+                      setProfileOpen(true);
+                      fetchStaffProfile(member.id).then(() => setAssignDialogOpen(true));
+                    }}
+                  >
+                    Services
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="rounded-xl"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedStaff(member);
+                      setProfileOpen(true);
+                      fetchStaffProfile(member.id).then(() => setScheduleDialogOpen(true));
+                    }}
+                  >
+                    Schedule
+                  </Button>
                 {userRole === "owner" && (
                   <Button
                     size="sm"
@@ -613,9 +746,9 @@ const Staff = () => {
                   <h4 className="font-medium text-sm text-gray-600">
                     Specialization
                   </h4>
-                  <p className="mt-1 text-sm">
-                    {selectedStaff.specialization || "N/A"}
-                  </p>
+                    <p className="mt-1 text-sm">
+                      {selectedStaff.specialization || specializations.find((s:any)=>s.id===selectedStaff.specialization_id)?.name || "N/A"}
+                    </p>
                 </div>
 
                 <div>
@@ -756,6 +889,126 @@ const Staff = () => {
               </div>
             </div>
           ) : null}
+        </DialogContent>
+      </Dialog>
+      {/* Assign Services Dialog */}
+      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign Services to {selectedStaff?.full_name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="max-h-64 overflow-auto">
+              {servicesList.map((s) => (
+                <label key={s.id} className="flex items-center gap-2 p-2">
+                  <input
+                    type="checkbox"
+                    checked={assignedServices.includes(s.id)}
+                    onChange={(e) => {
+                      const next = assignedServices.slice();
+                      if (e.target.checked) next.push(s.id);
+                      else {
+                        const idx = next.indexOf(s.id);
+                        if (idx >= 0) next.splice(idx, 1);
+                      }
+                      setAssignedServices(next);
+                    }}
+                  />
+                  <span className="text-sm">{s.name}</span>
+                </label>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
+              <Button onClick={async () => {
+                if (!selectedStaff) return;
+                const res = await assignServicesToStaff(selectedStaff.id, assignedServices);
+                if (res.success) {
+                  toast.success('Assigned services');
+                  setAssignDialogOpen(false);
+                } else {
+                  toast.error(res.error?.message || 'Failed to assign services');
+                }
+              }}>Save</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Schedule / Off-days Dialog */}
+      <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Schedule & Off days for {selectedStaff?.full_name}</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <h4 className="font-medium mb-2">Working Hours (weekly)</h4>
+              <div className="space-y-2 max-h-48 overflow-auto p-2 border rounded">
+                {workingHours.length === 0 ? <div className="text-sm text-muted-foreground">No working hours</div> : workingHours.map((w: any) => (
+                  <div key={w.id} className="text-sm">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][w.day_of_week]}: {w.start_time} - {w.end_time}</div>
+                ))}
+              </div>
+              <form className="mt-2 flex gap-2" onSubmit={async (e) => {
+                e.preventDefault();
+                if (!selectedStaff) return;
+                const f = new FormData(e.currentTarget as HTMLFormElement);
+                const day = Number(f.get('day'));
+                const start = String(f.get('start'));
+                const end = String(f.get('end'));
+                const res = await addWorkingHours(selectedStaff.id, day, start, end);
+                if (res.error) toast.error(res.error.message || 'Failed to add hours');
+                else {
+                  toast.success('Added working hours');
+                  const wh = await getWorkingHours(selectedStaff.id);
+                  if (!wh.error) setWorkingHours(wh.data || []);
+                }
+              }}>
+                <select name="day" className="rounded border px-2 py-1">
+                  <option value="1">Mon</option>
+                  <option value="2">Tue</option>
+                  <option value="3">Wed</option>
+                  <option value="4">Thu</option>
+                  <option value="5">Fri</option>
+                  <option value="6">Sat</option>
+                  <option value="0">Sun</option>
+                </select>
+                <input name="start" type="time" className="rounded border px-2 py-1" required />
+                <input name="end" type="time" className="rounded border px-2 py-1" required />
+                <Button type="submit">Add</Button>
+              </form>
+            </div>
+
+            <div>
+              <h4 className="font-medium mb-2">Off Days</h4>
+              <div className="space-y-2 max-h-48 overflow-auto p-2 border rounded">
+                {offDays.length === 0 ? <div className="text-sm text-muted-foreground">No off days</div> : offDays.map((d: any) => (
+                  <div key={d.id} className="text-sm">{d.off_date} {d.reason ? `— ${d.reason}` : ''}</div>
+                ))}
+              </div>
+              <form className="mt-2 flex gap-2" onSubmit={async (e) => {
+                e.preventDefault();
+                if (!selectedStaff) return;
+                const f = new FormData(e.currentTarget as HTMLFormElement);
+                const date = String(f.get('date'));
+                const reason = String(f.get('reason')) || undefined;
+                const res = await addOffDay(selectedStaff.id, date, reason);
+                if (res.error) toast.error(res.error.message || 'Failed to add off day');
+                else {
+                  toast.success('Added off day');
+                  const od = await getOffDays(selectedStaff.id);
+                  if (!od.error) setOffDays(od.data || []);
+                }
+              }}>
+                <input name="date" type="date" className="rounded border px-2 py-1" required />
+                <input name="reason" placeholder="Reason" className="rounded border px-2 py-1" />
+                <Button type="submit">Add</Button>
+              </form>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Button variant="outline" onClick={() => setScheduleDialogOpen(false)}>Close</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

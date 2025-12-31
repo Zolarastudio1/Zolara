@@ -27,6 +27,7 @@ import {
   Clock,
   Settings,
   CheckIcon,
+  Gift,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -41,6 +42,7 @@ const DashboardLayout = () => {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [open, setOpen] = useState(false);
+  const [currentRole, setCurrentRole] = useState<string>("");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -58,6 +60,29 @@ const DashboardLayout = () => {
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  useEffect(() => {
+    // fetch role for the current user to ensure nav reflects latest permissions
+    const syncRole = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: roleData } = await supabase.from("user_roles").select("role").eq("user_id", user.id).single();
+        const metaDataRole = (user as any).user_metadata?.role || "";
+        const role = roleData?.role || metaDataRole || "";
+        setCurrentRole(role);
+        // store in localStorage for legacy parts that read it
+        localStorage.setItem("user", JSON.stringify({ id: user.id, email: user.email, role }));
+      } catch (err) {
+        console.error("Failed to sync user role", err);
+      }
+    };
+
+    syncRole();
+    // re-sync role when window gains focus (helps reflect admin changes)
+    window.addEventListener("focus", syncRole);
+    return () => window.removeEventListener("focus", syncRole);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -92,6 +117,7 @@ const DashboardLayout = () => {
     { icon: UserCog, label: "Staff", path: "staff" },
     { icon: Scissors, label: "Services", path: "services" },
     { icon: CreditCard, label: "Sales", path: "sales" },
+    { icon: Gift, label: "Gift Cards", path: "gift-cards" },
     { icon: CheckIcon, label: "Checkout", path: "checkout" },
     { icon: FileText, label: "Reports", path: "reports" },
     { icon: Clock, label: "Attendance", path: "attendance" },
@@ -104,6 +130,11 @@ const DashboardLayout = () => {
   // ==========================================================
   const getNavItemsForRole = (role: string) => {
     switch (role) {
+      case "admin":
+        return baseNavItems.map((item) => ({
+          ...item,
+          path: `/app/admin/${item.path}`,
+        }))
       // ------------------------------------------------------
       // OWNER: FULL ACCESS
       // ------------------------------------------------------
@@ -128,7 +159,6 @@ const DashboardLayout = () => {
                 "Reports",
                 "Attendance Reports",
                 "Staff",
-                "Checkout",
                 "Settings",
               ].includes(item.label)
           )
@@ -181,7 +211,7 @@ const DashboardLayout = () => {
 
   const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
 
-  const navItems = getNavItemsForRole(storedUser.role);
+  const navItems = getNavItemsForRole(currentRole || storedUser.role || "");
 
   const roleLabels: Record<string, string> = {
     owner: "Owner Access",

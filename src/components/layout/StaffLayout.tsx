@@ -25,6 +25,7 @@ const StaffDashboard = () => {
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState("");
+  const [userRole, setUserRole] = useState<string>("");
   const [stats, setStats] = useState({
     total: 0,
     completed: 0,
@@ -37,7 +38,20 @@ const StaffDashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
+    fetchUserRole();
   }, []);
+
+  const fetchUserRole = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: roleData } = await supabase.from("user_roles").select("role").eq("user_id", user.id).single();
+      const metaDataRole = (user as any).user_metadata?.role;
+      setUserRole(roleData?.role || metaDataRole || "");
+    } catch (err) {
+      console.error("Failed to fetch user role", err);
+    }
+  };
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -184,9 +198,10 @@ const StaffDashboard = () => {
         />
       </div>
 
-      {/* Earnings & Performance */}
+      {/* Earnings & Performance (financial widgets hidden for non-admin roles) */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Total Earnings Card */}
+        {(userRole === "owner" || userRole === "admin") && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -208,6 +223,7 @@ const StaffDashboard = () => {
             </CardContent>
           </Card>
         </motion.div>
+        )}
 
         {/* Completion Rate */}
         <motion.div
@@ -252,12 +268,14 @@ const StaffDashboard = () => {
         />
       </div>
 
-      {/* Performance Chart */}
-      <RevenueChart
-        data={performanceData}
-        title="Your Earnings"
-        subtitle="Last 7 days performance"
-      />
+      {/* Performance Chart (financial) */}
+      {(userRole === "owner" || userRole === "admin") ? (
+        <RevenueChart
+          data={performanceData}
+          title="Your Earnings"
+          subtitle="Last 7 days performance"
+        />
+      ) : null}
 
       {/* Activity Row */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -268,14 +286,24 @@ const StaffDashboard = () => {
           icon={<Calendar className="w-5 h-5 text-primary" />}
           emptyMessage="No assigned bookings yet"
         />
-        <ActivityList
-          title="Payment History"
-          subtitle="Your earnings log"
-          items={recentPaymentItems}
-          showAmount
-          icon={<DollarSign className="w-5 h-5 text-success" />}
-          emptyMessage="No payments recorded yet"
-        />
+        {(userRole === "owner" || userRole === "admin") ? (
+          <ActivityList
+            title="Payment History"
+            subtitle="Your earnings log"
+            items={recentPaymentItems}
+            showAmount
+            icon={<DollarSign className="w-5 h-5 text-success" />}
+            emptyMessage="No payments recorded yet"
+          />
+        ) : (
+          <ActivityList
+            title="Recent Activity"
+            subtitle="Your recent bookings"
+            items={recentBookingItems}
+            icon={<Calendar className="w-5 h-5 text-primary" />}
+            emptyMessage="No recent activity"
+          />
+        )}
       </div>
     </div>
   );

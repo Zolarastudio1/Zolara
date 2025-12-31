@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useSettings } from "@/context/SettingsContext";
 import {
   format,
   startOfMonth,
@@ -31,9 +32,12 @@ const SalesRevenue = () => {
   >("month");
   const [customStart, setCustomStart] = useState<string>("");
   const [customEnd, setCustomEnd] = useState<string>("");
+  const [exportScope, setExportScope] = useState<"all" | "completed" | "pending">("all");
+  const [exportPaymentType, setExportPaymentType] = useState<"all" | string>("all");
   const [monthlyNet, setMonthlyNet] = useState<number>(0);
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const { settings } = useSettings();
 
   useEffect(() => {
     fetchPayments();
@@ -45,6 +49,27 @@ const SalesRevenue = () => {
     fetchPayments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateRange, customStart, customEnd]);
+
+  // Helper: build a human-friendly active range label
+  const activeRangeLabel = () => {
+    if (dateRange === "custom") {
+      if (customStart && customEnd) {
+        try {
+          const s = new Date(customStart);
+          const e = new Date(customEnd);
+          return `Showing sales for ${format(s, "MMM d")}–${format(e, "MMM d, yyyy")}`;
+        } catch (e) {
+          return `Showing sales for ${customStart} – ${customEnd}`;
+        }
+      }
+      return "Showing sales for custom range";
+    }
+    const now = new Date();
+    if (dateRange === "today") return `Showing sales for ${format(now, "PPP")}`;
+    if (dateRange === "week") return `Showing sales for ${format(startOfWeek(now), "MMM d")}–${format(endOfWeek(now), "MMM d, yyyy")}`;
+    if (dateRange === "month") return `Showing sales for ${format(startOfMonth(now), "MMM d")}–${format(endOfMonth(now), "MMM d, yyyy")}`;
+    return "Showing sales for all time";
+  };
 
   // Fetch monthly net revenue same as dashboard
   const fetchMonthlyNet = async () => {
@@ -274,6 +299,26 @@ const SalesRevenue = () => {
     (p) => p.payment_status === "pending"
   );
 
+  // Staff contribution to revenue (top earning staff this period)
+  const staffContributions = Object.values(
+    filteredPayments.reduce((acc: any, p: any) => {
+      const staffName = p.bookings?.staff?.full_name || "Unassigned";
+      if (!acc[staffName]) acc[staffName] = { name: staffName, revenue: 0 };
+      acc[staffName].revenue += Number(p.amount || 0);
+      return acc;
+    }, {})
+  ).sort((a: any, b: any) => b.revenue - a.revenue);
+
+  // Revenue by service
+  const serviceRevenue = Object.values(
+    filteredPayments.reduce((acc: any, p: any) => {
+      const svc = p.bookings?.services?.name || "Unassigned";
+      if (!acc[svc]) acc[svc] = { name: svc, revenue: 0 };
+      acc[svc].revenue += Number(p.amount || 0);
+      return acc;
+    }, {})
+  ).sort((a: any, b: any) => b.revenue - a.revenue);
+
   const openPaymentDialog = (p: any) => {
     setSelectedPayment(p);
     setPaymentDialogOpen(true);
@@ -310,7 +355,8 @@ const SalesRevenue = () => {
     const colors: any = {
       completed: "bg-success/10 text-success",
       pending: "bg-warning/10 text-warning",
-      refunded: "bg-destructive/10 text-destructive",
+      refunded: "bg-muted text-muted-foreground",
+      void: "bg-muted text-muted-foreground",
     };
     return colors[status] || "bg-muted text-muted-foreground";
   };
@@ -513,6 +559,7 @@ const SalesRevenue = () => {
         <p className="text-muted-foreground">
           Track salon revenue and payments
         </p>
+        <p className="text-sm text-muted-foreground mt-1">{activeRangeLabel()}</p>
       </div>
 
       {/* Filter Buttons */}
@@ -572,20 +619,40 @@ const SalesRevenue = () => {
           </Button>
         ))}
         <CSVLink
-          data={filteredPayments.map((p) => ({
-            client: p.bookings?.clients?.full_name,
-            service: p.bookings?.services?.name,
-            method: p.payment_method,
-            status: p.payment_status,
-            amount: p.amount,
-            date: p.payment_date
-              ? format(new Date(p.payment_date), "MMM dd, yyyy")
-              : "",
-          }))}
-          filename="revenue_summary.csv"
+          data={
+            filteredPayments
+              .filter((p) => exportScope === "all" || p.payment_status === exportScope)
+              .filter((p) => exportPaymentType === "all" || p.payment_method === exportPaymentType)
+              .map((p) => ({
+                client: p.bookings?.clients?.full_name,
+                service: p.bookings?.services?.name,
+                method: p.payment_method,
+                status: p.payment_status,
+                amount: p.amount,
+                reference: p.transaction_reference || p.reference || p.paystack_ref || p.momo_ref || p.txn_ref || "",
+                date: p.payment_date
+                  ? format(new Date(p.payment_date), "MMM dd, yyyy")
+                  : "",
+              }))
+          }
+          filename={`revenue_summary_${dateRange}.csv`}
         >
           <Button variant="outline">Export CSV</Button>
         </CSVLink>
+        <div className="flex items-center gap-2">
+          <label className="text-sm">Export:</label>
+          <select value={exportScope} onChange={(e) => setExportScope(e.target.value as any)} className="px-2 py-1 border rounded">
+            <option value="all">All</option>
+            <option value="completed">Completed only</option>
+            <option value="pending">Pending only</option>
+          </select>
+          <select value={exportPaymentType} onChange={(e) => setExportPaymentType(e.target.value as any)} className="px-2 py-1 border rounded">
+            <option value="all">All methods</option>
+            {(settings?.payment_methods?.filter((m) => m.enabled) || []).map((m: any) => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
+          </select>
+        </div>
         <Button variant="outline" onClick={saveReportAsPDF} className="ml-2">
           Export PDF
         </Button>
@@ -615,6 +682,33 @@ const SalesRevenue = () => {
           <p className="text-sm text-muted-foreground">
             Total Transactions: {completedPayments.length}
           </p>
+          {/* Top earning staff */}
+          <div className="mt-4">
+            <h4 className="text-sm font-medium">Top earning staff this period</h4>
+            <div className="mt-2 space-y-1">
+              {staffContributions.slice(0, 5).map((s: any) => (
+                <div key={s.name} className="flex justify-between text-sm text-muted-foreground">
+                  <div>{s.name}</div>
+                  <div>GH₵{Number(s.revenue).toLocaleString()}</div>
+                </div>
+              ))}
+              {staffContributions.length === 0 && <div className="text-sm text-muted-foreground">No staff revenue found</div>}
+            </div>
+          </div>
+
+          {/* Revenue by service */}
+          <div className="mt-4">
+            <h4 className="text-sm font-medium">Revenue by Service</h4>
+            <div className="mt-2 space-y-1">
+              {serviceRevenue.slice(0, 8).map((s: any) => (
+                <div key={s.name} className="flex justify-between text-sm text-muted-foreground">
+                  <div>{s.name}</div>
+                  <div>GH₵{Number(s.revenue).toLocaleString()}</div>
+                </div>
+              ))}
+              {serviceRevenue.length === 0 && <div className="text-sm text-muted-foreground">No service revenue</div>}
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -636,6 +730,29 @@ const SalesRevenue = () => {
           <p className="text-sm text-muted-foreground">
             Total Transactions: {pendingPayments.length}
           </p>
+          <div className="mt-2">
+            <h4 className="text-sm font-medium">Pending Actions</h4>
+            <ul className="text-sm list-disc ml-5 text-muted-foreground">
+              {pendingPayments.slice(0, 5).map((p) => (
+                <li key={p.id}>
+                  {p.bookings?.clients?.full_name} — {p.payment_method} — {
+                    p.payment_status === "pending" ? "Awaiting payment" : p.payment_status === "failed" ? "Payment failed" : "Manual follow up required"
+                  }
+                </li>
+              ))}
+              {pendingPayments.length > 5 && <li>...and {pendingPayments.length - 5} more</li>}
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Refunds / Adjustments placeholder */}
+      <Card className="bg-gray-50 border border-gray-200">
+        <CardHeader>
+          <CardTitle className="text-gray-700">Refunds & Adjustments</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Refunds and adjustments coming soon</p>
         </CardContent>
       </Card>
 
@@ -691,6 +808,10 @@ const SalesRevenue = () => {
                     )}
                   </span>
                 </div>
+                  {/* Transaction reference */}
+                  <div className="text-sm text-muted-foreground mt-1">
+                    Ref: {payment.transaction_reference || payment.reference || payment.paystack_ref || payment.momo_ref || payment.txn_ref || "N/A"}
+                  </div>
                 {payment.notes && (
                   <p className="text-sm text-muted-foreground mt-2">
                     Note: {payment.notes}

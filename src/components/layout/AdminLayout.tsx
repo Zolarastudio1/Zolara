@@ -21,6 +21,7 @@ import {
   startOfDay,
   endOfDay,
 } from "date-fns";
+import { useSettings } from "@/context/SettingsContext";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
@@ -76,6 +77,7 @@ const AdminDashboard = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [absentStaff, setAbsentStaff] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const { settings } = useSettings();
 
   useEffect(() => {
     fetchStats();
@@ -224,13 +226,16 @@ const AdminDashboard = () => {
       }, {});
 
       const totalPaymentAmount = periodRevenue || 1;
+      const enabledMethodIds = settings?.payment_methods?.filter((m: any) => m.enabled).map((m: any) => m.id) || [];
       const paymentMethodBreakdown = paymentMethods
-        ? Object.entries(paymentMethods).map(([method, data]: [string, any]) => ({
-            method,
-            amount: data.amount,
-            count: data.count,
-            percentage: (data.amount / totalPaymentAmount) * 100,
-          }))
+        ? Object.entries(paymentMethods)
+            .map(([method, data]: [string, any]) => ({
+              method,
+              amount: data.amount,
+              count: data.count,
+              percentage: (data.amount / totalPaymentAmount) * 100,
+            }))
+            .filter((p: any) => enabledMethodIds.includes(p.method))
         : [];
 
       // Top performing staff

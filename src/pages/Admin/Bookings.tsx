@@ -274,6 +274,8 @@ const Bookings = () => {
       fetchBookings();
       fetchAllBookings();
     } catch (error: any) {
+        console.error("Delete error:", error);
+
       toast.error("Failed to delete booking");
     } finally {
       setDeleteDialogOpen(false);
@@ -691,6 +693,7 @@ const Bookings = () => {
                 }}
                 onStatusUpdate={handleStatusUpdate}
                 onQuickAssign={handleQuickAssign}
+                paymentStatus={b.payment_status || "pending"}
               />
             ))}
           </div>
@@ -745,7 +748,7 @@ const Bookings = () => {
                     <span className="font-medium">Client:</span> {r.clients?.full_name || "Unknown"}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {format(new Date(r.appointment_date), "MMM dd, yyyy")} at {r.appointment_time}
+                    {format(new Date(r.preferred_date), "MMM dd, yyyy")} at {r.preferred_time}
                   </p>
                 </div>
                 <Badge className={`${getStatusColor(r.status)} text-xs px-3 py-1 rounded-full`}>

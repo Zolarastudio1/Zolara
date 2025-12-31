@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import PaymentDialog from "@/components/PaymentDialog";
+import { useSettings } from "@/context/SettingsContext";
 
 const ClientBookings = () => {
   const [bookings, setBookings] = useState<any[]>([]);
@@ -44,6 +45,7 @@ const ClientBookings = () => {
   const [requesting, setRequesting] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
 
+  const { settings } = useSettings();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -291,19 +293,21 @@ const ClientBookings = () => {
                   value={paymentMethod}
                   onValueChange={(value) =>
                     setPaymentMethod(
-                      value as "cash" | "card" | "momo" | "bank_transfer"
-                    )
+                        value as "cash" | "card" | "momo" | "bank_transfer"
+                      )
                   }
                 >
                   <SelectTrigger id="payment-method">
                     <SelectValue placeholder="Select payment method" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="card">Card (Paystack)</SelectItem>
-                    <SelectItem value="momo">Mobile Money</SelectItem>
-                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                  </SelectContent>
+                    <SelectContent>
+                      {/* Render only enabled payment methods from settings */}
+                        {settings?.payment_methods?.filter((m) => m.enabled).map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
                 </Select>
               </div>
 

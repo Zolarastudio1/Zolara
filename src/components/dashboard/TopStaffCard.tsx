@@ -56,7 +56,7 @@ export const TopStaffCard = ({ data, title = "Top Performing Staff", subtitle }:
       </CardHeader>
       <CardContent className="space-y-3">
         {data.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">No staff data available</p>
+          <p className="text-sm text-muted-foreground text-center py-4">No activity yet</p>
         ) : (
           data.slice(0, 5).map((staff, index) => (
             <motion.div

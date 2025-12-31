@@ -12,6 +12,7 @@ import PublicBooking from "./pages/PublicBooking";
 import DashboardLayout from "./components/layout/DashboardLayout";
 import AdminLayout from "./components/layout/AdminLayout";
 import StaffLayout from "./components/layout/StaffLayout";
+import ReceptionistLayout from "./components/layout/ReceptionistLayout";
 import ClientLayout from "./components/layout/ClientLayout";
 
 import Dashboard from "./pages/Admin/Dashboard";
@@ -25,6 +26,7 @@ import NotFound from "./pages/Admin/NotFound";
 import Attendance from "./pages/Admin/Attendance";
 import AttendanceReports from "./pages/Admin/AttendanceReports";
 import Checkout from "./pages/Admin/Checkout";
+import GiftCards from "./pages/Admin/GiftCards";
 
 import StaffBookings from "./pages/Staff/StaffBookings";
 import MyAttendance from "./pages/Staff/MyAttendance";
@@ -32,15 +34,17 @@ import MyAttendance from "./pages/Staff/MyAttendance";
 import ClientBookings from "./pages/Client/ClientBookings";
 import ViewServices from "./pages/Client/ViewServices";
 import SettingsPage from "./pages/Admin/Settings";
+import { CatalogProvider } from "./context/CatalogContext";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
+      <CatalogProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
         <Routes>
           {/* =================== PUBLIC ROUTES =================== */}
           {/* Public Landing Page */}
@@ -55,7 +59,7 @@ const App = () => (
           {/* =================== MANAGEMENT SYSTEM ROUTES =================== */}
           
           {/* OWNER (Manager) - Full Access */}
-          <Route element={<ProtectedRoute allowedRoles={["owner"]} />}>
+          <Route element={<ProtectedRoute allowedRoles={["owner", "admin"]} />}>
             <Route element={<DashboardLayout />}>
               <Route path="/app/admin/dashboard" element={<AdminLayout />} />
               <Route path="/app/admin/bookings" element={<Bookings />} />
@@ -68,6 +72,7 @@ const App = () => (
               <Route path="/app/admin/reports" element={<Reports />} />
               <Route path="/app/admin/attendance" element={<Attendance />} />
               <Route path="/app/admin/attendance-reports" element={<AttendanceReports />} />
+              <Route path="/app/admin/gift-cards" element={<GiftCards />} />
               <Route path="/app/admin/settings" element={<SettingsPage />} />
             </Route>
           </Route>
@@ -75,7 +80,7 @@ const App = () => (
           {/* RECEPTIONIST - Limited Access (daily operations) */}
           <Route element={<ProtectedRoute allowedRoles={["receptionist"]} />}>
             <Route element={<DashboardLayout />}>
-              <Route path="/app/receptionist/dashboard" element={<AdminLayout />} />
+              <Route path="/app/receptionist/dashboard" element={<ReceptionistLayout />} />
               <Route path="/app/receptionist/bookings" element={<Bookings />} />
               <Route path="/app/receptionist/clients" element={<Clients />} />
               <Route path="/app/receptionist/checkout" element={<Checkout />} />
@@ -118,7 +123,8 @@ const App = () => (
           {/* 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </BrowserRouter>
+        </BrowserRouter>
+      </CatalogProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

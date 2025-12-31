@@ -45,7 +45,7 @@ export const PaymentMethodChart = ({ data, title = "Payment Methods" }: PaymentM
       </CardHeader>
       <CardContent className="space-y-3">
         {data.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">No payment data</p>
+          <p className="text-sm text-muted-foreground text-center py-4">No activity yet</p>
         ) : (
           data.map((item, index) => (
             <motion.div

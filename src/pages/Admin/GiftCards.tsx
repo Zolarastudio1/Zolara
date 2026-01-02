@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
 import { fetchGiftCards, importGiftCards, checkExistingGiftCards, voidGiftCard, expireGiftCard, deleteGiftCard } from "@/lib/useGiftCards";
+import type { GiftCard } from "@/lib/useGiftCards";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { GiftCardItem } from "@/components/giftcards/GiftCardItem";
+import { EditGiftCardDialog } from "@/components/giftcards/EditGiftCardDialog";
+import { Search, Download, Upload, Plus, RefreshCw } from "lucide-react";
 
 const CODE_REGEX = /^ZLR-(\d{4})-(SLV|GLD|PLT|DMD)-B(\d{2})-([A-Z0-9]{6})$/;
 
@@ -30,10 +34,15 @@ const GiftCards = () => {
   const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
   const [importing, setImporting] = useState(false);
 
-  const [list, setList] = useState<any[]>([]);
+  const [list, setList] = useState<GiftCard[]>([]);
   const [loadingList, setLoadingList] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [tierFilter, setTierFilter] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // Edit dialog
+  const [editCard, setEditCard] = useState<GiftCard | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   const fetchList = async () => {
     setLoadingList(true);
@@ -57,7 +66,6 @@ const GiftCards = () => {
     if (!file) return;
     setFileName(file.name);
 
-    // CSV
     if (file.name.toLowerCase().endsWith(".csv")) {
       const text = await file.text();
       const lines = text.split(/\r?\n/).filter(Boolean);
@@ -78,7 +86,6 @@ const GiftCards = () => {
       return;
     }
 
-    // Excel
     try {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: "array" });
@@ -97,6 +104,7 @@ const GiftCards = () => {
   const [genYear, setGenYear] = useState<number>(new Date().getFullYear());
   const [genBatch, setGenBatch] = useState<string>("01");
   const [genValue, setGenValue] = useState<number>(50);
+  const [showGenerator, setShowGenerator] = useState(false);
 
   const randomSuffix = (len = 6) => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -134,15 +142,18 @@ const GiftCards = () => {
       });
     }
 
-    // Check DB collisions for these codes
     try {
       const codes = generated.map((r) => r.final_code);
       const { data: existing, error: existingErr } = await checkExistingGiftCards(codes);
       if (existingErr) throw existingErr;
       const existingSet = new Set((existing || []));
-      const marked: PreviewRow[] = generated.map((r) => ({ ...r, _valid: !existingSet.has(r.final_code), _message: existingSet.has(r.final_code) ? "collision" : r._message }));
+      const marked: PreviewRow[] = generated.map((r) => ({ 
+        ...r, 
+        _valid: !existingSet.has(r.final_code), 
+        _message: existingSet.has(r.final_code) ? "collision" : r._message 
+      }));
       setPreviewRows([...marked, ...previewRows]);
-      toast.success(`Generated ${generated.length} codes (collisions marked).`);
+      toast.success(`Generated ${generated.length} codes`);
     } catch (err: any) {
       console.error(err);
       toast.error("Failed to check collisions");
@@ -153,7 +164,7 @@ const GiftCards = () => {
   const commitGenerated = async () => {
     const rowsToImport = previewRows.filter((r) => r._message === "generated" || (r._valid && r.note === "(generated)"));
     if (rowsToImport.length === 0) {
-      toast.error("No generated rows to commit (remove any collisions first)");
+      toast.error("No generated rows to commit");
       return;
     }
     setImporting(true);
@@ -238,51 +249,17 @@ const GiftCards = () => {
       const res = await importGiftCards(toImport);
       if (res.error) throw res.error;
       setPreviewRows([]);
-      toast.success("Import finished. Check results below.");
-      console.debug("import result", res.data);
+      toast.success("Import finished");
       await fetchList();
     } catch (err: any) {
-      console.error("Import error", err);
+      console.error(err);
       toast.error(err.message || "Import failed");
     } finally {
       setImporting(false);
     }
   };
 
-  const voidCard = async (id: string) => {
-    const res = await voidGiftCard(id);
-    if (res.error) {
-      console.error(res.error);
-      toast.error("Failed to void card");
-      return;
-    }
-    toast.success("Card voided");
-    await fetchList();
-  };
-
-  const expireCard = async (id: string) => {
-    const res = await expireGiftCard(id);
-    if (res.error) {
-      console.error(res.error);
-      toast.error("Failed to expire card");
-      return;
-    }
-    toast.success("Card expired");
-    await fetchList();
-  };
-
-  const deleteCard = async (id: string) => {
-    const res = await deleteGiftCard(id);
-    if (res.error) {
-      console.error(res.error);
-      toast.error("Failed to delete card");
-      return;
-    }
-    toast.success("Card deleted");
-    await fetchList();
-  };
-
-  // Confirmation dialog state
+  // Confirmation dialog
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<"void" | "expire" | "delete" | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; code?: string } | null>(null);
@@ -324,55 +301,94 @@ const GiftCards = () => {
   };
 
   const exportList = () => {
-    const data = list
-      .filter((r) => (statusFilter === "all" ? true : r.status === statusFilter))
-      .filter((r) => (tierFilter ? r.tier === tierFilter : true));
+    const data = filteredList;
     const ws = XLSX.utils.json_to_sheet(data || []);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "gift_cards");
     XLSX.writeFile(wb, `gift_cards_export_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
+  const openEdit = (card: GiftCard) => {
+    setEditCard(card);
+    setEditOpen(true);
+  };
+
+  // Filtered list
+  const filteredList = list
+    .filter((r) => (statusFilter === 'all' ? true : r.status === statusFilter))
+    .filter((r) => (tierFilter ? r.tier === tierFilter : true))
+    .filter((r) => {
+      if (!searchQuery) return true;
+      const q = searchQuery.toLowerCase();
+      return r.final_code.toLowerCase().includes(q);
+    });
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Gift Cards</h1>
-        <p className="text-muted-foreground">Import and manage gift cards (Phase 1 import)</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Gift Cards</h1>
+          <p className="text-muted-foreground">Manage and import gift cards</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={fetchList} disabled={loadingList}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loadingList ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button variant="outline" onClick={exportList}>
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+        </div>
       </div>
 
+      {/* Import Section */}
       <Card>
-        <CardHeader>
-          <CardTitle>Import codes (CSV / XLSX)</CardTitle>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Import / Generate
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowGenerator(!showGenerator)}
+            >
+              {showGenerator ? "Hide Generator" : "Show Generator"}
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label>Upload file</Label>
+              <Label>Upload file (CSV / XLSX)</Label>
               <Input type="file" accept=".csv,.xlsx,.xls" onChange={(e) => handleFile(e.target.files?.[0])} />
-              <div className="mt-2 text-sm text-muted-foreground">Or paste CSV into the textarea below.</div>
             </div>
-            <div>
-              <Label>Preview / CSV fallback</Label>
-              <Textarea
-                placeholder={`final_code,tier,year,batch,card_value,expires_at\nZLR-2025-SLV-B01-ABC123,SLV,2025,B01,50,2026-01-01`}
-                value={""}
-                onChange={() => {}}
-                disabled
-              />
+            <div className="flex items-end gap-2">
+              <Button onClick={handleImport} disabled={importing || previewRows.filter(r => r._valid).length === 0}>
+                {importing ? "Importing..." : `Import ${previewRows.filter(r => r._valid).length} valid rows`}
+              </Button>
+              <Button variant="ghost" onClick={() => { setPreviewRows([]); setFileName(null); }}>
+                Clear
+              </Button>
             </div>
           </div>
 
-              <div className="mt-4">
-            <div className="mb-4 border rounded p-3 bg-muted">
-              <h4 className="font-semibold mb-2">Generate codes</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {showGenerator && (
+            <div className="border rounded-lg p-4 bg-muted/50 space-y-3">
+              <h4 className="font-semibold flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Generate Codes
+              </h4>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <div>
-                  <Label>Count</Label>
+                  <Label className="text-xs">Count</Label>
                   <Input type="number" value={genCount} min={1} onChange={(e) => setGenCount(Number(e.target.value))} />
                 </div>
                 <div>
-                  <Label>Tier</Label>
-                  <select value={genTier} onChange={(e) => setGenTier(e.target.value)} className="w-full rounded border px-2 py-1">
+                  <Label className="text-xs">Tier</Label>
+                  <select value={genTier} onChange={(e) => setGenTier(e.target.value)} className="w-full rounded border px-2 py-2 bg-background">
                     <option value="SLV">SLV</option>
                     <option value="GLD">GLD</option>
                     <option value="PLT">PLT</option>
@@ -380,111 +396,138 @@ const GiftCards = () => {
                   </select>
                 </div>
                 <div>
-                  <Label>Year</Label>
+                  <Label className="text-xs">Year</Label>
                   <Input type="number" value={genYear} onChange={(e) => setGenYear(Number(e.target.value))} />
                 </div>
                 <div>
-                  <Label>Batch</Label>
+                  <Label className="text-xs">Batch</Label>
                   <Input value={genBatch} onChange={(e) => setGenBatch(e.target.value)} />
                 </div>
                 <div>
-                  <Label>Value</Label>
+                  <Label className="text-xs">Value</Label>
                   <Input type="number" value={genValue} onChange={(e) => setGenValue(Number(e.target.value))} />
                 </div>
-                <div className="flex items-end">
-                  <div className="flex flex-wrap gap-2">
-                    <Button onClick={() => void generateCodes()}>Generate</Button>
-                    <Button variant="secondary" onClick={() => void commitGenerated()} disabled={importing}>Commit Generated</Button>
-                    <Button variant="ghost" onClick={() => { setPreviewRows([]); toast.success('Cleared preview'); }}>Clear Preview</Button>
-                  </div>
-                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => void generateCodes()}>Generate</Button>
+                <Button size="sm" variant="secondary" onClick={() => void commitGenerated()} disabled={importing}>
+                  Commit to DB
+                </Button>
               </div>
             </div>
+          )}
 
-            <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={handleImport} disabled={importing || previewRows.filter(r => r._valid).length === 0}>
-                {importing ? "Importing..." : `Import ${previewRows.filter(r => r._valid).length} valid rows`}
-              </Button>
-              <Button variant="ghost" onClick={() => { setPreviewRows([]); setFileName(null); }}>Clear Preview</Button>
-              <Button variant="outline" onClick={exportList} className="ml-auto w-full sm:w-auto">Export List</Button>
-            </div>
-
-            <div className="mt-4">
-              <h4 className="font-medium">Preview ({fileName || previewRows.length + ' rows'})</h4>
-              {previewRows.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No file parsed yet.</p>
-              ) : (
-                <div className="overflow-auto max-h-64 mt-2">
-                  <table className="w-full text-sm min-w-[700px]">
-                    <thead>
-                      <tr className="text-left">
-                        <th className="p-2">Code</th>
-                        <th className="p-2">Value</th>
-                        <th className="p-2">Tier</th>
-                        <th className="p-2">Batch</th>
-                        <th className="p-2">Year</th>
-                        <th className="p-2">Status</th>
+          {previewRows.length > 0 && (
+            <div className="border rounded-lg overflow-hidden">
+              <div className="bg-muted px-3 py-2 text-sm font-medium">
+                Preview: {fileName || `${previewRows.length} rows`}
+              </div>
+              <div className="overflow-auto max-h-48">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="p-2 text-left">Code</th>
+                      <th className="p-2 text-left">Value</th>
+                      <th className="p-2 text-left">Tier</th>
+                      <th className="p-2 text-left">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewRows.slice(0, 20).map((r, idx) => (
+                      <tr key={idx} className={`border-t ${r._valid ? '' : 'bg-destructive/10'}`}>
+                        <td className="p-2 font-mono text-xs">{r.final_code}</td>
+                        <td className="p-2">GH₵{Number(r.card_value || 0).toFixed(0)}</td>
+                        <td className="p-2">{r.tier}</td>
+                        <td className="p-2 text-xs text-muted-foreground">{r._message}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {previewRows.map((r, idx) => (
-                        <tr key={idx} className={`border-t ${r._valid ? '' : 'bg-red-50'}`}>
-                          <td className="p-2 monospace">{r.final_code}</td>
-                          <td className="p-2">GH₵ {Number(r.card_value || 0).toFixed(2)}</td>
-                          <td className="p-2">{r.tier}</td>
-                          <td className="p-2">{r.batch}</td>
-                          <td className="p-2">{r.year}</td>
-                          <td className="p-2 text-sm text-muted-foreground">{r._message}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                    ))}
+                    {previewRows.length > 20 && (
+                      <tr className="border-t">
+                        <td colSpan={4} className="p-2 text-center text-muted-foreground">
+                          ... and {previewRows.length - 20} more rows
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
+      {/* Manage Cards */}
       <Card>
-        <CardHeader>
-          <CardTitle>Manage Cards</CardTitle>
+        <CardHeader className="pb-3">
+          <CardTitle>Gift Cards ({filteredList.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-2 items-center mb-4">
-            <Label className="text-sm">Status</Label>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded border px-2 py-1">
-              <option value="all">All</option>
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3 mb-4">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by code..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="rounded border px-3 py-2 bg-background"
+            >
+              <option value="all">All Status</option>
               <option value="unused">Unused</option>
               <option value="redeemed">Redeemed</option>
               <option value="expired">Expired</option>
               <option value="void">Void</option>
             </select>
-            <Label className="text-sm">Tier</Label>
-            <input placeholder="Tier" value={tierFilter} onChange={(e) => setTierFilter(e.target.value)} className="rounded border px-2 py-1" />
-            <Button variant="ghost" onClick={() => { setStatusFilter('all'); setTierFilter(''); }}>Reset</Button>
+            <select
+              value={tierFilter}
+              onChange={(e) => setTierFilter(e.target.value)}
+              className="rounded border px-3 py-2 bg-background"
+            >
+              <option value="">All Tiers</option>
+              <option value="SLV">SLV</option>
+              <option value="GLD">GLD</option>
+              <option value="PLT">PLT</option>
+              <option value="DMD">DMD</option>
+            </select>
+            <Button variant="ghost" onClick={() => { setStatusFilter('all'); setTierFilter(''); setSearchQuery(''); }}>
+              Reset
+            </Button>
           </div>
 
-          <div className="space-y-2">
-            {loadingList && <div className="text-sm text-muted-foreground">Loading...</div>}
-            {list.filter((r) => (statusFilter==='all'?true:r.status===statusFilter)).filter((r)=> (tierFilter? r.tier===tierFilter : true)).map((c) => (
-              <div key={c.id} className="flex items-center justify-between p-3 bg-muted rounded">
-                <div>
-                  <div className="font-medium">{c.final_code} <span className="text-xs text-muted-foreground">{c.tier}</span></div>
-                  <div className="text-sm">Value: GH₵{Number(c.card_value).toFixed(2)} • Status: {c.status}</div>
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => navigator.clipboard?.writeText(c.final_code)}>Copy</Button>
-                  <Button size="sm" variant="secondary" onClick={() => openConfirm('expire', c.id, c.final_code)}>Expire</Button>
-                  <Button size="sm" variant="destructive" onClick={() => openConfirm('void', c.id, c.final_code)}>Void</Button>
-                  <Button size="sm" variant="ghost" onClick={() => openConfirm('delete', c.id, c.final_code)}>Delete</Button>
-                </div>
-              </div>
+          {/* List */}
+          <div className="space-y-3">
+            {loadingList && (
+              <div className="text-center py-8 text-muted-foreground">Loading gift cards...</div>
+            )}
+            {!loadingList && filteredList.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">No gift cards found</div>
+            )}
+            {filteredList.map((card) => (
+              <GiftCardItem
+                key={card.id}
+                card={card}
+                onEdit={openEdit}
+                onAction={openConfirm}
+              />
             ))}
-            {list.length === 0 && <div className="text-sm text-muted-foreground">No gift cards yet.</div>}
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Dialog */}
+      <EditGiftCardDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        giftCard={editCard}
+        onUpdated={fetchList}
+      />
+
       {/* Confirmation Dialog */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent className="max-w-md">
@@ -495,14 +538,16 @@ const GiftCards = () => {
               {confirmAction === 'delete' && 'Confirm Delete'}
             </DialogTitle>
             <DialogDescription>
-              {confirmAction === 'void' && `Are you sure you want to void ${confirmTarget?.code ?? confirmTarget?.id}? This cannot be undone.`}
-              {confirmAction === 'expire' && `Mark ${confirmTarget?.code ?? confirmTarget?.id} as expired?`}
-              {confirmAction === 'delete' && `Permanently delete ${confirmTarget?.code ?? confirmTarget?.id}? This action is irreversible.`}
+              {confirmAction === 'void' && `Are you sure you want to void ${confirmTarget?.code}? This cannot be undone.`}
+              {confirmAction === 'expire' && `Mark ${confirmTarget?.code} as expired?`}
+              {confirmAction === 'delete' && `Permanently delete ${confirmTarget?.code}? This action is irreversible.`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancel</Button>
-            <Button onClick={() => void handleConfirm()}>Confirm</Button>
+            <Button variant={confirmAction === 'delete' || confirmAction === 'void' ? 'destructive' : 'default'} onClick={() => void handleConfirm()}>
+              Confirm
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

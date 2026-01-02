@@ -140,8 +140,8 @@ const GiftCards = () => {
       const { data: existing, error: existingErr } = await checkExistingGiftCards(codes);
       if (existingErr) throw existingErr;
       const existingSet = new Set((existing || []));
-      const marked = generated.map((r) => ({ ...r, _valid: !existingSet.has(r.final_code), _message: existingSet.has(r.final_code) ? "collision" : r._message }));
-      setPreviewRows(marked.concat(previewRows));
+      const marked: PreviewRow[] = generated.map((r) => ({ ...r, _valid: !existingSet.has(r.final_code), _message: existingSet.has(r.final_code) ? "collision" : r._message }));
+      setPreviewRows([...marked, ...previewRows]);
       toast.success(`Generated ${generated.length} codes (collisions marked).`);
     } catch (err: any) {
       console.error(err);

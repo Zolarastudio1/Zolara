@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { validateGiftCard, redeemGiftCard as rpcRedeem } from "@/lib/useGiftCards";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -148,12 +149,7 @@ const Checkout = () => {
       console.error("Error fetching staff:", error);
     }
   };
-
-  // set default amount when booking loads
-  useEffect(() => {
-    if (booking?.services?.price) setAmount(String(booking.services.price));
-  }, [booking]);
-
+  
   const handleRedeemGiftCard = async () => {
     if (!booking) return;
     if (!giftCode || giftCode.trim() === "") {
@@ -167,12 +163,28 @@ const Checkout = () => {
 
     setRedeeming(true);
     try {
-      const { data, error } = await (supabase as any).rpc("rpc_redeem_gift_card", {
-        p_code: giftCode.trim(),
-        p_booking_id: booking.id,
-        p_client_id: booking.clients?.id,
-        p_staff_id: selectedStaff,
-        p_service_ids: [booking.services.id],
+      // Validate server-side first
+      const { data: valData, error: valError } = await validateGiftCard(giftCode.trim());
+      if (valError) {
+        console.error("validateGiftCard error", valError);
+        toast.error(valError.message || "Failed to validate gift card");
+        setRedeeming(false);
+        return;
+      }
+
+      const validation = Array.isArray(valData) ? valData[0] : valData;
+      if (!validation?.valid) {
+        toast.error(validation?.message || "Gift card is not valid");
+        setRedeeming(false);
+        return;
+      }
+
+      const { data, error } = await rpcRedeem({
+        code: giftCode.trim(),
+        booking_id: booking.id,
+        client_id: booking.clients?.id ?? null,
+        staff_id: selectedStaff,
+        service_ids: [booking.services.id],
       } as any);
 
       if (error) throw error;
@@ -184,7 +196,7 @@ const Checkout = () => {
         // reduce amount (do not go below 0)
         const newAmount = Math.max(0, (booking.services.price || 0) - value);
         setAmount(String(newAmount.toFixed(2)));
-        toast.success(`Gift card applied: GH₵ ${value.toFixed(2)}`);
+        toast.success(res.message || `Gift card applied: GH₵ ${value.toFixed(2)}`);
       } else {
         toast.error(res?.message || "Failed to redeem gift card");
       }

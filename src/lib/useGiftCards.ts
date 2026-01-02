@@ -70,14 +70,60 @@ export async function importGiftCards(rows: Record<string, any>[]) {
 /**
  * Redeem a gift card via RPC. Returns { data, error }. data is the rpc_redeem_gift_card return table.
  */
-export async function redeemGiftCard(code: string, bookingId: string | null, clientId: string | null, staffId: string | null, serviceIds?: string[] | null) {
+export async function redeemGiftCard(...args: any[]) {
   try {
-    // Supabase RPC positional parameters map to the function signature
-    const { data, error } = await (supabase as any).rpc("rpc_redeem_gift_card", [code, bookingId, clientId, staffId, serviceIds || null]);
+    // Support either positional args or a single named-object param.
+    // Positional: (code, bookingId, clientId, staffId, serviceIds)
+    // Named: { code, booking_id, client_id, staff_id, service_ids }
+    let code: string | undefined;
+    let bookingId: string | null = null;
+    let clientId: string | null = null;
+    let staffId: string | null = null;
+    let serviceIds: string[] | null = null;
+
+    if (args.length === 1 && typeof args[0] === "object" && args[0] !== null) {
+      const p = args[0];
+      code = p.code ?? p.p_code ?? p.pCode;
+      bookingId = p.booking_id ?? p.bookingId ?? p.p_booking_id ?? null;
+      clientId = p.client_id ?? p.clientId ?? p.p_client_id ?? null;
+      staffId = p.staff_id ?? p.staffId ?? p.p_staff_id ?? null;
+      serviceIds = p.service_ids ?? p.serviceIds ?? p.p_service_ids ?? null;
+    } else {
+      code = args[0];
+      bookingId = args[1] ?? null;
+      clientId = args[2] ?? null;
+      staffId = args[3] ?? null;
+      serviceIds = args[4] ?? null;
+    }
+
+    if (!code) throw new Error("code is required");
+
+  // Use positional args array to avoid PostgREST named-object key mismatches across migration versions.
+  // Order: p_code, p_booking_id, p_client_id, p_staff_id, p_service_ids
+  const rpcArgs: any[] = [code, bookingId, clientId, staffId ?? null, serviceIds ?? null];
+
+  const { data, error } = await (supabase as any).rpc("rpc_redeem_gift_card", rpcArgs as any);
     if (error) throw error;
     return { data: data || [], error: null };
   } catch (error: any) {
     return { data: [], error };
+  }
+}
+
+/**
+ * Validate a gift card code using the defensive RPC. Returns { data, error } where data is the rpc_validate_gift_card return table
+ */
+export async function validateGiftCard(code: string) {
+  try {
+    if (!code) return { data: null, error: new Error("code required") };
+  // Use positional args for validate RPC to avoid object-key mismatches: (p_code, p_service_id)
+  const { data, error } = await (supabase as any).rpc("rpc_validate_gift_card", [code] as any);
+    if (error) throw error;
+    // rpc_validate_gift_card returns TABLE(valid boolean, message text, gift_card jsonb)
+    const row = Array.isArray(data) ? data[0] : data;
+    return { data: row || null, error: null };
+  } catch (err: any) {
+    return { data: null, error: err };
   }
 }
 

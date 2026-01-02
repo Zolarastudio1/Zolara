@@ -250,8 +250,8 @@ const LandingPage = () => {
                   <div>
                     <p className="font-medium text-foreground">Open Hours</p>
                     <p className="text-sm text-muted-foreground">
-                      {(settings as any).opening_time || "8:30 AM"} -{" "}
-                      {(settings as any).closing_time || "20:30 PM"}
+                      {(settings as any).open_time || "8:30 AM"} -{" "}
+                      {(settings as any).close_time || "21:00 PM"}
                     </p>
                   </div>
                 </div>
@@ -514,8 +514,8 @@ const LandingPage = () => {
               <h4 className="font-semibold mb-4 text-champagne">Hours</h4>
               <ul className="space-y-2 text-sm text-white/70">
                 <li>
-                  {(settings as any).open_time || "8:30 AM"} -{" "}
-                  {(settings as any).close_time || "20:30 PM"}
+                  {settings?.open_time || "8:30 AM"} -{" "}
+                  {settings.close_time || "21:00 PM"}
                 </li>
                 {/* <li>Saturday: {(settings as any).open_time || "9:00 AM"} - {(settings as any).close_time || "6:00 PM"}</li>
                 <li>Sunday: Closed</li> */}

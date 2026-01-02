@@ -125,10 +125,13 @@ export default function Attendance() {
       const lateFlag = isLate(record?.check_in, DEFAULT_SHIFT);
       const earlyFlag = record?.check_out ? isEarlyCheckout(record.check_out, DEFAULT_SHIFT) : false;
       const halfDay = isHalfDay(total);
-      let status: string;
-      if (!record) status = "Absent";
-      else if (!record.check_out) status = "Checked In";
-      else status = "Checked Out";
+  let status: string;
+  // Prefer explicit DB status when present (e.g. 'absent'),
+  // fall back to deriving from check_out presence.
+  if (!record) status = "Absent";
+  else if (record.status === 'absent') status = "Absent";
+  else if (!record.check_out) status = "Checked In";
+  else status = "Checked Out";
       if (status !== "Absent" && lateFlag) status = "Late";
       if (status !== "Absent" && halfDay) status = "Half-day";
 
@@ -159,7 +162,8 @@ export default function Attendance() {
           case "late":
             return r.lateFlag;
           case "absent":
-            return !r.record;
+            // Consider explicit absent records OR no record at all
+            return (r.record && r.record.status === 'absent') || !r.record;
           case "half_day":
             return r.halfDay;
           default:
@@ -171,8 +175,8 @@ export default function Attendance() {
   }, [rows, staffFilter, statusFilter]);
 
   const summary = useMemo(() => {
-    const present = rows.filter((r) => r.record).length;
-    const absent = rows.filter((r) => !r.record).length;
+    const present = rows.filter((r) => r.record && r.record.status !== 'absent').length;
+    const absent = rows.filter((r) => (r.record && r.record.status === 'absent') || !r.record).length;
     const late = rows.filter((r) => r.lateFlag).length;
     const totalHours = rows.reduce((acc, r) => acc + r.total, 0);
     return { present, absent, late, totalHours };

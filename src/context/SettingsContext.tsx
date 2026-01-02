@@ -6,7 +6,6 @@ import React, {
   useState,
   ReactNode,
 } from "react";
-import { toast } from "sonner";
 
 interface PaymentMethod {
   id: string;
@@ -18,18 +17,37 @@ interface Settings {
   logo_url: string;
   paystack_enabled: boolean;
   payment_methods: PaymentMethod[];
-  // add other fields you have
+  business_name: string;
+  open_time: string;
+  close_time: string;
+  currency: string;
+  staff_roles: string[];
+  service_categories: string[];
+  use_24_hour_format: boolean;
+  business_phone: string
+  business_email: string;
+  business_address: string;
 }
 
 const defaultSettings: Settings = {
   logo_url: "",
-  paystack_enabled: false,
+  paystack_enabled: true,
   payment_methods: [
     { id: "cash", name: "Cash", enabled: true },
     { id: "momo", name: "Mobile Money (MoMo)", enabled: true },
     { id: "card", name: "Card", enabled: true },
     { id: "bank_transfer", name: "Bank Transfer", enabled: true },
   ],
+  business_name: "",
+  open_time: "08:30",
+  close_time: "21:00",
+  currency: "GH₵",
+  staff_roles: ["Hairdresser", "Barber", "Receptionist"],
+  service_categories: ["Hair", "Nails", "Massage"],
+  use_24_hour_format: true,
+  business_phone: "",
+  business_email: "",
+  business_address: "",
 };
 
 interface SettingsContextType {
@@ -57,7 +75,7 @@ export const SettingsProvider = ({ children }: Props) => {
   const fetchSettings = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase //@ts-ignore
+      const { data, error } = await supabase  //@ts-ignore
         .from("settings")
         .select("*")
         .single();
@@ -68,13 +86,12 @@ export const SettingsProvider = ({ children }: Props) => {
         setSettings({
           ...defaultSettings,
           ...data,
-          payment_methods: //@ts-ignore
-            data.payment_methods || defaultSettings.payment_methods,
+          payment_methods:  //@ts-ignore
+            data.payment_methods ?? defaultSettings.payment_methods,
         });
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to load settings:", err);
-      // toast.error("Failed to load settings");
     } finally {
       setLoading(false);
     }

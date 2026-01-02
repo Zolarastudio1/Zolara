@@ -92,7 +92,9 @@ const AdminDashboard = () => {
     try {
       setLoading(true);
       const today = new Date();
-      const startOfToday = format(today, "yyyy-MM-dd");
+  const startOfToday = format(today, "yyyy-MM-dd");
+  const startOfTodayIso = startOfDay(today).toISOString();
+  const endOfTodayIso = endOfDay(today).toISOString();
       const periodStart = format(dateRange.start, "yyyy-MM-dd");
       const periodEnd = format(dateRange.end, "yyyy-MM-dd");
       const startOfThisWeek = format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
@@ -126,23 +128,26 @@ const AdminDashboard = () => {
       ] = await Promise.all([
         supabase.from("bookings").select("*").eq("appointment_date", startOfToday),
         supabase.from("bookings").select("*").gte("appointment_date", periodStart).lte("appointment_date", periodEnd),
-        supabase.from("payments").select("amount, payment_method").gte("payment_date", startOfToday),
-        supabase.from("payments").select("amount, payment_method").gte("payment_date", periodStart).lte("payment_date", periodEnd),
-        supabase.from("payments").select("amount").gte("payment_date", startOfThisWeek).lte("payment_date", endOfThisWeek),
-        supabase.from("payments").select("amount").eq("payment_status", "completed").gte("payment_date", startOfThisMonth).lte("payment_date", endOfThisMonth),
-        supabase.from("payments").select("amount").gte("payment_date", previousMonthStart).lte("payment_date", previousMonthEnd),
+  // Only consider completed payments when calculating revenue numbers
+  supabase.from("payments").select("amount, payment_method").eq("payment_status", "completed").gte("payment_date", startOfToday),
+  supabase.from("payments").select("amount, payment_method").eq("payment_status", "completed").gte("payment_date", periodStart).lte("payment_date", periodEnd),
+  supabase.from("payments").select("amount").eq("payment_status", "completed").gte("payment_date", startOfThisWeek).lte("payment_date", endOfThisWeek),
+  supabase.from("payments").select("amount").eq("payment_status", "completed").gte("payment_date", startOfThisMonth).lte("payment_date", endOfThisMonth),
+  supabase.from("payments").select("amount").eq("payment_status", "completed").gte("payment_date", previousMonthStart).lte("payment_date", previousMonthEnd),
         supabase.from("clients").select("*", { count: "exact" }),
         supabase.from("clients").select("*", { count: "exact" }).lte("created_at", previousMonthEnd),
         supabase.from("staff").select("*").eq("is_active", true),
         supabase.from("bookings").select("service_id, services(name)").gte("appointment_date", startOfThisMonth).lte("appointment_date", endOfThisMonth),
-        supabase.from("bookings").select("status").gte("created_at", startOfThisMonth),
+  // booking status distribution should reflect appointment dates in the month
+  supabase.from("bookings").select("status").gte("appointment_date", startOfThisMonth).lte("appointment_date", endOfThisMonth),
         supabase.from("bookings").select("*, services(name), clients(full_name)").order("created_at", { ascending: false }).limit(5),
-        supabase.from("payments").select("*, bookings(services(name))").order("payment_date", { ascending: false }).limit(5),
+  supabase.from("payments").select("*, bookings(services(name))").order("payment_date", { ascending: false }).limit(5),
         supabase.from("payments").select("amount, payment_date").gte("payment_date", format(subDays(today, 30), "yyyy-MM-dd")).eq("payment_status", "completed"),
         supabase.from("booking_requests").select("*", { count: "exact" }).eq("status", "pending"),
         supabase.from("bookings").select("*, services(name), clients(full_name)").gte("appointment_date", startOfToday).in("status", ["scheduled", "confirmed"]).order("appointment_date", { ascending: true }).order("appointment_time", { ascending: true }).limit(5),
         supabase.from("bookings").select("staff_id, staff(full_name, specialization), services(price)").gte("appointment_date", periodStart).lte("appointment_date", periodEnd).eq("status", "completed"),
-        supabase.from("attendance").select("staff_id").eq("created_at", startOfToday),
+        // fetch attendance for today by check_in timestamp range (not created_at equality)
+        supabase.from("attendance").select("staff_id").gte("check_in", startOfTodayIso).lte("check_in", endOfTodayIso),
       ]);
 
       // Calculate stats
@@ -273,7 +278,7 @@ const AdminDashboard = () => {
       })) || [];
 
       // Check for absent staff
-      const checkedInStaffIds = todayAttendanceRes.data?.map((a: any) => a.staff_id) || [];
+  const checkedInStaffIds = todayAttendanceRes.data?.map((a: any) => a.staff_id) || [];
       const allActiveStaff = staffRes.data || [];
       const absentStaffNames = allActiveStaff
         .filter((s: any) => !checkedInStaffIds.includes(s.id))

@@ -32,6 +32,7 @@ import {
   User,
 } from "lucide-react";
 import { useSettings } from "@/context/SettingsContext";
+import { normalizeTimeTo24, isTimeWithinRange } from "@/lib/time";
 import { z } from "zod";
 
 const bookingSchema = z.object({
@@ -95,6 +96,21 @@ const PublicBooking = () => {
         preferredTime,
         notes,
       });
+
+      // Normalize time to 24h and enforce operating hours if configured
+      const normalizedTime = normalizeTimeTo24(validated.preferredTime);
+      if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(normalizedTime)) {
+        throw new Error("Please enter a valid time in HH:mm format");
+      }
+
+      const open = (settings as any)?.open_time;
+      const close = (settings as any)?.close_time;
+      if (open && close && !isTimeWithinRange(normalizedTime, open, close)) {
+        throw new Error(`Preferred time must be within operating hours (${open} — ${close})`);
+      }
+
+      // use normalized value for insert
+      validated.preferredTime = normalizedTime;
 
       // Check if client exists
       const { data: existingClient } = await supabase

@@ -121,6 +121,16 @@ export async function addOffDay(staffId: string, offDate: string, reason?: strin
   }
 }
 
+export async function deleteOffDay(offDayId: string) {
+  try {
+    const { error } = await (supabase as any).from('staff_off_days').delete().eq('id', offDayId);
+    if (error) throw error;
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error };
+  }
+}
+
 export async function getOffDays(staffId: string) {
   try {
     const { data, error } = await (supabase as any).from('staff_off_days').select('*').eq('staff_id', staffId).order('off_date');

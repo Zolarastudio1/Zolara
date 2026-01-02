@@ -37,7 +37,9 @@ import {
   addOffDay,
   getOffDays,
   setStaffStatus,
+  deleteOffDay,
 } from "@/lib/staff";
+import { formatTo12Hour, timeToMinutes } from "@/lib/time";
 
 // Schema for validation
 const staffSchema = z.object({
@@ -941,21 +943,51 @@ const Staff = () => {
           <DialogHeader>
             <DialogTitle>Schedule & Off days for {selectedStaff?.full_name}</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <h4 className="font-medium mb-2">Working Hours (weekly)</h4>
-              <div className="space-y-2 max-h-48 overflow-auto p-2 border rounded">
-                {workingHours.length === 0 ? <div className="text-sm text-muted-foreground">No working hours</div> : workingHours.map((w: any) => (
-                  <div key={w.id} className="text-sm">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][w.day_of_week]}: {w.start_time} - {w.end_time}</div>
-                ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-4 bg-white/5 rounded-lg border">
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <h4 className="font-medium">Working Hours (weekly)</h4>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Shop hours: {(settings as any)?.open_time && (settings as any)?.close_time
+                      ? ((settings as any)?.use24HourFormat ? `${(settings as any).open_time} — ${(settings as any).close_time}` : `${formatTo12Hour((settings as any).open_time)} — ${formatTo12Hour((settings as any).close_time)}`)
+                      : ((settings as any)?.use24HourFormat ? '08:30 — 21:00' : '8:30 AM — 9:00 PM')}
+                  </p>
+                </div>
               </div>
-              <form className="mt-2 flex gap-2" onSubmit={async (e) => {
+
+              <div className="space-y-2 max-h-48 overflow-auto p-2 border rounded mb-3 bg-white/3">
+                {workingHours.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">No working hours set for this staff.</div>
+                ) : (
+                  workingHours.map((w: any) => (
+                    <div key={w.id} className="flex items-center justify-between text-sm py-1">
+                      <div className="truncate">
+                        <strong className="inline-block w-14">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][w.day_of_week]}</strong>
+                        <span className="ml-2">{(settings as any)?.use24HourFormat ? `${w.start_time} - ${w.end_time}` : `${formatTo12Hour(w.start_time)} - ${formatTo12Hour(w.end_time)}`}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <form className="space-y-2" onSubmit={async (e) => {
                 e.preventDefault();
                 if (!selectedStaff) return;
                 const f = new FormData(e.currentTarget as HTMLFormElement);
                 const day = Number(f.get('day'));
                 const start = String(f.get('start'));
                 const end = String(f.get('end'));
+                // Validate time format
+                if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(start) || !/^([01]\d|2[0-3]):([0-5]\d)$/.test(end)) {
+                  toast.error('Please enter valid times using the time picker (HH:mm)');
+                  return;
+                }
+                // Ensure end is after start
+                if (timeToMinutes(end) <= timeToMinutes(start)) {
+                  toast.error('End time must be later than start time');
+                  return;
+                }
                 const res = await addWorkingHours(selectedStaff.id, day, start, end);
                 if (res.error) toast.error(res.error.message || 'Failed to add hours');
                 else {
@@ -963,30 +995,68 @@ const Staff = () => {
                   const wh = await getWorkingHours(selectedStaff.id);
                   if (!wh.error) setWorkingHours(wh.data || []);
                 }
+                // reset form fields
+                (e.currentTarget as HTMLFormElement).reset();
               }}>
-                <select name="day" className="rounded border px-2 py-1">
-                  <option value="1">Mon</option>
-                  <option value="2">Tue</option>
-                  <option value="3">Wed</option>
-                  <option value="4">Thu</option>
-                  <option value="5">Fri</option>
-                  <option value="6">Sat</option>
-                  <option value="0">Sun</option>
-                </select>
-                <input name="start" type="time" className="rounded border px-2 py-1" required />
-                <input name="end" type="time" className="rounded border px-2 py-1" required />
-                <Button type="submit">Add</Button>
+                <div className="grid grid-cols-3 gap-2">
+                  <select name="day" className="rounded border px-2 py-1 col-span-1">
+                    <option value="1">Mon</option>
+                    <option value="2">Tue</option>
+                    <option value="3">Wed</option>
+                    <option value="4">Thu</option>
+                    <option value="5">Fri</option>
+                    <option value="6">Sat</option>
+                    <option value="0">Sun</option>
+                  </select>
+                  <input name="start" type="time" className="rounded border px-2 py-1 col-span-1" required />
+                  <input name="end" type="time" className="rounded border px-2 py-1 col-span-1" required />
+                </div>
+                <div className="flex justify-end">
+                  <Button type="submit">Add Working Hours</Button>
+                </div>
               </form>
             </div>
 
-            <div>
-              <h4 className="font-medium mb-2">Off Days</h4>
-              <div className="space-y-2 max-h-48 overflow-auto p-2 border rounded">
-                {offDays.length === 0 ? <div className="text-sm text-muted-foreground">No off days</div> : offDays.map((d: any) => (
-                  <div key={d.id} className="text-sm">{d.off_date} {d.reason ? `— ${d.reason}` : ''}</div>
-                ))}
+            <div className="p-4 bg-white/5 rounded-lg border">
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <h4 className="font-medium">Off Days & Exceptions</h4>
+                  <p className="text-xs text-muted-foreground mt-1">Add temporary off days for this staff. Use the Delete action to remove mistakes.</p>
+                </div>
               </div>
-              <form className="mt-2 flex gap-2" onSubmit={async (e) => {
+
+              <div className="space-y-2 max-h-48 overflow-auto p-2 border rounded mb-3 bg-white/3">
+                {offDays.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">No off days recorded.</div>
+                ) : (
+                  offDays.map((d: any) => (
+                    <div key={d.id} className="flex items-center justify-between text-sm py-1">
+                      <div className="truncate">
+                        <div className="font-medium">{d.off_date}</div>
+                        {d.reason && <div className="text-xs text-muted-foreground">{d.reason}</div>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="ghost" onClick={async () => {
+                          if (!selectedStaff) return;
+                          const ok = confirm(`Delete off day ${d.off_date}?`);
+                          if (!ok) return;
+                          try {
+                            const del = await deleteOffDay(d.id);
+                            if (!del.success) throw del.error;
+                            toast.success('Off day deleted');
+                            const od = await getOffDays(selectedStaff.id);
+                            if (!od.error) setOffDays(od.data || []);
+                          } catch (err: any) {
+                            toast.error(err?.message || 'Failed to delete off day');
+                          }
+                        }}>Delete</Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <form className="space-y-2" onSubmit={async (e) => {
                 e.preventDefault();
                 if (!selectedStaff) return;
                 const f = new FormData(e.currentTarget as HTMLFormElement);
@@ -999,10 +1069,15 @@ const Staff = () => {
                   const od = await getOffDays(selectedStaff.id);
                   if (!od.error) setOffDays(od.data || []);
                 }
+                (e.currentTarget as HTMLFormElement).reset();
               }}>
-                <input name="date" type="date" className="rounded border px-2 py-1" required />
-                <input name="reason" placeholder="Reason" className="rounded border px-2 py-1" />
-                <Button type="submit">Add</Button>
+                <div className="grid grid-cols-2 gap-2">
+                  <input name="date" type="date" className="rounded border px-2 py-1" required />
+                  <input name="reason" placeholder="Reason (optional)" className="rounded border px-2 py-1" />
+                </div>
+                <div className="flex justify-end">
+                  <Button type="submit">Add Off Day</Button>
+                </div>
               </form>
             </div>
           </div>

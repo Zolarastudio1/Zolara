@@ -23,6 +23,9 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { format, isToday, parseISO, isAfter, startOfToday } from "date-fns";
 import { z } from "zod";
+import { useSettings } from "@/context/SettingsContext";
+import { normalizeTimeTo24, isTimeWithinRange, timeToMinutes, formatTo12Hour } from "@/lib/time";
+import { getOffDays, getWorkingHours } from "@/lib/staff";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { CollapsibleSearchBar } from "@/components/SearchBar";
@@ -44,6 +47,7 @@ const bookingSchema = z.object({
 });
 
 const Bookings = () => {
+  const { settings } = useSettings();
   const navigate = useNavigate();
   const location = useLocation();
   const [bookings, setBookings] = useState<any[]>([]);
@@ -84,11 +88,69 @@ const Bookings = () => {
     status: "scheduled",
     notes: "",
   });
+  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
 
   useEffect(() => {
     fetchData();
     fetchAllBookings();
   }, []);
+
+  // Generate available time slots based on shop hours and selected staff availability
+  useEffect(() => {
+    const open = (settings as any)?.open_time || "08:30";
+    const close = (settings as any)?.close_time || "21:00";
+    const step = 15; // minutes
+
+    const generateTimeOptions = (openT: string, closeT: string, stepMins = 15) => {
+      const startMin = timeToMinutes(openT);
+      const endMin = timeToMinutes(closeT);
+      if (isNaN(startMin) || isNaN(endMin) || endMin < startMin) return [];
+      const out: string[] = [];
+      for (let m = startMin; m <= endMin; m += stepMins) {
+        const hh = Math.floor(m / 60).toString().padStart(2, "0");
+        const mm = (m % 60).toString().padStart(2, "0");
+        out.push(`${hh}:${mm}`);
+      }
+      return out;
+    };
+
+    const baseOptions = generateTimeOptions(open, close, step);
+
+    if (!formData.staff_id) {
+      setAvailableTimes(baseOptions);
+      return;
+    }
+
+    // If staff selected, filter by their working hours for the appointment day
+    (async () => {
+      try {
+        const whRes = await getWorkingHours(formData.staff_id);
+        const wh = whRes.data || [];
+        if (!wh || wh.length === 0) {
+          setAvailableTimes(baseOptions);
+          return;
+        }
+
+        const apptDay = formData.appointment_date ? new Date(formData.appointment_date).getDay() : null;
+        if (apptDay === null) {
+          setAvailableTimes(baseOptions);
+          return;
+        }
+
+        const daySlots = wh.filter((s: any) => Number(s.day_of_week) === apptDay);
+        if (!daySlots || daySlots.length === 0) {
+          // staff has no slots for that day — fall back to shop hours
+          setAvailableTimes(baseOptions);
+          return;
+        }
+
+        const filtered = baseOptions.filter((t) => daySlots.some((s: any) => isTimeWithinRange(t, s.start_time, s.end_time)));
+        setAvailableTimes(filtered);
+      } catch (err) {
+        setAvailableTimes(baseOptions);
+      }
+    })();
+  }, [settings, formData.staff_id, formData.appointment_date]);
 
   useEffect(() => {
     fetchBookings(page);
@@ -212,7 +274,81 @@ const Bookings = () => {
     e.preventDefault();
 
     try {
-      const validated = bookingSchema.parse(formData);
+      // Normalize appointment_time to 24h before validation
+      const normalized = { ...formData };
+      if (normalized.appointment_time) {
+        normalized.appointment_time = normalizeTimeTo24(normalized.appointment_time);
+      }
+
+      const validated = bookingSchema.parse(normalized);
+
+      // Server-side validation: call RPC to validate booking rules (defensive)
+      try {
+        const resp: any = await (supabase as any).rpc('rpc_validate_booking', {
+          p_staff_id: validated.staff_id || null,
+          p_appointment_date: validated.appointment_date,
+          p_appointment_time: validated.appointment_time,
+        });
+        const rpcData: any = resp?.data ?? resp; // supabase typings vary
+        if (rpcData) {
+          if (typeof rpcData === 'string' && rpcData.length > 0) throw new Error(rpcData);
+        }
+      } catch (err: any) {
+        // If RPC fails (not deployed) or returns error string, bubble up for user to see
+        throw err;
+      }
+
+      // Enforce operating hours from SettingsContext (if present)
+      const openTime = (settings as any)?.open_time || "08:30";
+      const closeTime = (settings as any)?.close_time || "21:00";
+      if (!isTimeWithinRange(validated.appointment_time, openTime, closeTime)) {
+        throw new Error(`Appointment time must be within operating hours (${openTime} — ${closeTime})`);
+      }
+
+      // If staff is assigned, enforce staff working hours for that day
+      if (validated.staff_id) {
+        try {
+          const whRes = await getWorkingHours(validated.staff_id);
+          const wh = whRes.data || [];
+          const apptDay = new Date(validated.appointment_date).getDay(); // 0-6
+          // If staff has no configured working hours, allow bookings during shop operating hours (openTime/closeTime already set above)
+          if (wh.length === 0) {
+            // already enforced shop hours above, so nothing more to do
+          } else {
+            const daySlots = wh.filter((s: any) => Number(s.day_of_week) === apptDay);
+            if (daySlots.length === 0) {
+              // No slots for that day; disallow unless shop hours allow it (we already enforced shop hours globally)
+              // We'll allow the booking if it fits shop hours (already checked above), otherwise reject earlier.
+            } else {
+              const withinAny = daySlots.some((s: any) => {
+                const start = s.start_time;
+                const end = s.end_time;
+                return isTimeWithinRange(validated.appointment_time, start, end);
+              });
+              if (!withinAny) {
+                throw new Error("Selected staff is not available at the chosen time");
+              }
+            }
+          }
+
+          // Additionally, check off-days for the staff
+          try {
+            const odRes = await getOffDays(validated.staff_id);
+            const ods = odRes.data || [];
+            const hasOff = ods.some((d: any) => d.off_date === validated.appointment_date);
+            if (hasOff) throw new Error("Selected staff is off on the chosen date");
+          } catch (err) {
+            // ignore off-day errors (non-fatal) — if getOffDays failed we don't block here
+          }
+          // Also ensure staff is active
+          const staffMember = staff.find((s: any) => s.id === validated.staff_id);
+          if (staffMember && staffMember.status && staffMember.status !== 'active') {
+            throw new Error('Selected staff is not active');
+          }
+        } catch (err: any) {
+          throw err;
+        }
+      }
 
       const bookingData = {
         client_id: validated.client_id,
@@ -600,11 +736,22 @@ const Bookings = () => {
                 </div>
                 <div>
                   <Label>Time</Label>
-                  <Input
-                    type="time"
-                    value={formData.appointment_time || ""}
-                    onChange={(e) => setFormData({ ...formData, appointment_time: e.target.value })}
-                  />
+                  <Select value={formData.appointment_time || ""} onValueChange={(value) => setFormData({ ...formData, appointment_time: value })}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableTimes.length === 0 ? (
+                        <SelectItem value="">No available times</SelectItem>
+                      ) : (
+                        availableTimes.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {(settings as any)?.use24HourFormat ? t : formatTo12Hour(t)}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 

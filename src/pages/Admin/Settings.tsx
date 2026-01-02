@@ -48,8 +48,8 @@ interface Settings {
 const defaultSettings: Settings = {
   business_name: "",
   logo_url: "",
-  open_time: "09:00",
-  close_time: "17:00",
+  open_time: "8:30",
+  close_time: "21:00",
   currency: "GH₵",
   staff_roles: ["Hairdresser", "Barber", "Receptionist"],
   service_categories: ["Hair", "Nails", "Massage"],

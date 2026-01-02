@@ -41,7 +41,7 @@ export function OperatingHoursSection({
         <div className="space-y-0.5">
           <Label>Time Format</Label>
           <p className="text-sm text-muted-foreground">
-            {use24HourFormat ? "24-hour format (08:30 — 20:30)" : "12-hour format (8:30 AM — 8:30 PM)"}
+            {use24HourFormat ? `24-hour format (${openTime} — ${closeTime})` : `12-hour format (${openTime} — ${convertTo12Hour(closeTime)})`}
           </p>
         </div>
         <Switch

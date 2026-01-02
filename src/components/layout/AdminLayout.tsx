@@ -65,6 +65,7 @@ const AdminDashboard = () => {
     bookingChangePercentage: 0,
     pendingBookings: 0,
     pendingRequests: 0,
+    pendingRevenue: 0,
   });
 
   const [revenueData, setRevenueData] = useState<{ name: string; revenue: number; bookings: number }[]>([]);
@@ -124,16 +125,18 @@ const AdminDashboard = () => {
         pendingRequestsRes,
         upcomingBookingsRes,
         staffBookingsRes,
+        completedBookingsPaymentsRes,
         todayAttendanceRes,
       ] = await Promise.all([
         supabase.from("bookings").select("*").eq("appointment_date", startOfToday),
         supabase.from("bookings").select("*").gte("appointment_date", periodStart).lte("appointment_date", periodEnd),
   // Only consider completed payments when calculating revenue numbers
-  supabase.from("payments").select("amount, payment_method").eq("payment_status", "completed").gte("payment_date", startOfToday),
-  supabase.from("payments").select("amount, payment_method").eq("payment_status", "completed").gte("payment_date", periodStart).lte("payment_date", periodEnd),
-  supabase.from("payments").select("amount").eq("payment_status", "completed").gte("payment_date", startOfThisWeek).lte("payment_date", endOfThisWeek),
-  supabase.from("payments").select("amount").eq("payment_status", "completed").gte("payment_date", startOfThisMonth).lte("payment_date", endOfThisMonth),
-  supabase.from("payments").select("amount").eq("payment_status", "completed").gte("payment_date", previousMonthStart).lte("payment_date", previousMonthEnd),
+    // Only consider payments that are completed and are for bookings marked completed
+    supabase.from("payments").select("amount, payment_method, bookings(status, appointment_date)").eq("payment_status", "completed").gte("payment_date", startOfToday).eq("bookings.status", "completed"),
+  supabase.from("payments").select("amount, payment_method, bookings(status, appointment_date)").eq("payment_status", "completed").gte("payment_date", periodStart).lte("payment_date", periodEnd).eq("bookings.status", "completed"),
+  supabase.from("payments").select("amount, bookings(status, appointment_date)").eq("payment_status", "completed").gte("payment_date", startOfThisWeek).lte("payment_date", endOfThisWeek).eq("bookings.status", "completed"),
+  supabase.from("payments").select("amount, bookings(status, appointment_date)").eq("payment_status", "completed").gte("payment_date", startOfThisMonth).lte("payment_date", endOfThisMonth).eq("bookings.status", "completed"),
+  supabase.from("payments").select("amount, bookings(status, appointment_date)").eq("payment_status", "completed").gte("payment_date", previousMonthStart).lte("payment_date", previousMonthEnd).eq("bookings.status", "completed"),
         supabase.from("clients").select("*", { count: "exact" }),
         supabase.from("clients").select("*", { count: "exact" }).lte("created_at", previousMonthEnd),
         supabase.from("staff").select("*").eq("is_active", true),
@@ -145,7 +148,9 @@ const AdminDashboard = () => {
         supabase.from("payments").select("amount, payment_date").gte("payment_date", format(subDays(today, 30), "yyyy-MM-dd")).eq("payment_status", "completed"),
         supabase.from("booking_requests").select("*", { count: "exact" }).eq("status", "pending"),
         supabase.from("bookings").select("*, services(name), clients(full_name)").gte("appointment_date", startOfToday).in("status", ["scheduled", "confirmed"]).order("appointment_date", { ascending: true }).order("appointment_time", { ascending: true }).limit(5),
-        supabase.from("bookings").select("staff_id, staff(full_name, specialization), services(price)").gte("appointment_date", periodStart).lte("appointment_date", periodEnd).eq("status", "completed"),
+    supabase.from("bookings").select("staff_id, staff(full_name, specialization), services(price), payments(amount, payment_status, payment_method)").gte("appointment_date", periodStart).lte("appointment_date", periodEnd).eq("status", "completed"),
+  // Fetch completed bookings with nested payments to compute pending revenue (completed but unpaid)
+  supabase.from("bookings").select("id, staff_id, services(price), payments(amount, payment_status, payment_method)").gte("appointment_date", periodStart).lte("appointment_date", periodEnd).eq("status", "completed"),
         // fetch attendance for today by check_in timestamp range (not created_at equality)
         supabase.from("attendance").select("staff_id").gte("check_in", startOfTodayIso).lte("check_in", endOfTodayIso),
       ]);
@@ -156,6 +161,18 @@ const AdminDashboard = () => {
       const weeklyRevenue = weeklyPaymentsRes.data?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
       const monthlyRevenue = monthlyPaymentsRes.data?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
       const previousMonthRevenue = previousMonthPaymentsRes.data?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+
+      // Pending revenue: bookings that are marked completed but have no completed payment recorded
+      const completedBookings = completedBookingsPaymentsRes.data || [];
+      const pendingRevenue = completedBookings.reduce((sum: number, b: any) => {
+        const payments: any[] = b.payments || [];
+        const hasCompletedPayment = payments.some((p) => p && p.payment_status === "completed" && p.payment_method);
+        if (!hasCompletedPayment) {
+          // treat full service price as pending (partial-pay scenarios can be refined later)
+          return sum + Number(b.services?.price || 0);
+        }
+        return sum;
+      }, 0);
 
       // Client growth calculation
       const totalClients = clientsRes.count || 0;
@@ -243,7 +260,7 @@ const AdminDashboard = () => {
             .filter((p: any) => enabledMethodIds.includes(p.method))
         : [];
 
-      // Top performing staff
+      // Top performing staff — attribute revenue only from completed payments tied to bookings
       const staffPerformance = staffBookingsRes.data?.reduce((acc: any, booking: any) => {
         if (!booking.staff_id || !booking.staff) return acc;
         const staffId = booking.staff_id;
@@ -257,7 +274,15 @@ const AdminDashboard = () => {
           };
         }
         acc[staffId].bookings += 1;
-        acc[staffId].revenue += Number(booking.services?.price || 0);
+        // Sum only completed payments with a payment_method to ensure accurate sales attribution
+        const payments: any[] = booking.payments || [];
+        const paidAmount = payments.reduce((s, p) => {
+          if (p && p.payment_status === "completed" && p.payment_method) {
+            return s + Number(p.amount || 0);
+          }
+          return s;
+        }, 0);
+        acc[staffId].revenue += paidAmount;
         return acc;
       }, {});
 
@@ -313,6 +338,7 @@ const AdminDashboard = () => {
         bookingChangePercentage: 0,
         pendingBookings,
         pendingRequests: pendingRequestsRes.count || 0,
+        pendingRevenue,
       });
 
       setRevenueData(revenueChartData);

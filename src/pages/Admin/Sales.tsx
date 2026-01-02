@@ -25,6 +25,7 @@ import { CSVLink } from "react-csv"; // For CSV export
 
 const SalesRevenue = () => {
   const [payments, setPayments] = useState<any[]>([]);
+  const [pendingRevenue, setPendingRevenue] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [filterMethod, setFilterMethod] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<
@@ -279,6 +280,46 @@ const SalesRevenue = () => {
       if (error) throw error;
 
       setPayments(data || []);
+      // compute pending revenue: completed bookings in the same range that lack a completed payment
+      try {
+        let bookingsQuery = supabase
+          .from("bookings")
+          .select("id, services(price), payments(amount, payment_status, payment_method), appointment_date")
+          .eq("status", "completed");
+
+        if (dateRange === "today") {
+          const today = format(new Date(), "yyyy-MM-dd");
+          bookingsQuery = bookingsQuery.eq("appointment_date", today);
+        } else if (dateRange === "week") {
+          const today = new Date();
+          const start = format(startOfWeek(today), "yyyy-MM-dd");
+          const end = format(endOfWeek(today), "yyyy-MM-dd");
+          bookingsQuery = bookingsQuery.gte("appointment_date", start).lte("appointment_date", end);
+        } else if (dateRange === "month") {
+          const today = new Date();
+          const start = format(startOfMonth(today), "yyyy-MM-dd");
+          const end = format(endOfMonth(today), "yyyy-MM-dd");
+          bookingsQuery = bookingsQuery.gte("appointment_date", start).lte("appointment_date", end);
+        } else if (dateRange === "custom") {
+          if (customStart) bookingsQuery = bookingsQuery.gte("appointment_date", customStart);
+          if (customEnd) bookingsQuery = bookingsQuery.lte("appointment_date", customEnd);
+        }
+
+        const { data: bookingsData, error: bError } = await bookingsQuery;
+        if (!bError) {
+          const pending = (bookingsData || []).reduce((sum: number, b: any) => {
+            const paymentsForBooking: any[] = b.payments || [];
+            const hasCompletedPayment = paymentsForBooking.some((p) => p && p.payment_status === "completed" && p.payment_method);
+            if (!hasCompletedPayment) {
+              return sum + Number(b.services?.price || 0);
+            }
+            return sum;
+          }, 0);
+          setPendingRevenue(pending);
+        }
+      } catch (err) {
+        console.error("Failed to compute pending revenue", err);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -291,17 +332,18 @@ const SalesRevenue = () => {
     ? payments.filter((p) => p.payment_method === filterMethod)
     : payments;
 
-  // Separate completed and pending payments
+  // Only treat payments as completed revenue when they are completed AND tied to a completed booking and have a payment_method
   const completedPayments = filteredPayments.filter(
-    (p) => p.payment_status === "completed"
+    (p) => p.payment_status === "completed" && p.payment_method && p.bookings?.status === "completed"
   );
   const pendingPayments = filteredPayments.filter(
     (p) => p.payment_status === "pending"
   );
 
   // Staff contribution to revenue (top earning staff this period)
+  // Attribute staff revenue only from completed payments tied to completed bookings and having a payment_method
   const staffContributions = Object.values(
-    filteredPayments.reduce((acc: any, p: any) => {
+    completedPayments.reduce((acc: any, p: any) => {
       const staffName = p.bookings?.staff?.full_name || "Unassigned";
       if (!acc[staffName]) acc[staffName] = { name: staffName, revenue: 0 };
       acc[staffName].revenue += Number(p.amount || 0);
@@ -310,8 +352,9 @@ const SalesRevenue = () => {
   ).sort((a: any, b: any) => b.revenue - a.revenue);
 
   // Revenue by service
+  // Revenue by service should also only include completed payments tied to completed bookings
   const serviceRevenue = Object.values(
-    filteredPayments.reduce((acc: any, p: any) => {
+    completedPayments.reduce((acc: any, p: any) => {
       const svc = p.bookings?.services?.name || "Unassigned";
       if (!acc[svc]) acc[svc] = { name: svc, revenue: 0 };
       acc[svc].revenue += Number(p.amount || 0);

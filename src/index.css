@@ -1,0 +1,182 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ---- CORE COLORS (Champagne Gold Luxury Palette) ---- */
+    /* Primary brand tones */
+    /* Champagne Gold - Primary */
+    --primary: 30 46% 68%; /* #D4AF89 */
+    --primary-foreground: 0 0% 100%;
+
+    /* Rich & alternative golds */
+    --rich-gold: 46 65% 52%; /* #D4AF37 */
+    --bright-gold: 44 90% 61%; /* #F4D03F */
+    --dark-goldenrod: 42 90% 38%; /* #B8860B */
+
+    /* Champagne variants */
+    --champagne: 30 46% 68%; /* #D4AF89 */
+    --champagne-foreground: 0 0% 100%;
+    --champagne-light: 36 45% 79%; /* #E6D5AC */
+    --champagne-dark: 32 32% 56%; /* #B8956A */
+
+    /* Core surface & text */
+    --background: 30 100% 97%; /* Alabaster #FFF8F0 */
+    --foreground: 38 34% 13%; /* Obsidian #2C2416 */
+
+    --card: 0 0% 100%;
+    --card-foreground: 38 34% 13%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 38 34% 13%;
+
+    /* Supporting colors */
+    --deep-navy: 230 30% 14%; /* #1A1A2E */
+    --coral-accent: 349 76% 59%; /* #E94560 */
+    --background-muted: 210 20% 98%; /* #F8F9FA */
+    --text-secondary: 210 14% 46%; /* #64748B */
+
+    /* STATUS COLORS */
+    --success: 154 73% 39%; /* #10B981 */
+    --error: 358 79% 56%; /* #EF4444 */
+    --warning: 36 92% 50%; /* #F59E0B */
+    --info: 214 86% 56%; /* #3B82F6 */
+
+    /* Gradient helpers */
+    --gradient-start: 40 100% 98%;
+    --gradient-mid: 35 80% 86%;
+    --gradient-end: 40 100% 98%;
+
+    /* Border & inputs */
+    --border: 210 20% 94%;
+    --input: 210 20% 94%;
+    --ring: 30 46% 68%;
+
+    /* Sidebar */
+    --sidebar-background: 230 20% 6%;
+    --sidebar-foreground: 0 0% 95%;
+
+    /* Chart colors */
+    --chart-1: 30 46% 68%; /* champagne */
+    --chart-2: 214 86% 56%; /* info / blue */
+    --chart-3: 154 73% 39%; /* success */
+    --chart-4: 280 70% 55%;
+    --chart-5: 349 76% 59%; /* coral */
+    --chart-6: 180 60% 45%;
+
+    --radius: 0.75rem;
+  }
+
+  /* ---- DARK MODE ---- */
+  .dark {
+    --background: 220 20% 8%;
+    --foreground: 40 33% 96%;
+
+    --card: 220 20% 12%;
+    --card-foreground: 40 33% 96%;
+
+    --popover: 220 20% 12%;
+    --popover-foreground: 40 33% 96%;
+
+    --primary: 38 70% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 15% 18%;
+    --secondary-foreground: 40 33% 96%;
+
+    --accent: 38 80% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --champagne: 38 45% 68%;
+    --champagne-foreground: 0 0% 100%;
+    --champagne-dark: 38 50% 45%;
+
+    --muted: 220 15% 18%;
+    --muted-foreground: 220 10% 60%;
+
+    --success-light: 152 60% 15%;
+    --warning-light: 38 92% 15%;
+    --info-light: 210 80% 15%;
+    --destructive-light: 0 72% 15%;
+
+    --border: 220 15% 22%;
+    --input: 220 15% 22%;
+    --ring: 38 70% 55%;
+
+    --sidebar-background: 220 20% 5%;
+    --sidebar-foreground: 40 33% 96%;
+    --sidebar-primary: 38 70% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 38 65% 45%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 220 15% 15%;
+    --sidebar-ring: 38 70% 55%;
+
+    --chart-1: 38 70% 55%;
+    --chart-2: 210 80% 55%;
+    --chart-3: 152 60% 45%;
+    --chart-4: 280 70% 55%;
+    --chart-5: 0 70% 55%;
+    --chart-6: 180 60% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', serif;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-xl border border-border/50 shadow-lg;
+  }
+  
+  .gradient-gold {
+    background: linear-gradient(135deg, hsl(var(--gradient-gold-start)), hsl(var(--gradient-gold-end)));
+  }
+  
+  .gradient-purple {
+    background: linear-gradient(135deg, hsl(var(--gradient-purple-start)), hsl(var(--gradient-purple-end)));
+  }
+  
+  .gradient-blue {
+    background: linear-gradient(135deg, hsl(var(--gradient-blue-start)), hsl(var(--gradient-blue-end)));
+  }
+  
+  .gradient-green {
+    background: linear-gradient(135deg, hsl(var(--gradient-green-start)), hsl(var(--gradient-green-end)));
+  }
+
+  .stat-card-shadow {
+    box-shadow: 0 4px 24px -4px hsl(var(--primary) / 0.15);
+  }
+
+  /* Luxury glassmorphism helper (per design spec) */
+  .luxury-glass {
+    background: rgba(212, 175, 137, 0.15); /* Champagne Gold tint */
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(212, 175, 137, 0.3);
+  }
+
+  /* Luxury shadow presets */
+  .luxury-shadow {
+    box-shadow: 0 8px 32px 0 rgba(197, 160, 89, 0.15);
+  }
+
+  .chart-glow {
+    filter: drop-shadow(0 0 8px hsl(var(--primary) / 0.3));
+  }
+}

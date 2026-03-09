@@ -1,0 +1,177 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const ALLOWED_ROLES = ["client", "staff", "receptionist", "owner"] as const;
+type Role = typeof ALLOWED_ROLES[number];
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "https://www.zolarasalon.com",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+Deno.serve(async (req) => {
+  try {
+    // ───────────────── CORS / METHOD ─────────────────
+    if (req.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: corsHeaders });
+    }
+
+    if (req.method !== "POST") {
+      return new Response(
+        JSON.stringify({ error: "Method not allowed" }),
+        { status: 405, headers: corsHeaders }
+      );
+    }
+
+
+    // ───────────────── BODY PARSE ─────────────────
+    let body: any;
+    try {
+      body = await req.json();
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON body" }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    const email = body.email?.trim();
+    const full_name = body.full_name?.trim();
+    const role: Role = body.role;
+    const auth = typeof body.auth === "boolean" ? body.auth : false;
+    const password: string | undefined = body?.password;
+
+    // ───────────────── VALIDATION ─────────────────
+    if (!email || !full_name || !ALLOWED_ROLES.includes(role)) {
+      return new Response(
+        JSON.stringify({ error: "Missing or invalid fields" }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    if (auth && !password) {
+      return new Response(
+        JSON.stringify({ error: "Password is required for signup" }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    // ───────────────── SUPABASE CLIENT ─────────────────
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // ───────────────── AUTH USER CREATE ─────────────────
+    const { data: authData, error: authError } =
+      await supabase.auth.admin.createUser({
+        email,
+        ...(!auth ? { email_confirm: true } : {}),
+        ...(auth && password ? { password } : {}),
+        user_metadata: {
+          full_name,
+          role,
+          phone: body.phone?.trim() ?? "",
+          address: body.address?.trim() ?? "",
+          notes: body.notes?.trim() ?? "",
+          image: body.image?.trim() ?? "",
+          specialization: body.specialization?.trim() ?? "",
+          emergency_contact: body.emergency_contact?.trim() ?? "",
+          is_active: body.is_active ?? true,
+        },
+      });
+
+    if (authError || !authData?.user) {
+      throw new Error("AUTH_USER_CREATION_FAILED");
+    }
+
+    const userId = authData.user.id;
+
+    // ───────────────── PROFILES INSERT ─────────────────
+    const { error: profileError } = await supabase.from("profiles").insert({
+      id: userId,
+      email,
+      full_name,
+      phone: body.phone ?? "",
+    });
+
+    if (profileError) {
+      throw new Error("PROFILE_INSERT_FAILED");
+    }
+
+    // ───────────────── USER ROLE INSERT ─────────────────
+    const { error: roleError } = await supabase
+      .from("user_roles")
+      .insert({ user_id: userId, role });
+
+    if (roleError) {
+      throw new Error("ROLE_INSERT_FAILED");
+    }
+
+    // ───────────────── ROLE-SPECIFIC INSERTS ─────────────────
+    if (role === "client") {
+
+      const { error } = await supabase.from("clients").insert({
+        id: userId,
+        email,
+        full_name,
+        phone: body.phone ?? "",
+        address: body.address ?? "",
+        notes: body.notes ?? "",
+        image: body.image ?? "",
+      });
+
+      if (error) {
+        throw new Error("Failed to create client");
+      }
+    }
+
+    if (role === "staff" || role === "receptionist") {
+      const { error } = await supabase.from("staff").insert({
+        id: userId,
+        email,
+        full_name,
+        phone: body.phone ?? "",
+        specialization: body.specialization ?? "",
+        is_active: body.is_active ?? true,
+        image: body.image ?? "",
+        emergency_contact: body.emergency_contact ?? "",
+      });
+
+      if (error) {
+        throw new Error("Failed to insert staff");
+      }
+    }
+
+    // ───────────────── RECOVERY EMAIL ─────────────────
+    if (!auth) {
+      try {
+        await supabase.auth.admin.generateLink({
+          type: "recovery",
+          email,
+        });
+        console.log("✅ Recovery email sent");
+      } catch (recoveryError) {
+        console.warn("⚠️ Recovery email failed", recoveryError);
+      }
+    }
+
+    // ───────────────── SUCCESS ─────────────────
+    console.log("🎉 User created successfully:", userId);
+
+    return new Response(
+      JSON.stringify({ success: true, userId }),
+      { status: 200, headers: corsHeaders }
+    );
+
+  } catch (err: any) {
+    console.error("Invite user failed", err);
+
+    return new Response(
+      JSON.stringify({
+        error: err?.message ?? "Failed to create user",
+      }),
+      { status: 500, headers: corsHeaders }
+    );
+  }
+});

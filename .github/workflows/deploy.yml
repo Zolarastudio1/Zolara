@@ -24,8 +24,8 @@ jobs:
     - name: Build project
       run: npm run build
       env:
-        VITE_SUPABASE_URL: https://ekvjnydomfresnkealpb.supabase.co
-        VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ctUK9R-mIEuCFQnCR_8A4A_2L68Nutd
+        VITE_SUPABASE_URL: https://tlepcrmwidzbkmkvmpdd.supabase.co
+        VITE_SUPABASE_PUBLISHABLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZXBjcm13aWR6Ymtta3ZtcGRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwMDU2NTcsImV4cCI6MjA4ODU4MTY1N30.7C1zVrszok4LWjB3mgRnSoftdq3UnSykQO41BcwXons
 
     - name: Deploy successful
       run: echo "✅ Build passed. Vercel is deploying automatically."

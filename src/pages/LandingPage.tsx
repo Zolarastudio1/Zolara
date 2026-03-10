@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Heart,
   X,
+  Menu,
 } from "lucide-react";
 import { useSettings } from "@/context/SettingsContext";
 import { SocialIcon } from "react-social-icons";
@@ -23,6 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 const LandingPage = () => {
   const { settings } = useSettings();
   const [testimonials, setTestimonials] = useState([]);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const services = [
     {
@@ -79,48 +81,57 @@ const LandingPage = () => {
               />
             </div>
             <span className="text-xl font-bold text-white">
-              {/* @ts-ignore */}
-              {settings?.business_name || "Zolara Beauty Studio"}
+              {(settings as any)?.business_name || "Zolara Beauty Studio"}
             </span>
           </div>
+
+          {/* Desktop links */}
           <div className="hidden md:flex items-center gap-6">
-            <a
-              href="#services"
-              className="text-white/80 hover:text-champagne transition-colors"
-            >
-              Services
-            </a>
-            <a
-              href="#gallery"
-              className="text-white/80 hover:text-champagne transition-colors"
-            >
-              Gallery
-            </a>
-            <a
-              href="#about"
-              className="text-white/80 hover:text-champagne transition-colors"
-            >
-              About
-            </a>
-            <a
-              href="#testimonials"
-              className="text-white/80 hover:text-champagne transition-colors"
-            >
-              Reviews
-            </a>
-            <a
-              href="#contact"
-              className="text-white/80 hover:text-champagne transition-colors"
-            >
-              Contact
-            </a>
+            {["#services", "#gallery", "#about", "#testimonials", "#contact"].map((href) => (
+              <a key={href} href={href} className="text-white/80 hover:text-champagne transition-colors capitalize">
+                {href.replace("#", "")}
+              </a>
+            ))}
           </div>
-          <Link to="/book">
-            <Button className="bg-champagne hover:bg-champagne-dark text-white">
-              Book Now
-            </Button>
-          </Link>
+
+          <div className="flex items-center gap-3">
+            <Link to="/book">
+              <Button className="bg-champagne hover:bg-champagne-dark text-white">
+                Book Now
+              </Button>
+            </Link>
+            {/* Mobile hamburger */}
+            <button
+              className="md:hidden text-white p-1"
+              onClick={() => setMobileMenuOpen((o) => !o)}
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
         </div>
+
+        {/* Mobile dropdown */}
+        {mobileMenuOpen && (
+          <div className="md:hidden bg-black/95 border-t border-champagne/20 px-4 py-4 flex flex-col gap-4">
+            {[
+              { href: "#services", label: "Services" },
+              { href: "#gallery", label: "Gallery" },
+              { href: "#about", label: "About" },
+              { href: "#testimonials", label: "Reviews" },
+              { href: "#contact", label: "Contact" },
+            ].map(({ href, label }) => (
+              <a
+                key={href}
+                href={href}
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-white/80 hover:text-champagne transition-colors text-base py-1"
+              >
+                {label}
+              </a>
+            ))}
+          </div>
+        )}
       </nav>
 
       {/* Hero Section */}

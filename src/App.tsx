@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Auth from "./pages/Auth";
 import LandingPage from "./pages/LandingPage";
 import PublicBooking from "./pages/PublicBooking";
+import BuyGiftCard from "./pages/Public/BuyGiftCard";
 
 import DashboardLayout from "./components/layout/DashboardLayout";
 import AdminLayout from "./components/layout/AdminLayout";
@@ -58,6 +59,7 @@ const App = () => (
           
           {/* Public Booking Page (no login required) */}
           <Route path="/book" element={<PublicBooking />} />
+          <Route path="/buy-gift-card" element={<BuyGiftCard />} />
           
           {/* Staff Login Page */}
           <Route path="/app/auth" element={<Auth />} />

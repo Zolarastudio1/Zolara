@@ -1,4 +1,4 @@
-# 🌟 Zolara Beauty Studio - Advanced Beauty Business Platform
+ # 🌟 Zolara Beauty Studio - Advanced Beauty Business Platform
 
 **Ghana's Most Technologically Advanced Beauty Studio Management System**
 

@@ -10,7 +10,7 @@ import { PermissionLevelsSection } from "@/components/settings/PermissionLevelsS
 import { DataManagementSection } from "@/components/settings/DataManagementSection";
 import { BackupRestoreSection } from "@/components/settings/BackupRestoreSection";
 import { Loader2 } from "lucide-react";
-import { GallerySettingsSection } from "@/components/settings/GallerySection";
+import { GallerySettingsSection } from "@/components/settings/GalllerySection";
 import { ReviewsSettingsSection } from "@/components/settings/ReviewsManagement";
 
 interface PaymentMethod {

@@ -3,9 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-// Support both key names - PUBLISHABLE_KEY is the new name, ANON_KEY is the old name
-const SUPABASE_PUBLISHABLE_KEY = 
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 
+const SUPABASE_PUBLISHABLE_KEY =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
   import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Import the supabase client like this:

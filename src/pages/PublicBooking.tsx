@@ -131,9 +131,14 @@ const PublicBooking = () => {
         .from("clients")
         .select("*")
         .eq("email", email);
+
+      console.log("Raw clients data:", existingClient, "Error:", error);
+
       if (error) throw error;
 
       let clientId: string | null = null;
+      console.log("Existing client", existingClient);
+
       // Create client if not found
       if (existingClient && existingClient.length > 0) {
         clientId = existingClient[0].id;
@@ -142,7 +147,7 @@ const PublicBooking = () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrdmpueWRvbWZyZXNua2VhbHBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2MjE1MjgsImV4cCI6MjA3ODE5NzUyOH0.9Yg5H0x4AFptSnGu7PRhMPL33z4cUuCJDBt4VlvuMQc`,
           },
           body: JSON.stringify({
             role: "client",

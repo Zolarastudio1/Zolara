@@ -63,6 +63,14 @@ const Reports = () => {
     const dt = new Date(year, month, day, hour, minute, second);
 
     if (isNaN(dt.getTime())) {
+      console.log("Invalid parsed date:", {
+        date,
+        time,
+        parts,
+        year,
+        month,
+        day,
+      });
       return "";
     }
 

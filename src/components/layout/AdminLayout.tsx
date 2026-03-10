@@ -120,6 +120,9 @@ const AdminDashboard = () => {
         59,
         999
       ).toISOString();
+
+      console.log("Start of day", todayStart);
+      console.log("End of day", todayEnd);
       const periodStart = format(dateRange.start, "yyyy-MM-dd");
       const periodEnd = format(dateRange.end, "yyyy-MM-dd");
       const startOfThisWeek = format(
@@ -427,6 +430,9 @@ const AdminDashboard = () => {
                 p.method === "gift_card" || enabledMethodIds.includes(p.method)
             )
         : [];
+
+      console.log("Payment method breakdown", paymentMethodBreakdown);
+
       // Top performing staff — attribute revenue only from completed payments tied to bookings
       const staffPerformance = staffBookingsRes.data?.reduce(
         (acc: any, booking: any) => {

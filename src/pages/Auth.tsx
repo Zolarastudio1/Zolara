@@ -160,6 +160,8 @@ const Auth = () => {
 
       // If role does not exist, create it
       const role = roleData?.role || metaDataRole;
+      console.log("User role:", role);
+
       // Save minimal user info
       const userData = { id: data.user.id, email: data.user.email, role };
       localStorage.setItem("user", JSON.stringify(userData));
@@ -257,12 +259,15 @@ const Auth = () => {
         password: validated.password,
         auth: true,
       };
+
+      console.log("Client data", clientData);
+
       const { data, error } = await supabase.functions.invoke("invite-user", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
+            "Content-Type": "application/json",
+            Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrdmpueWRvbWZyZXNua2VhbHBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2MjE1MjgsImV4cCI6MjA3ODE5NzUyOH0.9Yg5H0x4AFptSnGu7PRhMPL33z4cUuCJDBt4VlvuMQc`,
+          },
         body: JSON.stringify(clientData),
       });
 
@@ -338,7 +343,7 @@ const Auth = () => {
         className="min-h-screen flex items-center justify-center p-4 relative"
         style={{
           backgroundImage:
-            "url('https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg')",
+            "url('import.meta.env.VITE_SUPABASE_URL/storage/v1/object/public/avatars/logo_1764609621458.jpg')",
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
@@ -420,7 +425,7 @@ const Auth = () => {
       className="min-h-screen flex relative"
       style={{
         backgroundImage:
-          "url('https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg')",
+          "url('import.meta.env.VITE_SUPABASE_URL/storage/v1/object/public/avatars/logo_1764609621458.jpg')",
         backgroundSize: "cover",
         backgroundPosition: "center",
       }}
@@ -435,7 +440,7 @@ const Auth = () => {
             <img
               src={
                 settings.logo_url ||
-                "https://ekvjnydomfresnkealpb.supabase.co/storage/v1/object/public/avatars/logo_1764609621458.jpg"
+                "import.meta.env.VITE_SUPABASE_URL/storage/v1/object/public/avatars/logo_1764609621458.jpg"
               }
               className="w-full h-full object-cover"
               alt="Zolara Logo"

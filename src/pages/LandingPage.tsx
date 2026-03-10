@@ -49,20 +49,18 @@ const LandingPage = () => {
     fetchTestimonials();
   }, []);
 
-  const fetchTestimonials = async () => {  //@ts-ignore
-    const { data, error } = await supabase //@ts-ignore
+  const fetchTestimonials = async () => {
+    const { data, error } = await (supabase as any)
       .from("reviews")
       .select("*")
-      .eq("visible", true)
-
-    console.log("Reviews", data);
-    setTestimonials(data);
+      .eq("visible", true);
 
     if (error) {
       console.error("Failed to fetch reviews:", error);
       setTestimonials([]);
+      return;
     }
-  };
+    setTestimonials(data ?? []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -81,7 +79,7 @@ const LandingPage = () => {
               />
             </div>
             <span className="text-xl font-bold text-white">
-              {(settings as any)?.business_name || "Zolara Beauty Studio"}
+              {settings?.business_name || "Zolara Beauty Studio"}
             </span>
           </div>
 
@@ -157,7 +155,6 @@ const LandingPage = () => {
             />
           </div>
           <h1 className="text-5xl md:text-7xl font-bold text-white mb-4 tracking-tight">
-            {/* @ts-ignore */}
             {settings?.business_name || "Zolara Beauty Studio"}
           </h1>
           <p className="text-xl md:text-2xl text-champagne italic mb-8 flex items-center justify-center gap-2">
@@ -242,7 +239,6 @@ const LandingPage = () => {
                 About Us
               </h2>
               <p className="text-muted-foreground mb-4 leading-relaxed">
-                {/* @ts-ignore */}
                 {settings?.business_name || "Zolara Beauty Studio"} is a premier
                 beauty destination committed to providing exceptional services
                 in a relaxing and luxurious environment.
@@ -260,8 +256,8 @@ const LandingPage = () => {
                   <div>
                     <p className="font-medium text-foreground">Open Hours</p>
                     <p className="text-sm text-muted-foreground">
-                      {(settings as any).open_time || "8:30 AM"} -{" "}
-                      {(settings as any).close_time || "21:00 PM"}
+                      {settings.open_time || "8:30 AM"} -{" "}
+                      {settings.close_time || "21:00 PM"}
                     </p>
                   </div>
                 </div>
@@ -305,9 +301,7 @@ const LandingPage = () => {
             </p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {/* @ts-ignore */}
             {settings.gallery_images?.length > 0 &&
-              // @ts-ignore
               settings.gallery_images.map((src, index) => (
                 <div
                   key={index}
@@ -410,7 +404,6 @@ const LandingPage = () => {
                 </div>
                 <h3 className="font-semibold text-foreground mb-2">Location</h3>
                 <p className="text-muted-foreground text-sm">
-                  {/* @ts-ignore */}
                   {settings?.business_address || "Sakasaka, Opposite CalBank, Tamale"}
                 </p>
               </CardContent>
@@ -422,7 +415,6 @@ const LandingPage = () => {
                 </div>
                 <h3 className="font-semibold text-foreground mb-2">Phone</h3>
                 <p className="text-muted-foreground text-sm">
-                  {/* @ts-ignore */}
                   {settings?.business_phone || "+233249978750"}
                 </p>
               </CardContent>
@@ -434,7 +426,6 @@ const LandingPage = () => {
                 </div>
                 <h3 className="font-semibold text-foreground mb-2">Email</h3>
                 <p className="text-muted-foreground text-sm">
-                  {/* @ts-ignore */}
                   {settings?.business_email || "info@zolarasalon.com"}
                 </p>
               </CardContent>
@@ -471,7 +462,6 @@ const LandingPage = () => {
                   />
                 </div>
                 <span className="text-lg font-bold">
-                  {/* @ts-ignore */}
                   {settings?.business_name || "Zolara Beauty Studio Ltd"}
                 </span>
               </div>
@@ -539,7 +529,7 @@ const LandingPage = () => {
                   {settings?.open_time || "8:30 AM"} -{" "}
                   {settings.close_time || "21:00 PM"}
                 </li>
-                {/* <li>Saturday: {(settings as any).open_time || "9:00 AM"} - {(settings as any).close_time || "6:00 PM"}</li>
+                {/* <li>Saturday: {settings.open_time || "9:00 AM"} - {settings.close_time || "6:00 PM"}</li>
                 <li>Sunday: Closed</li> */}
               </ul>
             </div>
@@ -556,7 +546,7 @@ const LandingPage = () => {
           <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-white/50 text-sm">
               © {new Date().getFullYear()}{" "}
-              {(settings as any)?.business_name || "Zolara Beauty Studio"}. All
+              {settings?.business_name || "Zolara Beauty Studio"}. All
               rights reserved.
             </p>
             <div className="flex items-center gap-4">

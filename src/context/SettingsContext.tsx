@@ -27,6 +27,7 @@ interface Settings {
   business_phone: string;
   business_email: string;
   business_address: string;
+  gallery_images: string[];
 }
 
 const defaultSettings: Settings = {
@@ -48,6 +49,7 @@ const defaultSettings: Settings = {
   business_phone: "",
   business_email: "",
   business_address: "",
+  gallery_images: [],
 };
 
 type UserRole = string | null;

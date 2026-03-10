@@ -42,7 +42,7 @@ const ProtectedRoute = ({ allowedRoles }) => {
 
   // If no role or role not allowed → redirect to login
   if (!userRole || !allowedRoles.includes(userRole)) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/app/auth" replace />;
   }
 
   return <Outlet />;

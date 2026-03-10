@@ -33,6 +33,13 @@ import MyAttendance from "./pages/Staff/MyAttendance";
 import ClientBookings from "./pages/Client/ClientBookings";
 import ViewServices from "./pages/Client/ViewServices";
 import SettingsPage from "./pages/Admin/Settings";
+import Waitlist from "./pages/Admin/Waitlist";
+import Addons from "./pages/Admin/Addons";
+import PromoCodes from "./pages/Admin/PromoCodes";
+import ClientNotes from "./pages/Admin/ClientNotes";
+import SMSCampaigns from "./pages/Admin/SMSCampaigns";
+import Analytics from "./pages/Admin/Analytics";
+import Products from "./pages/Admin/Products";
 import { CatalogProvider } from "./context/CatalogContext";
 
 const queryClient = new QueryClient();
@@ -73,6 +80,13 @@ const App = () => (
               <Route path="/app/admin/attendance-reports" element={<AttendanceReports />} />
               <Route path="/app/admin/gift-cards" element={<GiftCards />} />
               <Route path="/app/admin/settings" element={<SettingsPage />} />
+              <Route path="/app/admin/waitlist" element={<Waitlist />} />
+              <Route path="/app/admin/addons" element={<Addons />} />
+              <Route path="/app/admin/promo-codes" element={<PromoCodes />} />
+              <Route path="/app/admin/client-notes" element={<ClientNotes />} />
+              <Route path="/app/admin/sms-campaigns" element={<SMSCampaigns />} />
+              <Route path="/app/admin/analytics" element={<Analytics />} />
+              <Route path="/app/admin/products" element={<Products />} />
             </Route>
           </Route>
 

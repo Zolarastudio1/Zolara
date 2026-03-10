@@ -256,8 +256,8 @@ const LandingPage = () => {
                   <div>
                     <p className="font-medium text-foreground">Open Hours</p>
                     <p className="text-sm text-muted-foreground">
-                      {settings.open_time || "8:30 AM"} -{" "}
-                      {settings.close_time || "21:00 PM"}
+                      {settings?.open_time || "08:30"} -{" "}
+                      {settings?.close_time || "21:00"}
                     </p>
                   </div>
                 </div>
@@ -300,9 +300,9 @@ const LandingPage = () => {
               Take a peek inside our beautiful salon and see our work.
             </p>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {settings.gallery_images?.length > 0 &&
-              settings.gallery_images.map((src, index) => (
+          {settings.gallery_images?.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {settings.gallery_images.map((src, index) => (
                 <div
                   key={index}
                   className="group relative overflow-hidden rounded-xl aspect-square"
@@ -317,7 +317,12 @@ const LandingPage = () => {
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300" />
                 </div>
               ))}
-          </div>
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-white/40 text-sm">Gallery coming soon. Follow us on Instagram for a preview.</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -526,8 +531,8 @@ const LandingPage = () => {
               <h4 className="font-semibold mb-4 text-champagne">Hours</h4>
               <ul className="space-y-2 text-sm text-white/70">
                 <li>
-                  {settings?.open_time || "8:30 AM"} -{" "}
-                  {settings.close_time || "21:00 PM"}
+                  {settings?.open_time || "08:30"} -{" "}
+                  {settings?.close_time || "21:00"}
                 </li>
                 {/* <li>Saturday: {settings.open_time || "9:00 AM"} - {settings.close_time || "6:00 PM"}</li>
                 <li>Sunday: Closed</li> */}

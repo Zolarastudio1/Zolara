@@ -61,6 +61,7 @@ const LandingPage = () => {
       return;
     }
     setTestimonials(data ?? []);
+  };
 
   return (
     <div className="min-h-screen bg-background">

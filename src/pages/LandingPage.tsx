@@ -19,7 +19,6 @@ import { useSettings } from "@/context/SettingsContext";
 import { SocialIcon } from "react-social-icons";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ReviewsCardSection } from "@/components/ReviewsCardSection";
 
 const LandingPage = () => {
   const { settings } = useSettings();
@@ -367,7 +366,19 @@ const LandingPage = () => {
           </div>
         </section>
       )}
-      <ReviewsCardSection />
+      {/* Leave a Review CTA */}
+      <section className="py-12 bg-black text-white text-center border-t border-white/10">
+        <p className="text-white/60 text-sm mb-3">Had a great experience? We'd love to hear from you.</p>
+        <a
+          href="https://www.google.com/maps/search/?api=1&query=Zolara+Beauty+Studio+Tamale"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 bg-champagne hover:bg-champagne/90 text-white text-sm font-semibold px-6 py-3 rounded-full transition-colors"
+        >
+          <Star className="w-4 h-4 fill-white" />
+          Leave Us a Review
+        </a>
+      </section>
 
       {/* Contact Section */}
       <section id="contact" className="py-20 bg-secondary">

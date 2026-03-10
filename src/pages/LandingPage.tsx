@@ -46,7 +46,7 @@ const LandingPage = () => {
 
   useEffect(() => {
     fetchTestimonials();
-  });
+  }, []);
 
   const fetchTestimonials = async () => {  //@ts-ignore
     const { data, error } = await supabase //@ts-ignore

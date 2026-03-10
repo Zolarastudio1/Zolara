@@ -320,7 +320,6 @@ const Staff = () => {
         if (error) {
           console.error("Edge function error:", error);
         } else {
-          console.log("User created:", data);
           toast.success("Staff added successfully");
         }
       }

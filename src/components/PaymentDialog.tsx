@@ -37,7 +37,6 @@ export default function PaymentDialog({
   booking,
   onPaymentComplete,
 }: PaymentDialogProps) {
-  console.log(booking);
   const [loading, setLoading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
 

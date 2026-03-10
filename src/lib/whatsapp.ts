@@ -143,7 +143,6 @@ export const whatsAppService = {
   async sendViaWhatsAppAPI(phoneNumber: string, message: string, messageType: 'text' | 'template') {
     if (!WHATSAPP_ACCESS_TOKEN || !PHONE_NUMBER_ID) {
       // For development, simulate success
-      console.log('WhatsApp API not configured, simulating send:', { phoneNumber, message });
       return { 
         messages: [{ 
           id: 'sim_' + Date.now(),

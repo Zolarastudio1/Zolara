@@ -160,8 +160,6 @@ const Auth = () => {
 
       // If role does not exist, create it
       const role = roleData?.role || metaDataRole;
-      console.log("User role:", role);
-
       // Save minimal user info
       const userData = { id: data.user.id, email: data.user.email, role };
       localStorage.setItem("user", JSON.stringify(userData));
@@ -259,9 +257,6 @@ const Auth = () => {
         password: validated.password,
         auth: true,
       };
-
-      console.log("Client data", clientData);
-
       const { data, error } = await supabase.functions.invoke("invite-user", {
         method: "POST",
         headers: {

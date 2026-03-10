@@ -206,9 +206,6 @@ const StaffBookings = () => {
     };
     return colors[status] || "bg-muted text-muted-foreground";
   };
-
-  console.log(requestBookings);
-
   return (
     <div className="space-y-6 p-6">
       <div className="flex justify-between items-center">

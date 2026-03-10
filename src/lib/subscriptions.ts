@@ -417,8 +417,6 @@ export const subscriptionService = {
       const amount = subscription.subscription_plans.price;
       
       // In real implementation, this would call Hubtel, Paystack, etc.
-      console.log(`Charging subscription ${subscription.id}: GHS ${amount}`);
-      
       // Record payment transaction
       const { data: transaction, error } = await supabase
         .from('payment_transactions')

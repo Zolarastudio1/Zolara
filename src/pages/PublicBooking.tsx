@@ -147,7 +147,7 @@ const PublicBooking = () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrdmpueWRvbWZyZXNua2VhbHBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2MjE1MjgsImV4cCI6MjA3ODE5NzUyOH0.9Yg5H0x4AFptSnGu7PRhMPL33z4cUuCJDBt4VlvuMQc`,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
           body: JSON.stringify({
             role: "client",

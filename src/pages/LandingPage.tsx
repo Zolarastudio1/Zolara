@@ -239,14 +239,14 @@ const LandingPage = () => {
                 About Us
               </h2>
               <p className="text-muted-foreground mb-4 leading-relaxed">
-                {settings?.business_name || "Zolara Beauty Studio"} is a premier
-                beauty destination committed to providing exceptional services
-                in a relaxing and luxurious environment.
+                {settings?.business_name || "Zolara Beauty Studio"} is Tamale's
+                premium beauty destination. Located in Sakasaka, opposite CalBank,
+                we bring world-class beauty services to the heart of the Northern Region.
               </p>
               <p className="text-muted-foreground mb-6 leading-relaxed">
-                Our team of skilled professionals uses only the finest products
-                and techniques to ensure you leave feeling refreshed,
-                rejuvenated, and beautiful.
+                From precision braids and lash extensions to manicures, pedicures,
+                and makeup, our team of dedicated professionals ensures every visit
+                leaves you refreshed, confident, and beautiful.
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex items-center gap-3">
@@ -283,8 +283,8 @@ const LandingPage = () => {
                 className="rounded-2xl shadow-2xl"
               />
               <div className="absolute -bottom-6 -left-6 bg-champagne text-white p-6 rounded-xl shadow-xl">
-                <p className="text-3xl font-bold">10+</p>
-                <p className="text-sm">Years Experience</p>
+                <p className="text-3xl font-bold">7</p>
+                <p className="text-sm">Services Offered</p>
               </div>
             </div>
           </div>
